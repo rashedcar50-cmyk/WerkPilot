@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>WerkPilot Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root{--bg:#0b1220;--panel:#151f33;--panel2:#1d2940;--line:#334155;--text:#f8fafc;--muted:#94a3b8;--pri:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#b91c1c;--font:16px}
+*{box-sizing:border-box}
+html{font-size:var(--font)}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.login-screen{min-height:100vh;display:grid;place-items:center;padding:22px}
+.login-card{width:min(460px,100%);background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:26px;box-shadow:0 24px 70px #0007}
+.brand{font-size:2rem;font-weight:800}.tag{color:var(--muted);margin:6px 0 24px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-weight:700}
+input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#0f172a;color:var(--text)}
+textarea{min-height:100px;resize:vertical}
+.btn{border:0;border-radius:12px;padding:11px 15px;background:#334155;color:white;font-weight:700}
+.btn.primary{background:var(--pri)}.btn.ok{background:var(--ok)}.btn.warn{background:var(--warn)}.btn.bad{background:var(--bad)}.btn.ghost{background:transparent;border:1px solid var(--line)}
+.btn.small{padding:7px 10px;font-size:.9rem}.full{width:100%}
+.hint,.muted{color:var(--muted);font-size:.92rem}
+.shell{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.sidebar{background:#0f172a;border-left:1px solid var(--line);padding:18px;position:sticky;top:0;height:100vh;overflow:auto}
+.sidebrand{font-size:1.35rem;font-weight:800;margin-bottom:14px}
+.nav{display:flex;flex-direction:column;gap:7px}
+.nav button{background:transparent;color:var(--text);border:0;border-radius:10px;padding:10px 12px;text-align:right}
+.nav button.active,.nav button:hover{background:var(--panel2)}
+.main{min-width:0}
+.topbar{position:sticky;top:0;z-index:8;background:#0f172aee;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.content{padding:18px;max-width:1400px;margin:auto}
+.page-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.page-title h1{margin:0;font-size:1.7rem}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.metric{font-size:1.8rem;font-weight:800;margin-top:6px}
+.badge{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border-radius:999px;background:#1e293b;border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:#22c55e}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}
+table{width:100%;border-collapse:collapse;min-width:720px;background:var(--panel)}
+th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+th{background:#111827;position:sticky;top:0}
+.status{padding:4px 8px;border-radius:999px;background:#334155}.status.ok{background:#14532d}.status.warn{background:#78350f}
+.modal-back{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:18px;z-index:50}
+.modal{width:min(760px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.span2{grid-column:1/-1}
+.filebox{border:1px dashed #64748b;border-radius:12px;padding:12px;background:#0f172a}
+.ocr-preview{max-width:100%;max-height:220px;border-radius:10px;margin-top:10px}
+.progress{height:8px;background:#334155;border-radius:999px;overflow:hidden;margin:8px 0}.progress>div{height:100%;width:0;background:#3b82f6}
+.kpi-row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.mobile-menu{display:none}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#111827;border:1px solid var(--line);padding:10px 14px;border-radius:12px;z-index:100}
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}.sidebar{position:fixed;right:-280px;top:0;z-index:30;width:260px;transition:.2s}.sidebar.open{right:0}
+  .mobile-menu{display:inline-block}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){.grid,.form-grid{grid-template-columns:1fr}.span2{grid-column:auto}.hide-mobile{display:none}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modalRoot"></div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const storeKey='werkpilot_pro_v1';
+const seed={
+ users:[
+  {u:'admin',p:'1234',name:'المدير',role:'manager'},
+  {u:'accountant',p:'1234',name:'المحاسب',role:'accountant'},
+  {u:'mechanic',p:'1234',name:'الميكانيكي',role:'mechanic'},
+  {u:'warehouse',p:'1234',name:'أمين المستودع',role:'warehouse'}
+ ],
+ companies:[
+  {id:'de',name:'Auto Service',country:'DE',currency:'EUR',docLang:'de'},
+  {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
+ ],
+ customers:[],vehicles:[],repairs:[],estimates:[],invoices:[],purchases:[],inventory:[],
+ employees:[],expenses:[],journal:[],audit:[],
+ settings:{theme:'dark',font:16,uiLang:'ar'}
+};
+let db=load(), session=null;
+
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function load(){try{return {...clone(seed),...JSON.parse(localStorage.getItem(storeKey)||'{}')}}catch{return clone(seed)}}
+function save(){localStorage.setItem(storeKey,JSON.stringify(db))}
+function id(p='x'){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function money(v){return Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'})}
+function toast(t){const x=document.createElement('div');x.className='toast';x.textContent=t;document.body.append(x);setTimeout(()=>x.remove(),2200)}
+function audit(action,detail=''){db.audit.unshift({id:id('a'),ts:new Date().toISOString(),user:session?.user?.name||'system',company:session?.company?.id||'',action,detail});save()}
+function companyRows(name){return db[name].filter(x=>x.companyId===session.company.id)}
+function customerName(cid){return db.customers.find(c=>c.id===cid)?.name||'-'}
+function vehicleName(vid){const v=db.vehicles.find(x=>x.id===vid);return v?`${v.plate||v.vin||'-'} · ${v.make||''} ${v.model||''}`:'-'}
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function roleCan(section){
+ const r=session.user.role;
+ if(r==='manager') return true;
+ if(r==='accountant') return !['settings'].includes(section);
+ if(r==='mechanic') return ['dashboard','customers','vehicles','repairs','estimates','integrations'].includes(section);
+ if(r==='warehouse') return ['dashboard','inventory','purchases','integrations'].includes(section);
+ return false;
+}
+
+const nav=[
+ ['dashboard','الرئيسية'],['customers','العملاء'],['vehicles','السيارات'],['repairs','أوامر الإصلاح'],
+ ['estimates','Kostenvoranschlag'],['invoices','الفواتير و Barverkauf'],['purchases','المشتريات'],
+ ['inventory','المخزون وقطع الغيار'],['employees','الموظفون والرواتب'],['expenses','المصاريف'],
+ ['journal','دفتر اليومية'],['reports','التقارير'],['integrations','التكاملات'],
+ ['audit','سجل النشاط'],['settings','الإعدادات']
+];
+
+function login(){
+ document.documentElement.dir='rtl';
+ $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
+ <div class="brand">WerkPilot Pro</div><div class="tag">إدارة الورشة الذكية</div>
+ <div class="field"><label>اسم المستخدم</label><input id="lu" value="admin"></div>
+ <div class="field"><label>كلمة المرور</label><input id="lp" type="password" value="1234"></div>
+ <button class="btn primary full" id="loginBtn">دخول</button>
+ <div class="hint" style="margin-top:12px">admin / 1234 · accountant / 1234 · mechanic / 1234 · warehouse / 1234</div>
+ </div></div>`;
+ $('#loginBtn').onclick=()=>{
+  const u=db.users.find(x=>x.u===$('#lu').value&&x.p===$('#lp').value);
+  if(!u)return toast('بيانات الدخول غير صحيحة');
+  session={user:u,company:db.companies[0],page:'dashboard'};
+  audit('login');render();
+ };
+}
+
+function render(){
+ document.documentElement.style.setProperty('--font',db.settings.font+'px');
+ const allowed=nav.filter(([k])=>roleCan(k));
+ $('#app').innerHTML=`<div class="shell">
+ <aside class="sidebar" id="side"><div class="sidebrand">WerkPilot Pro</div><div class="nav">
+ ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
+ </div></aside>
+ <main class="main">
+  <div class="topbar">
+   <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
+   <select id="company">${db.companies.map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${c.name} · ${c.country}</option>`).join('')}</select></div>
+   <div class="top-actions"><span class="badge hide-mobile"><span class="dot"></span>${session.user.name}</span><button class="btn ghost small" id="logout">خروج</button></div>
+  </div>
+  <div class="content" id="content"></div>
+ </main></div>`;
+ $$('[data-page]').forEach(b=>b.onclick=()=>{session.page=b.dataset.page;render()});
+ $('#logout').onclick=()=>{audit('logout');session=null;login()};
+ $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';render()};
+ $('#menu').onclick=()=>$('#side').classList.toggle('open');
+ page();
+}
+function page(){
+ const m={dashboard,customers,vehicles,repairs,estimates,invoices,purchases,inventory,employees,expenses,journal,reports,integrations,audit:auditPage,settings};
+ (m[session.page]||dashboard)();
+}
+function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>${action}</div>`}
+function table(headers,rows){
+ if(!rows.length)return `<div class="card muted">لا توجد بيانات بعد.</div>`;
+ return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+ <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c??''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function modal(title,body,onSave,saveText='حفظ'){
+ $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal">
+ <div class="modal-head"><h2>${title}</h2><button class="btn ghost small" id="xmod">✕</button></div>
+ ${body}<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="msave">${saveText}</button><button class="btn ghost" id="mcancel">إلغاء</button></div>
+ </div></div>`;
+ $('#xmod').onclick=closeModal;$('#mcancel').onclick=closeModal;$('#msave').onclick=onSave;
+}
+function closeModal(){$('#modalRoot').innerHTML=''}
+
+function dashboard(){
+ const inv=companyRows('invoices'),exp=companyRows('expenses'),rep=companyRows('repairs'),veh=companyRows('vehicles');
+ const sales=inv.reduce((a,x)=>a+Number(x.total||0),0),costs=exp.reduce((a,x)=>a+Number(x.amount||0),0);
+ $('#content').innerHTML=head('لوحة التحكم')+`<div class="grid">
+ <div class="card"><div class="muted">العملاء</div><div class="metric">${companyRows('customers').length}</div></div>
+ <div class="card"><div class="muted">السيارات</div><div class="metric">${veh.length}</div></div>
+ <div class="card"><div class="muted">أوامر الإصلاح المفتوحة</div><div class="metric">${rep.filter(x=>x.status!=='مكتمل').length}</div></div>
+ <div class="card"><div class="muted">إجمالي المبيعات</div><div class="metric">${money(sales)}</div></div>
+ ${session.user.role==='manager'?`<div class="card"><div class="muted">صافي تقريبي</div><div class="metric">${money(sales-costs)}</div></div>`:''}
+ </div><div class="card" style="margin-top:14px"><div class="kpi-row"><b>الشركة النشطة</b><span class="badge">${session.company.name} · ${session.company.country}</span></div>
+ <p class="muted">كل البيانات معزولة حسب الشركة النشطة.</p></div>`;
+}
+
+function customers(){
+ const rows=companyRows('customers');
+ $('#content').innerHTML=head('العملاء',`<button class="btn primary" id="add">عميل جديد</button>`)+
+ table(['الاسم','الهاتف','الإيميل','العنوان','السيارات'],rows.map(c=>[esc(c.name),esc(c.phone||'-'),esc(c.email||'-'),esc(c.address||'-'),db.vehicles.filter(v=>v.customerId===c.id).length]));
+ $('#add').onclick=customerModal;
+}
+function customerModal(){
+ modal('عميل جديد',`<div class="form-grid">
+ <div class="field"><label>الاسم</label><input id="n"></div>
+ <div class="field"><label>الهاتف</label><input id="ph"></div>
+ <div class="field"><label>الإيميل</label><input id="em"></div>
+ <div class="field"><label>العنوان</label><input id="ad"></div>
+ </div>`,()=>{
+  const c={id:id('c'),companyId:session.company.id,name:$('#n').value.trim(),phone:$('#ph').value,email:$('#em').value,address:$('#ad').value};
+  if(!c.name)return toast('أدخل اسم العميل');
+  db.customers.push(c);save();audit('customer.create',c.name);closeModal();render();
+ });
+}
+
+function vehicles(){
+ const rows=companyRows('vehicles');
+ $('#content').innerHTML=head('السيارات',`<div class="toolbar"><button class="btn primary" id="add">إضافة سيارة</button><button class="btn ok" id="scan">📷 تصوير ورقة السيارة</button></div>`)+
+ table(['العميل','اللوحة','VIN','الماركة','الموديل','السنة','المحرك','اللون'],rows.map(v=>[customerName(v.customerId),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),esc(v.engine||'-'),esc(v.paint||'-')]));
+ $('#add').onclick=()=>vehicleModal();
+ $('#scan').onclick=scanVehicleDocument;
+}
+function vehicleModal(prefill={}){
+ const customers=companyRows('customers');
+ modal('إضافة سيارة',`<div class="form-grid">
+ <div class="field"><label>العميل</label><select id="cu"><option value="">اختر العميل</option>${customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
+ <div class="field"><label>رقم اللوحة</label><input id="pl" value="${esc(prefill.plate||'')}"></div>
+ <div class="field"><label>VIN</label><input id="vin" value="${esc(prefill.vin||'')}"></div>
+ <div class="field"><label>الماركة</label><input id="mk" value="${esc(prefill.make||'')}"></div>
+ <div class="field"><label>الموديل</label><input id="mo" value="${esc(prefill.model||'')}"></div>
+ <div class="field"><label>السنة</label><input id="yr" type="number" value="${esc(prefill.year||'')}"></div>
+ <div class="field"><label>كود المحرك</label><input id="en" value="${esc(prefill.engine||'')}"></div>
+ <div class="field"><label>كود اللون</label><input id="pa" value="${esc(prefill.paint||'')}"></div>
+ </div>`,()=>{
+  if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
+  const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),ocrSource:prefill.ocrSource||''};
+  db.vehicles.push(v);save();audit('vehicle.create',v.plate||v.vin);closeModal();render();
+ });
+}
+function scanVehicleDocument(){
+ modal('تصوير/رفع ورقة السيارة',`<div class="field">
+ <label>اختر صورة Fahrzeugschein / Zulassungsbescheinigung</label>
+ <input id="doc" type="file" accept="image/*" capture="environment">
+ <div class="hint">تتم قراءة الصورة في المتصفح. راجع البيانات قبل الحفظ.</div>
+ <img id="ocrImg" class="ocr-preview hidden">
+ <div id="ocrBox" class="hidden"><div class="progress"><div id="ocrProg"></div></div><div id="ocrStatus" class="muted"></div></div>
+ </div>`,async()=>{
+  const f=$('#doc').files[0];if(!f)return toast('اختر أو صوّر الورقة أولاً');
+  $('#ocrBox').classList.remove('hidden');
+  $('#msave').disabled=true;
+  try{
+   const url=URL.createObjectURL(f);$('#ocrImg').src=url;$('#ocrImg').classList.remove('hidden');
+   const {data:{text}}=await Tesseract.recognize(f,'deu+eng',{logger:m=>{if(m.progress){$('#ocrProg').style.width=(m.progress*100)+'%'}$('#ocrStatus').textContent=m.status||'جارٍ القراءة...'}});
+   const parsed=parseVehicleOCR(text);
+   closeModal();vehicleModal({...parsed,ocrSource:f.name});
+   toast('تمت القراءة. راجع الحقول قبل الحفظ.');
+  }catch(e){console.error(e);$('#ocrStatus').textContent='تعذرت القراءة التلقائية. يمكنك إدخال البيانات يدوياً.';$('#msave').disabled=false}
+ },'قراءة البيانات');
+ $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden')}};
+}
+function parseVehicleOCR(text){
+ const t=text.replace(/\r/g,' ').replace(/[ \t]+/g,' ');
+ const vinMatch=t.match(/\b[A-HJ-NPR-Z0-9]{17}\b/i);
+ const yearMatch=t.match(/\b(19|20)\d{2}\b/);
+ const plateMatch=t.match(/\b[A-ZÄÖÜ]{1,3}[-\s][A-Z]{1,2}[-\s]?\d{1,4}[EH]?\b/i);
+ const makes=['VOLKSWAGEN','VW','BMW','MERCEDES','AUDI','OPEL','FORD','TOYOTA','RENAULT','PEUGEOT','CITROEN','SKODA','SEAT','FIAT','HYUNDAI','KIA','PORSCHE','MAZDA','NISSAN','HONDA','VOLVO'];
+ const upper=t.toUpperCase();
+ const make=makes.find(x=>upper.includes(x))||'';
+ return {vin:vinMatch?.[0]||'',year:yearMatch?.[0]||'',plate:plateMatch?.[0]?.replace(/\s+/g,'-')||'',make};
+}
+
+function repairs(){
+ const rows=companyRows('repairs');
+ $('#content').innerHTML=head('أوامر الإصلاح',`<button class="btn primary" id="add">أمر إصلاح جديد</button>`)+
+ table(['السيارة','الوصف','الفني','الساعات','الحالة'],rows.map(r=>[vehicleName(r.vehicleId),esc(r.description),esc(r.tech||'-'),esc(r.hours||0),`<span class="status ${r.status==='مكتمل'?'ok':r.status==='جاري العمل'?'warn':''}">${r.status}</span>`]));
+ $('#add').onclick=repairModal;
+}
+function repairModal(){
+ modal('أمر إصلاح جديد',`<div class="form-grid">
+ <div class="field"><label>السيارة</label><select id="rv">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+ <div class="field"><label>الفني</label><input id="rt"></div>
+ <div class="field span2"><label>وصف العطل والعمل</label><textarea id="rd"></textarea></div>
+ <div class="field"><label>ساعات العمل</label><input id="rh" type="number" step=".25"></div>
+ <div class="field"><label>الحالة</label><select id="rs"><option>جديد</option><option>جاري العمل</option><option>مكتمل</option></select></div>
+ </div>`,()=>{
+  const r={id:id('r'),companyId:session.company.id,vehicleId:$('#rv').value,description:$('#rd').value,tech:$('#rt').value,hours:$('#rh').value,status:$('#rs').value};
+  db.repairs.push(r);save();audit('repair.create',r.description);closeModal();render();
+ });
+}
+function estimates(){
+ const rows=companyRows('estimates');
+ $('#content').innerHTML=head('Kostenvoranschlag',`<button class="btn primary" id="add">إنشاء تقدير</button>`)+
+ table(['العميل/السيارة','القطع','الأجور','الخصم','الضريبة','الإجمالي','رسوم التقدير'],rows.map(x=>[vehicleName(x.vehicleId),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]));
+ $('#add').onclick=()=>financeModal('estimate');
+}
+function invoices(){
+ const rows=companyRows('invoices');
+ $('#content').innerHTML=head('الفواتير و Barverkauf',`<div class="toolbar"><button class="btn primary" id="inv">فاتورة جديدة</button><button class="btn" id="bar">Barverkauf</button></div>`)+
+ table(['النوع','العميل/السيارة','الصافي','الضريبة','الإجمالي','الدفع'],rows.map(x=>[x.type,vehicleName(x.vehicleId)||'بيع مباشر',money(x.net),x.tax+'%',money(x.total),esc(x.payment||'غير محدد')]));
+ $('#inv').onclick=()=>financeModal('invoice');$('#bar').onclick=()=>financeModal('bar');
+}
+function financeModal(type){
+ const title=type==='estimate'?'Kostenvoranschlag':type==='bar'?'Barverkauf':'فاتورة جديدة';
+ modal(title,`<div class="form-grid">
+ <div class="field"><label>السيارة</label><select id="fv"><option value="">بدون سيارة</option>${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+ <div class="field"><label>القطع €</label><input id="fp" type="number" step=".01" value="0"></div>
+ <div class="field"><label>الأجور €</label><input id="fl" type="number" step=".01" value="0"></div>
+ <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="0"></div>
+ <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="19"></div>
+ ${type==='estimate'?'<div class="field"><label>رسوم إعداد التقدير €</label><input id="ff" type="number" step=".01" value="0"></div>':'<div class="field"><label>طريقة الدفع</label><select id="pay"><option>غير محدد</option><option>نقدي</option><option>بطاقة</option><option>تحويل بنكي</option></select></div>'}
+ </div>`,()=>{
+  const parts=+$('#fp').value||0,labor=+$('#fl').value||0,discount=+$('#fd').value||0,tax=+$('#ft').value||0,net=Math.max(0,parts+labor-discount),total=net*(1+tax/100);
+  const obj={id:id(type[0]),companyId:session.company.id,vehicleId:$('#fv').value,parts,labor,discount,tax,net,total};
+  if(type==='estimate'){obj.fee=+$('#ff').value||0;db.estimates.push(obj);audit('estimate.create',money(total))}
+  else{obj.type=type==='bar'?'Barverkauf':'فاتورة';obj.payment=$('#pay').value;db.invoices.push(obj);audit('invoice.create',money(total))}
+  save();closeModal();render();
+ });
+}
+function purchases(){
+ const rows=companyRows('purchases');
+ $('#content').innerHTML=head('المشتريات',`<button class="btn primary" id="add">شراء جديد</button>`)+
+ table(['المورد','الصنف','الكمية','السعر','الإجمالي'],rows.map(x=>[esc(x.supplier),esc(x.item),x.qty,money(x.price),money(x.qty*x.price)]));
+ $('#add').onclick=()=>simpleModal('شراء جديد',[['supplier','المورد'],['item','الصنف'],['qty','الكمية','number'],['price','السعر','number']],o=>{o.companyId=session.company.id;o.id=id('p');db.purchases.push(o);save();audit('purchase.create',o.item);render()});
+}
+function inventory(){
+ const rows=companyRows('inventory');
+ $('#content').innerHTML=head('المخزون وقطع الغيار',`<button class="btn primary" id="add">قطعة جديدة</button>`)+
+ table(['رقم القطعة','الاسم','الكمية','سعر الشراء','سعر البيع'],rows.map(x=>[esc(x.sku),esc(x.name),x.qty,money(x.buy),money(x.sell)]));
+ $('#add').onclick=()=>simpleModal('قطعة جديدة',[['sku','رقم القطعة'],['name','الاسم'],['qty','الكمية','number'],['buy','سعر الشراء','number'],['sell','سعر البيع','number']],o=>{o.companyId=session.company.id;o.id=id('i');db.inventory.push(o);save();audit('inventory.create',o.name);render()});
+}
+function employees(){
+ const rows=companyRows('employees');
+ $('#content').innerHTML=head('الموظفون والرواتب',`<button class="btn primary" id="add">موظف جديد</button>`)+
+ table(['الاسم','الوظيفة','الهاتف','الراتب'],rows.map(x=>[esc(x.name),esc(x.role),esc(x.phone||'-'),money(x.salary)]));
+ $('#add').onclick=()=>simpleModal('موظف جديد',[['name','الاسم'],['role','الوظيفة'],['phone','الهاتف'],['salary','الراتب','number']],o=>{o.companyId=session.company.id;o.id=id('e');db.employees.push(o);save();audit('employee.create',o.name);render()});
+}
+function expenses(){
+ const rows=companyRows('expenses');
+ $('#content').innerHTML=head('المصاريف',`<button class="btn primary" id="add">مصروف جديد</button>`)+
+ table(['التاريخ','البيان','المبلغ','الفئة'],rows.map(x=>[esc(x.date),esc(x.note),money(x.amount),esc(x.category)]));
+ $('#add').onclick=()=>simpleModal('مصروف جديد',[['date','التاريخ','date'],['note','البيان'],['amount','المبلغ','number'],['category','الفئة']],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);save();audit('expense.create',o.note);render()});
+}
+function journal(){
+ const rows=companyRows('journal');
+ $('#content').innerHTML=head('دفتر اليومية',`<button class="btn primary" id="add">قيد جديد</button>`)+
+ table(['التاريخ','الحساب','مدين','دائن','البيان'],rows.map(x=>[esc(x.date),esc(x.account),money(x.debit),money(x.credit),esc(x.note)]));
+ $('#add').onclick=()=>simpleModal('قيد جديد',[['date','التاريخ','date'],['account','الحساب'],['debit','مدين','number'],['credit','دائن','number'],['note','البيان']],o=>{o.companyId=session.company.id;o.id=id('j');db.journal.push(o);save();audit('journal.create',o.account);render()});
+}
+function reports(){
+ const inv=companyRows('invoices'),exp=companyRows('expenses'),pur=companyRows('purchases');
+ const sales=inv.reduce((a,x)=>a+Number(x.total||0),0),costs=exp.reduce((a,x)=>a+Number(x.amount||0),0)+pur.reduce((a,x)=>a+Number(x.qty||0)*Number(x.price||0),0);
+ $('#content').innerHTML=head('التقارير')+`<div class="grid">
+ <div class="card"><div class="muted">المبيعات</div><div class="metric">${money(sales)}</div></div>
+ <div class="card"><div class="muted">المصاريف والمشتريات</div><div class="metric">${money(costs)}</div></div>
+ <div class="card"><div class="muted">الفرق التقريبي</div><div class="metric">${money(sales-costs)}</div></div>
+ <div class="card"><div class="muted">الفواتير</div><div class="metric">${inv.length}</div></div>
+ </div>`;
+}
+function integrations(){
+ $('#content').innerHTML=head('التكاملات')+`<div class="grid">
+ <div class="card"><b>TSE / Kasse</b><p class="muted">نقطة تكامل جاهزة. الربط الحقيقي يحتاج مزوداً معتمداً وواجهة API.</p></div>
+ <div class="card"><b>البنك</b><p class="muted">يتطلب مزود Open Banking وخادماً آمناً.</p></div>
+ <div class="card"><b>PartsLink24</b><p class="muted">يتطلب حساباً وواجهة API مرخّصة.</p></div>
+ <div class="card"><b>MATIS / مزودات أخرى</b><p class="muted">يمكن ربطها لاحقاً حسب بيانات الوصول.</p></div>
+ </div>`;
+}
+function auditPage(){
+ const rows=db.audit.filter(a=>!session.company||a.company===session.company.id||!a.company).slice(0,200);
+ $('#content').innerHTML=head('سجل النشاط')+table(['الوقت','المستخدم','الإجراء','التفاصيل'],rows.map(a=>[new Date(a.ts).toLocaleString(),esc(a.user),esc(a.action),esc(a.detail)]));
+}
+function settings(){
+ $('#content').innerHTML=head('الإعدادات')+`<div class="card"><div class="form-grid">
+ <div class="field"><label>حجم الخط</label><input id="font" type="number" min="13" max="22" value="${db.settings.font}"></div>
+ <div class="field"><label>اللغة</label><select id="lang"><option value="ar">العربية</option><option value="de">Deutsch</option><option value="es">Español</option></select></div>
+ </div><button class="btn primary" id="saveset">حفظ الإعدادات</button>
+ <button class="btn bad" id="reset" style="margin-right:8px">مسح بيانات التجربة</button></div>`;
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;save();toast('تم الحفظ');render()};
+ $('#reset').onclick=()=>{if(confirm('سيتم حذف كل البيانات المحلية. متابعة؟')){db=clone(seed);save();toast('تمت إعادة الضبط');render()}};
+}
+function simpleModal(title,fields,onSave){
+ modal(title,`<div class="form-grid">${fields.map(([k,l,t='text'])=>`<div class="field"><label>${l}</label><input id="f_${k}" type="${t}"></div>`).join('')}</div>`,()=>{
+  const o={};fields.forEach(([k])=>o[k]=$('#f_'+k).value);closeModal();onSave(o);
+ });
+}
+
+login();
+</script>
+</body>
+</html>
