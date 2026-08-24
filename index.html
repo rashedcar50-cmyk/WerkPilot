@@ -235,6 +235,7 @@ function scanVehicleDocument(){
  modal('تصوير/رفع ورقة السيارة',`<div class="field">
  <label>اختر صورة Fahrzeugschein / Zulassungsbescheinigung</label>
  <input id="doc" type="file" accept="image/*" capture="environment">
+ <button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
  <div class="hint">تتم قراءة الصورة في المتصفح. راجع البيانات قبل الحفظ.</div>
  <img id="ocrImg" class="ocr-preview hidden">
  <div id="ocrBox" class="hidden"><div class="progress"><div id="ocrProg"></div></div><div id="ocrStatus" class="muted"></div></div>
@@ -381,7 +382,75 @@ function simpleModal(title,fields,onSave){
   const SUPABASE_KEY = window.SUPABASE_KEY;
    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 login();
-   
+  async function openCamera(){
+if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+return toast('الكاميرا غير مدعومة في هذا المتصفح');
+}
+
+const box=document.createElement('div');
+box.className='modal-back';
+box.innerHTML=`
+<div class="modal" style="max-width:700px">
+<div class="modal-head">
+<b>📷 تصوير ورقة السيارة</b>
+<button id="camClose" class="btn bad">✕</button>
+</div>
+<video id="cameraVideo" autoplay playsinline
+style="width:100%;border-radius:12px;background:#000"></video>
+<div style="margin-top:12px;text-align:center">
+<button id="takePhoto" class="btn primary">📸 التقاط الصورة</button>
+</div>
+</div>
+`;
+
+document.body.appendChild(box);
+
+const video=box.querySelector('#cameraVideo');
+let stream;
+
+try{
+stream=await navigator.mediaDevices.getUserMedia({
+video:{facingMode:{ideal:'environment'}},
+audio:false
+});
+
+video.srcObject=stream;
+
+const close=()=>{
+if(stream) stream.getTracks().forEach(t=>t.stop());
+box.remove();
+};
+
+box.querySelector('#camClose').onclick=close;
+
+box.querySelector('#takePhoto').onclick=()=>{
+const canvas=document.createElement('canvas');
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
+
+canvas.getContext('2d').drawImage(video,0,0);
+
+canvas.toBlob(blob=>{
+const file=new File([blob],'fahrzeugschein.jpg',{type:'image/jpeg'});
+const dt=new DataTransfer();
+dt.items.add(file);
+
+const input=document.querySelector('#doc');
+input.files=dt.files;
+input.dispatchEvent(new Event('change',{bubbles:true}));
+
+close();
+toast('تم التقاط الصورة بنجاح');
+},'image/jpeg',0.92);
+};
+
+}catch(e){
+box.remove();
+toast('لم يتم السماح باستخدام الكاميرا');
+console.error(e);
+}
+}
+ 
 </script>
 </body>
 </html>
