@@ -375,7 +375,8 @@ function simpleModal(title,fields,onSave){
   const o={};fields.forEach(([k])=>o[k]=$('#f_'+k).value);closeModal();onSave(o);
  });
 }
-
+const SUPABASE_URL = window.SUPABASE_URL;
+  const SUPABASE_KEY = window.SUPABASE_KEY;
 login();
 </script>
 </body>
