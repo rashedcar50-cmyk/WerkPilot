@@ -247,7 +247,8 @@ function scanVehicleDocument(){
   try{
    const url=URL.createObjectURL(f);$('#ocrImg').src=url;$('#ocrImg').classList.remove('hidden');
    const {data:{text}}=await Tesseract.recognize(f,'deu+eng',{logger:m=>{if(m.progress){$('#ocrProg').style.width=(m.progress*100)+'%'}$('#ocrStatus').textContent=m.status||'جارٍ القراءة...'}});
-   const parsed=parseVehicleOCR(text);
+   console.log(text);
+     const parsed=parseVehicleOCR(text);
    closeModal();vehicleModal({...parsed,ocrSource:f.name});
    toast('تمت القراءة. راجع الحقول قبل الحفظ.');
   }catch(e){console.error(e);$('#ocrStatus').textContent='تعذرت القراءة التلقائية. يمكنك إدخال البيانات يدوياً.';$('#msave').disabled=false}
