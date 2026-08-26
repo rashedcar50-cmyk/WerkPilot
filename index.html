@@ -225,11 +225,14 @@ function vehicleModal(prefill={}){
  <div class="field"><label>الماركة</label><input id="mk" value="${esc(prefill.make||'')}"></div>
  <div class="field"><label>الموديل</label><input id="mo" value="${esc(prefill.model||'')}"></div>
  <div class="field"><label>السنة</label><input id="yr" type="number" value="${esc(prefill.year||'')}"></div>
+ <div class="field"><label>سعة المحرك (cm³)</label><input id="cc" type="number" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
+ <div class="field"><label>نوع الوقود</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
+ <div class="field"><label>قوة المحرك (kW)</label><input id="kw" type="number" value="${esc(prefill.engine_power_kw||'')}"></div>
  <div class="field"><label>كود المحرك</label><input id="en" value="${esc(prefill.engine||'')}"></div>
  <div class="field"><label>كود اللون</label><input id="pa" value="${esc(prefill.paint||'')}"></div>
  </div>`,()=>{
   if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
-  const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),ocrSource:prefill.ocrSource||''};
+  const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ocrSource:prefill.ocrSource||''};
   db.vehicles.push(v);save();audit('vehicle.create',v.plate||v.vin);closeModal();render();
  });
   $('#partslinkBtn').onclick=()=>{
