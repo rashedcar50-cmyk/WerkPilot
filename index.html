@@ -433,10 +433,97 @@ function employees(){
 }
 function expenses(){
  const rows=companyRows('expenses');
- $('#content').innerHTML=head('المصاريف',`<button class="btn primary" id="add">مصروف جديد</button>`)+
+$('#content').innerHTML=head('المصاريف','<button class="btn primary" id="scanExpense">📷 تصوير فاتورة</button> <button class="btn primary" id="add">مصروف جديد</button>')+
  table(['التاريخ','البيان','المبلغ','الفئة'],rows.map(x=>[esc(x.date),esc(x.note),money(x.amount),esc(x.category)]));
  $('#add').onclick=()=>simpleModal('مصروف جديد',[['date','التاريخ','date'],['note','البيان'],['amount','المبلغ','number'],['category','الفئة']],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);save();audit('expense.create',o.note);render()});
+$('#scanExpense').onclick=scanExpenseDocument;
 }
+   async function scanExpenseDocument(){
+modal('تصوير فاتورة مصروف',`
+<div class="field">
+<label>صوّر الفاتورة أو اختر صورة</label>
+<input id="doc" type="file" accept="image/*">
+<button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
+<div class="hint">سيتم قراءة الفاتورة وإضافتها تلقائيًا إلى المصروفات.</div>
+<img id="expenseImg" class="ocr-preview hidden">
+<div id="expenseStatus" class="hint"></div>
+</div>
+`,async()=>{
+const f=$('#doc').files[0];
+if(!f)return toast('اختر أو صوّر الفاتورة أولاً');
+
+try{
+$('#msave').disabled=true;
+$('#expenseStatus').textContent='جاري قراءة الفاتورة...';
+
+const imageData=await new Promise((resolve,reject)=>{
+const reader=new FileReader();
+reader.onload=()=>resolve(reader.result);
+reader.onerror=reject;
+reader.readAsDataURL(f);
+});
+
+$('#expenseImg').src=imageData;
+$('#expenseImg').classList.remove('hidden');
+
+const response=await fetch(
+`${window.SUPABASE_URL}/functions/v1/expense-ocr`,
+{
+method:'POST',
+headers:{
+'Content-Type':'application/json',
+'apikey':window.SUPABASE_KEY,
+'Authorization':`Bearer ${window.SUPABASE_KEY}`
+},
+body:JSON.stringify({image:imageData})
+}
+);
+
+const ai=await response.json();
+
+if(!response.ok){
+console.error(ai);
+throw new Error(ai.error||'تعذرت قراءة الفاتورة');
+}
+
+const amount=Number(
+String(ai.total_amount||ai.net_amount||'0')
+.replace(',','.')
+.replace(/[^\d.-]/g,'')
+)||0;
+
+const expense={
+id:id('x'),
+companyId:session.company.id,
+date:ai.expense_date||new Date().toISOString().slice(0,10),
+note:ai.description||ai.supplier_name||'مصروف',
+amount:amount,
+category:ai.category||'مصروف',
+supplier_name:ai.supplier_name||'',
+net_amount:ai.net_amount||'',
+tax_amount:ai.tax_amount||'',
+total_amount:ai.total_amount||'',
+payment_method:ai.payment_method||'',
+receipt_number:ai.receipt_number||'',
+notes:ai.notes||''
+};
+
+db.expenses.push(expense);
+save();
+audit('expense.create',expense.note);
+closeModal();
+render();
+toast('تمت إضافة المصروف بنجاح');
+
+}catch(e){
+console.error(e);
+$('#expenseStatus').textContent='تعذرت قراءة الفاتورة';
+toast(e.message||'حدث خطأ');
+$('#msave').disabled=false;
+}
+},'قراءة وإضافة');
+}
+
 function journal(){
  const rows=companyRows('journal');
  $('#content').innerHTML=head('دفتر اليومية',`<button class="btn primary" id="add">قيد جديد</button>`)+
