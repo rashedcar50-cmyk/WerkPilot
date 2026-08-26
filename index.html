@@ -221,6 +221,7 @@ function vehicleModal(prefill={}){
  <div class="field"><label>العميل</label><select id="cu"><option value="">اختر العميل</option>${customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
  <div class="field"><label>رقم اللوحة</label><input id="pl" value="${esc(prefill.plate||'')}"></div>
  <div class="field"><label>VIN</label><input id="vin" value="${esc(prefill.vin||'')}"></div>
+ <div class="field"><label>Partslink24</label><button type="button" class="btn" id="partslinkBtn">فتح partslink24</button></div>
  <div class="field"><label>الماركة</label><input id="mk" value="${esc(prefill.make||'')}"></div>
  <div class="field"><label>الموديل</label><input id="mo" value="${esc(prefill.model||'')}"></div>
  <div class="field"><label>السنة</label><input id="yr" type="number" value="${esc(prefill.year||'')}"></div>
@@ -231,6 +232,9 @@ function vehicleModal(prefill={}){
   const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),ocrSource:prefill.ocrSource||''};
   db.vehicles.push(v);save();audit('vehicle.create',v.plate||v.vin);closeModal();render();
  });
+  $('#partslinkBtn').onclick=()=>{
+window.open('https://www.partslink24.com/','_blank');
+}; 
 }
 function scanVehicleDocument(){
  modal('تصوير/رفع ورقة السيارة',`<div class="field">
