@@ -1,2 +1,2 @@
 window.SUPABASE_URL = "https://jljzobaggesefsdeslrf.supabase.co";
-window.SUPABASE_KEY = "sb_publishable6edIQ7MAFnoxYtQKzwHrgzIAIP";
+window.SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsanpvYmFnZ2VzZWZzZGVzbHJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MTU2OTMsImV4cCI6MjEwMzA5MTY5M30.UUSyqBHS7wN8rQKtBwlwIEFammY76xavrg2JbaI8rOU"
