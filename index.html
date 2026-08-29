@@ -424,14 +424,14 @@ function purchases(){
 modal('تصوير فاتورة شراء',`
 <div class="field">
 <label>صوّر فاتورة الشراء أو اختر صورة</label>
-<input id="doc" type="file" accept="image/*">
-<button type="button" class="btn primary" id="purchaseCamOpen">📷 فتح الكاميرا</button>
+<input id="purchaseCamera" type="file" accept="image/*" capture="environment">
+<input id="purchaseFile" type="file" accept="image/*">
 <div class="hint">سيتم قراءة الفاتورة وإضافتها تلقائيًا إلى المشتريات.</div>
 <img id="purchaseImg" class="ocr-preview hidden">
 <div id="purchaseStatus" class="hint"></div>
 </div>
 `,async()=>{
-const f=$('#doc').files[0];
+const f=$('#purchaseCamera').files[0] || $('#purchaseFile').files[0];
 if(!f)return toast('اختر أو صوّر فاتورة الشراء أولاً');
 
 try{
@@ -513,7 +513,7 @@ toast(e.message||'حدث خطأ');
 $('#msave').disabled=false;
 }
 },'قراءة وإضافة');
-     $('#purchaseCamOpen').onclick=openCamera; 
+
 }
 function inventory(){
  const rows=companyRows('inventory');
