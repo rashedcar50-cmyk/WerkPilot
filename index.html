@@ -6,6 +6,7 @@
 <title>WerkPilot Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
    <script src="supabase-config.js"></script>                                                                               pt>
 <style>
 :root{--bg:#0b1220;--panel:#151f33;--panel2:#1d2940;--line:#334155;--text:#f8fafc;--muted:#94a3b8;--pri:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#b91c1c;--font:16px}
@@ -416,10 +417,82 @@ function financeModal(type){
 function purchases(){
  const rows=companyRows('purchases');
  $('#content').innerHTML=head('المشتريات','<button class="btn primary" id="scanPurchase">📷 تصوير فاتورة شراء</button> <button class="btn primary" id="add">شراء جديد</button>')+
- table(['المورد','الصنف','الكمية','السعر','الإجمالي'],rows.map(x=>[esc(x.supplier),esc(x.item),x.qty,money(x.price),money(x.qty*x.price)]));
+ table(['المورد','الصنف','الكمية','السعر','الإجمالي','الفاتورة'],rows.map(x=>[
+esc(x.supplier),
+esc(x.item),
+x.qty,
+money(x.price),
+money(x.qty*x.price),
+x.receipt_url ? `<button class="btn small primary" onclick="viewReceiptPDF('${x.receipt_url}')">📄 عرض PDF</button>` : '-'
+]));
  $('#add').onclick=()=>simpleModal('شراء جديد',[['supplier','المورد'],['item','الصنف'],['qty','الكمية','number'],['price','السعر','number']],o=>{o.companyId=session.company.id;o.id=id('p');db.purchases.push(o);save();audit('purchase.create',o.item);render()});
   $('#scanPurchase').onclick=scanPurchaseDocument; 
 }
+   async function viewReceiptPDF(url){
+if(!url) return toast('لا توجد فاتورة محفوظة');
+
+const pdfWindow=window.open('','_blank');
+if(!pdfWindow) return toast('اسمح بفتح النوافذ المنبثقة لعرض PDF');
+try{
+const response=await fetch(url);
+if(!response.ok) throw new Error('تعذر تحميل الفاتورة');
+
+const blob=await response.blob();
+
+const dataUrl=await new Promise((resolve,reject)=>{
+const reader=new FileReader();
+reader.onload=()=>resolve(reader.result);
+reader.onerror=reject;
+reader.readAsDataURL(blob);
+});
+
+const img=await new Promise((resolve,reject)=>{
+const image=new Image();
+image.onload=()=>resolve(image);
+image.onerror=reject;
+image.src=dataUrl;
+});
+
+const {jsPDF}=window.jspdf;
+
+const orientation=img.width>img.height ? 'landscape' : 'portrait';
+const pdf=new jsPDF({
+orientation:orientation,
+unit:'mm',
+format:'a4'
+});
+
+const pageWidth=pdf.internal.pageSize.getWidth();
+const pageHeight=pdf.internal.pageSize.getHeight();
+
+const ratio=Math.min(
+(pageWidth-10)/img.width,
+(pageHeight-10)/img.height
+);
+
+const width=img.width*ratio;
+const height=img.height*ratio;
+
+const format=blob.type.includes('png') ? 'PNG' : 'JPEG';
+
+pdf.addImage(
+dataUrl,
+format,
+(pageWidth-width)/2,
+(pageHeight-height)/2,
+width,
+height
+);
+
+pdfWindow.location.href=pdf.output('bloburl');
+
+}catch(e){
+console.error(e);
+if(pdfWindow) pdfWindow.close();
+toast('تعذر فتح الفاتورة PDF');
+}
+}
+
    async function scanPurchaseDocument(){
 modal('تصوير فاتورة شراء',`
 <div class="field">
