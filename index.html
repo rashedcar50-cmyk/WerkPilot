@@ -105,13 +105,13 @@ async function loadPurchasesFromCloud(){
   try{
     const sb = window.supabaseClient;
     if(!sb) return false;
-    const { data, error } = await sb.from('purchases').select('*').order('date', { ascending: false });
+    const { data, error } = await sb.from('purchases').select('*').order('purchase_date', { ascending: false });
     if(error){ console.warn('loadPurchases', error.message); return false; }
     if(!Array.isArray(data)) return false;
-    // حوّل أسماء الأعمدة من snake_case
     db.purchases = data.map(r => ({
-      id: r.id,
-      companyId: r.company_id,
+      id: 'p_cloud_' + r.id,
+      cloudId: r.id,
+      companyId: r.company_id || 'de',
       supplier: r.supplier || '',
       invoice_number: r.invoice_number || '',
       item: r.item || '',
@@ -120,8 +120,8 @@ async function loadPurchasesFromCloud(){
       subtotal: r.subtotal,
       tax_amount: r.tax_amount,
       total_amount: r.total_amount,
-      date: r.date,
-      payment_status: r.payment_status || 'pending',
+      date: r.purchase_date || r.date || '',
+      payment_status: r.payment_status || r.status || 'pending',
       notes: r.notes || '',
       receipt_url: r.receipt_url || ''
     }));
@@ -135,22 +135,35 @@ async function upsertPurchaseCloud(p){
     const sb = window.supabaseClient;
     if(!sb) return;
     const row = {
-      id: p.id,
-      company_id: p.companyId || session?.company?.id || 'de',
+      company_id: String(p.companyId || session?.company?.id || 'de'),
       supplier: p.supplier || '',
       invoice_number: p.invoice_number || '',
       item: p.item || '',
-      qty: p.qty ?? 1,
-      price: p.price ?? 0,
-      subtotal: p.subtotal ?? 0,
-      tax_amount: p.tax_amount ?? 0,
-      total_amount: p.total_amount ?? 0,
-      date: p.date || new Date().toISOString().slice(0,10),
+      qty: Number(p.qty ?? 1),
+      price: Number(p.price ?? 0),
+      subtotal: Number(p.subtotal ?? 0),
+      tax_amount: Number(p.tax_amount ?? 0),
+      total_amount: Number(p.total_amount ?? 0),
+      purchase_date: p.date || new Date().toISOString().slice(0,10),
       payment_status: p.payment_status || 'pending',
       notes: p.notes || '',
       receipt_url: p.receipt_url || ''
     };
-    const { error } = await sb.from('purchases').upsert(row);
+    // إذا id رقمي من السحابة نحدّث، وإلا ندرج صف جديد
+    let error;
+    if(p.cloudId){
+      ({ error } = await sb.from('purchases').update(row).eq('id', p.cloudId));
+    } else {
+      const res = await sb.from('purchases').insert(row).select('id').single();
+      error = res.error;
+      if(res.data?.id){
+        p.cloudId = res.data.id;
+        // حدّث النسخة المحلية بالـ cloudId
+        const local = db.purchases.find(x => x.id === p.id);
+        if(local) local.cloudId = res.data.id;
+        save();
+      }
+    }
     if(error) console.warn('upsertPurchase', error.message);
   }catch(e){ console.warn(e); }
 }
@@ -159,7 +172,10 @@ async function deletePurchaseCloud(pid){
   try{
     const sb = window.supabaseClient;
     if(!sb) return;
-    const { error } = await sb.from('purchases').delete().eq('id', pid);
+    const local = db.purchases.find(x => x.id === pid);
+    const cloudId = local?.cloudId;
+    if(!cloudId) return;
+    const { error } = await sb.from('purchases').delete().eq('id', cloudId);
     if(error) console.warn('deletePurchase', error.message);
   }catch(e){ console.warn(e); }
 }

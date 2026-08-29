@@ -1,141 +1,80 @@
--- WerkPilot Schema for Supabase
--- نفّذ هذا في: Supabase Dashboard → SQL Editor → New query → Run
+-- WerkPilot: إصلاح الجداول + فتح الكتابة للتجربة
+-- الصق في: Supabase → SQL Editor → Run
 
--- تفعيل UUID إن لزم
-create extension if not exists "pgcrypto";
+-- ===== purchases: إضافة الأعمدة الناقصة =====
+alter table purchases add column if not exists supplier text;
+alter table purchases add column if not exists item text;
+alter table purchases add column if not exists qty numeric default 1;
+alter table purchases add column if not exists price numeric default 0;
+alter table purchases add column if not exists receipt_url text;
+alter table purchases add column if not exists invoice_number text;
+alter table purchases add column if not exists subtotal numeric default 0;
+alter table purchases add column if not exists tax_amount numeric default 0;
+alter table purchases add column if not exists total_amount numeric default 0;
+alter table purchases add column if not exists purchase_date date;
+alter table purchases add column if not exists payment_status text default 'pending';
+alter table purchases add column if not exists notes text;
+alter table purchases add column if not exists company_id text;
 
--- الشركات
-create table if not exists companies (
-  id text primary key,
-  name text not null,
-  country text default 'DE',
-  currency text default 'EUR',
-  doc_lang text default 'de',
-  created_at timestamptz default now()
-);
+-- ===== customers =====
+alter table customers add column if not exists name text;
+alter table customers add column if not exists phone text;
+alter table customers add column if not exists email text;
+alter table customers add column if not exists address text;
+alter table customers add column if not exists company_id text;
 
--- العملاء
-create table if not exists customers (
-  id text primary key,
-  company_id text references companies(id),
-  name text not null,
-  phone text,
-  email text,
-  address text,
-  document_name text,
-  created_at timestamptz default now()
-);
+-- ===== vehicles =====
+alter table vehicles add column if not exists plate text;
+alter table vehicles add column if not exists vin text;
+alter table vehicles add column if not exists make text;
+alter table vehicles add column if not exists model text;
+alter table vehicles add column if not exists year text;
+alter table vehicles add column if not exists engine text;
+alter table vehicles add column if not exists paint text;
+alter table vehicles add column if not exists customer_id text;
+alter table vehicles add column if not exists company_id text;
 
--- السيارات
-create table if not exists vehicles (
-  id text primary key,
-  company_id text references companies(id),
-  customer_id text references customers(id),
-  plate text,
-  vin text,
-  make text,
-  model text,
-  year text,
-  engine text,
-  paint text,
-  document_name text,
-  created_at timestamptz default now()
-);
+-- ===== inventory =====
+alter table inventory add column if not exists sku text;
+alter table inventory add column if not exists name text;
+alter table inventory add column if not exists qty numeric default 0;
+alter table inventory add column if not exists buy numeric default 0;
+alter table inventory add column if not exists sell numeric default 0;
+alter table inventory add column if not exists company_id text;
 
--- المشتريات
-create table if not exists purchases (
-  id text primary key,
-  company_id text references companies(id),
-  supplier text,
-  invoice_number text,
-  item text,
-  qty numeric default 1,
-  price numeric default 0,
-  subtotal numeric default 0,
-  tax_amount numeric default 0,
-  total_amount numeric default 0,
-  date date,
-  payment_status text default 'pending',
-  notes text,
-  receipt_url text,
-  created_at timestamptz default now()
-);
+-- ===== companies =====
+alter table companies add column if not exists name text;
+alter table companies add column if not exists country text default 'DE';
+alter table companies add column if not exists currency text default 'EUR';
 
--- المخزون
-create table if not exists inventory (
-  id text primary key,
-  company_id text references companies(id),
-  sku text,
-  name text,
-  qty numeric default 0,
-  buy numeric default 0,
-  sell numeric default 0,
-  created_at timestamptz default now()
-);
+insert into companies (id, name, country, currency)
+values
+  ('de', 'Auto Service', 'DE', 'EUR'),
+  ('es', 'Auto Service España', 'ES', 'EUR')
+on conflict (id) do update set name = excluded.name;
 
--- أوامر الإصلاح
-create table if not exists repairs (
-  id text primary key,
-  company_id text references companies(id),
-  vehicle_id text references vehicles(id),
-  description text,
-  tech text,
-  hours numeric default 0,
-  status text default 'جديد',
-  created_at timestamptz default now()
-);
+-- ===== RLS: فتح للتجربة (anon) =====
+-- ملاحظة: لاحقاً نقيدها مع تسجيل دخول حقيقي
 
--- الفواتير
-create table if not exists invoices (
-  id text primary key,
-  company_id text references companies(id),
-  vehicle_id text,
-  type text,
-  parts numeric default 0,
-  labor numeric default 0,
-  discount numeric default 0,
-  tax numeric default 19,
-  net numeric default 0,
-  total numeric default 0,
-  payment text,
-  date timestamptz,
-  created_at timestamptz default now()
-);
-
--- بيانات أولية للشركات
-insert into companies (id, name, country, currency, doc_lang) values
-  ('de', 'Auto Service', 'DE', 'EUR', 'de'),
-  ('es', 'Auto Service España', 'ES', 'EUR', 'es')
-on conflict (id) do nothing;
-
--- سياسات مفتوحة للتجربة (anon) — لاحقاً نقيدها مع Auth
-alter table companies enable row level security;
+alter table purchases enable row level security;
 alter table customers enable row level security;
 alter table vehicles enable row level security;
-alter table purchases enable row level security;
 alter table inventory enable row level security;
-alter table repairs enable row level security;
-alter table invoices enable row level security;
+alter table companies enable row level security;
 
--- سياسات قراءة/كتابة للـ anon (نسخة تجريبية)
-do $$ begin
-  create policy "anon_all_companies" on companies for all using (true) with check (true);
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy "anon_all_customers" on customers for all using (true) with check (true);
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy "anon_all_vehicles" on vehicles for all using (true) with check (true);
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy "anon_all_purchases" on purchases for all using (true) with check (true);
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy "anon_all_inventory" on inventory for all using (true) with check (true);
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy "anon_all_repairs" on repairs for all using (true) with check (true);
-exception when duplicate_object then null; end $$;
-do $$ begin
-  create policy "anon_all_invoices" on invoices for all using (true) with check (true);
-exception when duplicate_object then null; end $$;
+drop policy if exists "wp_purchases_all" on purchases;
+create policy "wp_purchases_all" on purchases for all using (true) with check (true);
+
+drop policy if exists "wp_customers_all" on customers;
+create policy "wp_customers_all" on customers for all using (true) with check (true);
+
+drop policy if exists "wp_vehicles_all" on vehicles;
+create policy "wp_vehicles_all" on vehicles for all using (true) with check (true);
+
+drop policy if exists "wp_inventory_all" on inventory;
+create policy "wp_inventory_all" on inventory for all using (true) with check (true);
+
+drop policy if exists "wp_companies_all" on companies;
+create policy "wp_companies_all" on companies for all using (true) with check (true);
+
+-- تأكيد bucket الإيصالات (إذا مش موجود أنشئه من Storage يدوياً: purchase-receipts / Public)
