@@ -95,6 +95,75 @@ let db=load(), session=null;
 function clone(x){return JSON.parse(JSON.stringify(x))}
 function load(){try{return {...clone(seed),...JSON.parse(localStorage.getItem(storeKey)||'{}')}}catch{return clone(seed)}}
 function save(){localStorage.setItem(storeKey,JSON.stringify(db))}
+
+/* ===== Supabase data layer (purchases أولاً) ===== */
+async function sbReady(){
+  return !!(window.supabaseClient);
+}
+
+async function loadPurchasesFromCloud(){
+  try{
+    const sb = window.supabaseClient;
+    if(!sb) return false;
+    const { data, error } = await sb.from('purchases').select('*').order('date', { ascending: false });
+    if(error){ console.warn('loadPurchases', error.message); return false; }
+    if(!Array.isArray(data)) return false;
+    // حوّل أسماء الأعمدة من snake_case
+    db.purchases = data.map(r => ({
+      id: r.id,
+      companyId: r.company_id,
+      supplier: r.supplier || '',
+      invoice_number: r.invoice_number || '',
+      item: r.item || '',
+      qty: r.qty,
+      price: r.price,
+      subtotal: r.subtotal,
+      tax_amount: r.tax_amount,
+      total_amount: r.total_amount,
+      date: r.date,
+      payment_status: r.payment_status || 'pending',
+      notes: r.notes || '',
+      receipt_url: r.receipt_url || ''
+    }));
+    save();
+    return true;
+  }catch(e){ console.warn(e); return false; }
+}
+
+async function upsertPurchaseCloud(p){
+  try{
+    const sb = window.supabaseClient;
+    if(!sb) return;
+    const row = {
+      id: p.id,
+      company_id: p.companyId || session?.company?.id || 'de',
+      supplier: p.supplier || '',
+      invoice_number: p.invoice_number || '',
+      item: p.item || '',
+      qty: p.qty ?? 1,
+      price: p.price ?? 0,
+      subtotal: p.subtotal ?? 0,
+      tax_amount: p.tax_amount ?? 0,
+      total_amount: p.total_amount ?? 0,
+      date: p.date || new Date().toISOString().slice(0,10),
+      payment_status: p.payment_status || 'pending',
+      notes: p.notes || '',
+      receipt_url: p.receipt_url || ''
+    };
+    const { error } = await sb.from('purchases').upsert(row);
+    if(error) console.warn('upsertPurchase', error.message);
+  }catch(e){ console.warn(e); }
+}
+
+async function deletePurchaseCloud(pid){
+  try{
+    const sb = window.supabaseClient;
+    if(!sb) return;
+    const { error } = await sb.from('purchases').delete().eq('id', pid);
+    if(error) console.warn('deletePurchase', error.message);
+  }catch(e){ console.warn(e); }
+}
+
 function id(p='x'){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function money(v){return Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'})}
 function toast(t){const x=document.createElement('div');x.className='toast';x.textContent=t;document.body.append(x);setTimeout(()=>x.remove(),2200)}
@@ -133,7 +202,8 @@ function login(){
   const u=db.users.find(x=>x.u===$('#lu').value&&x.p===$('#lp').value);
   if(!u)return toast('بيانات الدخول غير صحيحة');
   session={user:u,company:db.companies[0],page:'dashboard'};
-  audit('login');render();
+  audit('login');
+  loadPurchasesFromCloud().then(()=>render()).catch(()=>render());
  };
 }
 
@@ -489,6 +559,7 @@ function purchaseManualModal(){
     };
     db.purchases.push(purchase);
     save();
+    upsertPurchaseCloud(purchase);
     audit('purchase.create', purchase.supplier);
     closeModal();
     render();
@@ -500,6 +571,7 @@ function deletePurchase(pid){
   if(!confirm('حذف فاتورة الشراء؟')) return;
   db.purchases = db.purchases.filter(x => x.id !== pid);
   save();
+  deletePurchaseCloud(pid);
   audit('purchase.delete', pid);
   render();
   toast('تم الحذف');
@@ -638,6 +710,7 @@ async function scanPurchaseDocument(){
 
       db.purchases.push(purchase);
       save();
+      upsertPurchaseCloud(purchase);
       audit('purchase.create', purchase.invoice_number || purchase.supplier);
       if(pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
       closeModal();
