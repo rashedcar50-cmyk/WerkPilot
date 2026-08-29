@@ -135,7 +135,7 @@ async function upsertPurchaseCloud(p){
     const sb = window.supabaseClient;
     if(!sb) return;
     const row = {
-      company_id: String(p.companyId || session?.company?.id || 'de'),
+      // company_id في قاعدة البيانات bigint FK — نتركه null مؤقتاً لتجنب خطأ المفتاح الأجنبي
       supplier: p.supplier || '',
       invoice_number: p.invoice_number || '',
       item: p.item || '',
