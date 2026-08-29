@@ -65,6 +65,23 @@ th{background:#111827;position:sticky;top:0}
   .mobile-menu{display:inline-block}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:560px){.grid,.form-grid{grid-template-columns:1fr}.span2{grid-column:auto}.hide-mobile{display:none}}
+
+@media print{
+  .sidebar,.topbar,.toolbar,.btn,.nav,.mobile-menu,#modalRoot,.toast{display:none!important}
+  .shell{display:block}
+  .main,.content{padding:0;max-width:100%}
+  body{background:#fff;color:#000}
+  .card,table{border-color:#ccc}
+  th{background:#eee!important;color:#000}
+}
+.print-doc{direction:rtl;font-family:Arial,sans-serif;padding:24px;color:#111}
+.print-doc h1{margin:0 0 8px;font-size:22px}
+.print-doc .meta{color:#555;margin-bottom:16px;font-size:13px}
+.print-doc table{width:100%;border-collapse:collapse;margin-top:12px}
+.print-doc th,.print-doc td{border:1px solid #ccc;padding:8px;text-align:right;font-size:13px}
+.print-doc th{background:#f3f4f6}
+.share-bar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
+
 </style>
 </head>
 <body>
@@ -352,11 +369,149 @@ function page(){
  (m[session.page]||dashboard)();
 }
 function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>${action}</div>`}
-function table(headers,rows){
- if(!rows.length)return `<div class="card muted">لا توجد بيانات بعد.</div>`;
- return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
- <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c??''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+
+const PAGE_SIZE = 50;
+function table(headers, rows, pageKey){
+  if(!rows.length) return `<div class="card muted">لا توجد بيانات بعد.</div>`;
+  const key = pageKey || 'default';
+  if(!window._tblPage) window._tblPage = {};
+  if(window._tblPage[key] == null) window._tblPage[key] = 0;
+  const total = rows.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if(window._tblPage[key] >= pages) window._tblPage[key] = pages - 1;
+  const page = window._tblPage[key];
+  const slice = rows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const pager = pages > 1 ? `<div class="toolbar" style="margin-top:10px;justify-content:space-between">
+    <span class="muted">عرض ${page*PAGE_SIZE+1}–${Math.min((page+1)*PAGE_SIZE,total)} من ${total}</span>
+    <div class="toolbar">
+      <button class="btn small ghost" ${page<=0?'disabled':''} onclick="window._tblPage['${key}']=${page-1};render()">السابق</button>
+      <span class="muted">${page+1} / ${pages}</span>
+      <button class="btn small ghost" ${page>=pages-1?'disabled':''} onclick="window._tblPage['${key}']=${page+1};render()">التالي</button>
+    </div>
+  </div>` : `<div class="muted" style="margin-top:8px">${total} سجل</div>`;
+  return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+  <tbody>${slice.map(r=>`<tr>${r.map(c=>`<td>${c??''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${pager}`;
 }
+
+function shareBar(type, id){
+  return `<div class="share-bar">
+    <button class="btn small" onclick="exportPrint('${type}','${id||''}')">🖨️ طباعة</button>
+    <button class="btn small" onclick="exportPDF('${type}','${id||''}')">📄 PDF</button>
+    <button class="btn small" onclick="exportEmail('${type}','${id||''}')">✉️ إيميل</button>
+    <button class="btn small" onclick="exportWhatsApp('${type}','${id||''}')">💬 واتساب</button>
+  </div>`;
+}
+
+function listShareBar(type){
+  return `<div class="share-bar">
+    <button class="btn small" onclick="exportPrint('${type}','')">🖨️ طباعة القائمة</button>
+    <button class="btn small" onclick="exportPDF('${type}','')">📄 PDF القائمة</button>
+    <button class="btn small" onclick="exportEmail('${type}','')">✉️ إيميل</button>
+    <button class="btn small" onclick="exportWhatsApp('${type}','')">💬 واتساب</button>
+  </div>`;
+}
+
+function buildDocHTML(type, id){
+  const co = session?.company?.name || 'WerkPilot';
+  const now = new Date().toLocaleString('ar');
+  let title = '', body = '';
+
+  if(type === 'customers'){
+    title = 'قائمة العملاء';
+    const rows = companyRows('customers');
+    body = `<table><thead><tr><th>الاسم</th><th>الهاتف</th><th>الإيميل</th><th>العنوان</th></tr></thead><tbody>` +
+      rows.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.phone||'')}</td><td>${esc(c.email||'')}</td><td>${esc(c.address||'')}</td></tr>`).join('') +
+      `</tbody></table>`;
+  } else if(type === 'vehicles'){
+    title = 'قائمة السيارات';
+    const rows = companyRows('vehicles');
+    body = `<table><thead><tr><th>العميل</th><th>اللوحة</th><th>VIN</th><th>الماركة</th><th>الموديل</th><th>السنة</th></tr></thead><tbody>` +
+      rows.map(v=>`<tr><td>${esc(customerName(v.customerId))}</td><td>${esc(v.plate||'')}</td><td>${esc(v.vin||'')}</td><td>${esc(v.make||'')}</td><td>${esc(v.model||'')}</td><td>${esc(v.year||'')}</td></tr>`).join('') +
+      `</tbody></table>`;
+  } else if(type === 'purchases'){
+    title = id ? 'فاتورة شراء' : 'قائمة المشتريات';
+    let rows = companyRows('purchases');
+    if(id) rows = rows.filter(x => x.id === id);
+    body = `<table><thead><tr><th>المورد</th><th>رقم الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th></tr></thead><tbody>` +
+      rows.map(x=>{
+        const total = Number(x.total_amount || (x.qty||0)*(x.price||0) || 0);
+        return `<tr><td>${esc(x.supplier||'')}</td><td>${esc(x.invoice_number||x.item||'')}</td><td>${esc(x.date||'')}</td><td>${money(total)}</td><td>${esc(x.payment_status||'')}</td></tr>`;
+      }).join('') + `</tbody></table>`;
+  } else if(type === 'invoices'){
+    title = id ? 'فاتورة' : 'قائمة الفواتير';
+    let rows = companyRows('invoices');
+    if(id) rows = rows.filter(x => x.id === id);
+    body = `<table><thead><tr><th>النوع</th><th>السيارة</th><th>الصافي</th><th>الضريبة</th><th>الإجمالي</th><th>الدفع</th></tr></thead><tbody>` +
+      rows.map(x=>`<tr><td>${esc(x.type||'')}</td><td>${esc(vehicleName(x.vehicleId)||'بيع مباشر')}</td><td>${money(x.net)}</td><td>${x.tax||0}%</td><td>${money(x.total)}</td><td>${esc(x.payment||'')}</td></tr>`).join('') +
+      `</tbody></table>`;
+  } else if(type === 'inventory'){
+    title = 'قائمة المخزون';
+    const rows = companyRows('inventory');
+    body = `<table><thead><tr><th>رقم القطعة</th><th>الاسم</th><th>الكمية</th><th>شراء</th><th>بيع</th></tr></thead><tbody>` +
+      rows.map(x=>`<tr><td>${esc(x.sku||'')}</td><td>${esc(x.name||'')}</td><td>${x.qty}</td><td>${money(x.buy)}</td><td>${money(x.sell)}</td></tr>`).join('') +
+      `</tbody></table>`;
+  } else {
+    title = 'تقرير';
+    body = '<p>لا توجد بيانات</p>';
+  }
+
+  return `<div class="print-doc"><h1>${title}</h1><div class="meta">${esc(co)} · ${now}</div>${body}</div>`;
+}
+
+function plainTextDoc(type, id){
+  const div = document.createElement('div');
+  div.innerHTML = buildDocHTML(type, id);
+  return (div.innerText || div.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function exportPrint(type, id){
+  const html = buildDocHTML(type, id);
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if(!w) return toast('اسمح بالنوافذ المنبثقة');
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>طباعة</title>
+    <style>body{font-family:Arial,sans-serif;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ccc;padding:8px;text-align:right} th{background:#f3f4f6} h1{margin:0 0 8px}.meta{color:#555;margin-bottom:16px}</style>
+    </head><body>${html}<script>window.onload=()=>{window.print()}<\/script></body></html>`);
+  w.document.close();
+}
+
+function exportPDF(type, id){
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const text = plainTextDoc(type, id);
+    const lines = doc.splitTextToSize(text, 180);
+    let y = 15;
+    doc.setFontSize(11);
+    lines.forEach(line => {
+      if(y > 280){ doc.addPage(); y = 15; }
+      doc.text(line, 15, y);
+      y += 6;
+    });
+    const name = `${type || 'report'}-${(id||'list').slice(0,12)}-${Date.now().toString(36)}.pdf`;
+    doc.save(name);
+    toast('تم إنشاء PDF');
+  }catch(e){
+    console.error(e);
+    toast('تعذر إنشاء PDF');
+  }
+}
+
+function exportEmail(type, id){
+  const subject = encodeURIComponent('WerkPilot - ' + (type || 'تقرير'));
+  const body = encodeURIComponent(plainTextDoc(type, id).slice(0, 1800));
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+}
+
+function exportWhatsApp(type, id){
+  const text = encodeURIComponent(plainTextDoc(type, id).slice(0, 1500));
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+window.exportPrint = exportPrint;
+window.exportPDF = exportPDF;
+window.exportEmail = exportEmail;
+window.exportWhatsApp = exportWhatsApp;
+
 function modal(title,body,onSave,saveText='حفظ'){
  $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal">
  <div class="modal-head"><h2>${title}</h2><button class="btn ghost small" id="xmod">✕</button></div>
@@ -382,7 +537,13 @@ function dashboard(){
 function customers(){
  const rows=companyRows('customers');
  $('#content').innerHTML=head('العملاء',`<button class="btn primary" id="add">عميل جديد</button>`)+
- table(['الاسم','الهاتف','الإيميل','العنوان','السيارات'],rows.map(c=>[esc(c.name),esc(c.phone||'-'),esc(c.email||'-'),esc(c.address||'-'),db.vehicles.filter(v=>v.customerId===c.id).length]));
+ listShareBar('customers')+
+ table(['الاسم','الهاتف','الإيميل','العنوان','السيارات','مشاركة'],rows.map(c=>[
+  esc(c.name),esc(c.phone||'-'),esc(c.email||'-'),esc(c.address||'-'),
+  db.vehicles.filter(v=>v.customerId===c.id).length,
+  `<button class="btn small" onclick="exportPrint('customers','')">🖨️</button>
+   <button class="btn small" onclick="exportWhatsApp('customers','')">💬</button>`
+ ]), 'customers');
  $('#add').onclick=customerModal;
 }
 function customerModal(){
@@ -401,7 +562,8 @@ function customerModal(){
 function vehicles(){
  const rows=companyRows('vehicles');
  $('#content').innerHTML=head('السيارات',`<div class="toolbar"><button class="btn primary" id="add">إضافة سيارة</button><button class="btn ok" id="scan">📷 تصوير ورقة السيارة</button></div>`)+
- table(['العميل','اللوحة','VIN','الماركة','الموديل','السنة','المحرك','اللون'],rows.map(v=>[customerName(v.customerId),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),esc(v.engine||'-'),esc(v.paint||'-')]));
+ listShareBar('vehicles')+
+ table(['العميل','اللوحة','VIN','الماركة','الموديل','السنة','المحرك','اللون'],rows.map(v=>[customerName(v.customerId),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),esc(v.engine||'-'),esc(v.paint||'-')]), 'vehicles');
  $('#add').onclick=()=>vehicleModal();
  $('#scan').onclick=scanVehicleDocument;
 }
@@ -577,13 +739,21 @@ function repairModal(){
 function estimates(){
  const rows=companyRows('estimates');
  $('#content').innerHTML=head('Kostenvoranschlag',`<button class="btn primary" id="add">إنشاء تقدير</button>`)+
- table(['العميل/السيارة','القطع','الأجور','الخصم','الضريبة','الإجمالي','رسوم التقدير'],rows.map(x=>[vehicleName(x.vehicleId),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]));
+ listShareBar('invoices')+
+ table(['العميل/السيارة','القطع','الأجور','الخصم','الضريبة','الإجمالي','رسوم التقدير'],rows.map(x=>[vehicleName(x.vehicleId),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]), 'estimates');
  $('#add').onclick=()=>financeModal('estimate');
 }
 function invoices(){
  const rows=companyRows('invoices');
  $('#content').innerHTML=head('الفواتير و Barverkauf',`<div class="toolbar"><button class="btn primary" id="inv">فاتورة جديدة</button><button class="btn" id="bar">Barverkauf</button></div>`)+
- table(['النوع','العميل/السيارة','الصافي','الضريبة','الإجمالي','الدفع'],rows.map(x=>[x.type,vehicleName(x.vehicleId)||'بيع مباشر',money(x.net),x.tax+'%',money(x.total),esc(x.payment||'غير محدد')]));
+ listShareBar('invoices')+
+ table(['النوع','العميل/السيارة','الصافي','الضريبة','الإجمالي','الدفع','إرسال'],rows.map(x=>[
+  x.type, vehicleName(x.vehicleId)||'بيع مباشر', money(x.net), x.tax+'%', money(x.total), esc(x.payment||'غير محدد'),
+  `<button class="btn small" onclick="exportPrint('invoices','${x.id}')">🖨️</button>
+   <button class="btn small" onclick="exportPDF('invoices','${x.id}')">📄</button>
+   <button class="btn small" onclick="exportEmail('invoices','${x.id}')">✉️</button>
+   <button class="btn small" onclick="exportWhatsApp('invoices','${x.id}')">💬</button>`
+ ]), 'invoices');
  $('#inv').onclick=()=>financeModal('invoice');$('#bar').onclick=()=>financeModal('bar');
 }
 function financeModal(type){
@@ -640,13 +810,13 @@ function purchases(){
       <button class="btn primary" id="scanPurchase">📷 تصوير / رفع فاتورة</button>
       <button class="btn primary" id="add">+ شراء يدوي</button>
     </div>
-  `) + `
+  `) + listShareBar('purchases') + `
   <div class="grid" style="margin-bottom:14px">
     <div class="card"><div class="muted">عدد الفواتير</div><div class="metric">${rows.length}</div></div>
     <div class="card"><div class="muted">إجمالي المشتريات</div><div class="metric">${money(totalSpend)}</div></div>
   </div>
   ` + table(
-    ['المورد','رقم الفاتورة','التاريخ','الإجمالي','الحالة','المستند','إجراءات'],
+    ['المورد','رقم الفاتورة','التاريخ','الإجمالي','الحالة','المستند','إرسال','إجراءات'],
     rows.map(x=>{
       const total = Number(x.total_amount || (Number(x.qty||0)*Number(x.price||0)) || 0);
       const status = x.payment_status || 'pending';
@@ -661,9 +831,13 @@ function purchases(){
         x.receipt_url
           ? `<button class="btn small primary" onclick="viewReceipt(${JSON.stringify(x.receipt_url)})">📄 عرض</button>`
           : '<span class="muted">—</span>',
+        `<button class="btn small" onclick="exportPrint('purchases','${x.id}')">🖨️</button>
+         <button class="btn small" onclick="exportPDF('purchases','${x.id}')">📄</button>
+         <button class="btn small" onclick="exportEmail('purchases','${x.id}')">✉️</button>
+         <button class="btn small" onclick="exportWhatsApp('purchases','${x.id}')">💬</button>`,
         `<button class="btn small bad" onclick="deletePurchase('${x.id}')">حذف</button>`
       ];
-    })
+    }), 'purchases'
   );
 
   $('#add').onclick = () => purchaseManualModal();
@@ -1078,7 +1252,8 @@ async function openCameraForPurchase(onCapture){
 function inventory(){
  const rows=companyRows('inventory');
  $('#content').innerHTML=head('المخزون وقطع الغيار',`<button class="btn primary" id="add">قطعة جديدة</button>`)+
- table(['رقم القطعة','الاسم','الكمية','سعر الشراء','سعر البيع'],rows.map(x=>[esc(x.sku),esc(x.name),x.qty,money(x.buy),money(x.sell)]));
+ listShareBar('inventory')+
+ table(['رقم القطعة','الاسم','الكمية','سعر الشراء','سعر البيع'],rows.map(x=>[esc(x.sku),esc(x.name),x.qty,money(x.buy),money(x.sell)]), 'inventory');
  $('#add').onclick=()=>simpleModal('قطعة جديدة',[['sku','رقم القطعة'],['name','الاسم'],['qty','الكمية','number'],['buy','سعر الشراء','number'],['sell','سعر البيع','number']],o=>{o.companyId=session.company.id;o.id=id('i');db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
 }
 function employees(){
