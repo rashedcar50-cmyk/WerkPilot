@@ -7,7 +7,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-   <script src="supabase-config.js"></script>                                                                               pt>
+   <script src="supabase-config.js"></script>
+<script src="i18n.js"></script>                                                                               pt>
 <style>
 :root{--bg:#0b1220;--panel:#151f33;--panel2:#1d2940;--line:#334155;--text:#f8fafc;--muted:#94a3b8;--pri:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#b91c1c;--font:16px}
 *{box-sizing:border-box}
@@ -430,24 +431,30 @@ function roleCan(section){
  return false;
 }
 
-const nav=[
- ['dashboard','الرئيسية'],['customers','العملاء'],['vehicles','السيارات'],['repairs','أوامر الإصلاح'],['appointments','المواعيد'],
- ['estimates','Kostenvoranschlag'],['invoices','الفواتير و Barverkauf'],['purchases','المشتريات'],
- ['inventory','المخزون وقطع الغيار'],['employees','الموظفون والرواتب'],['expenses','المصاريف'],
- ['journal','دفتر اليومية'],['reports','التقارير'],['integrations','التكاملات'],
- ['audit','سجل النشاط'],['settings','الإعدادات']
-];
+function nav(){
+ return [
+  ['dashboard', t('dash')],['customers', t('customers')],['vehicles', t('vehicles')],['repairs', t('repairs')],['appointments', t('appointments')],
+  ['estimates', t('estimates')],['invoices', t('invoices')],['purchases', t('purchases')],
+  ['inventory', t('inventory')],['employees', t('employees')],['expenses', t('expenses')],
+  ['journal', t('journal')],['reports', t('reports')],['integrations', t('integrations')],
+  ['audit', t('audit')],['settings', t('settings')]
+ ];
+}
 
 function login(){
- document.documentElement.dir='rtl';
+ applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
- <div class="brand">WerkPilot Pro</div><div class="tag">إدارة الورشة الذكية</div>
- <div class="field"><label>اسم المستخدم</label><input id="lu" value="admin"></div>
- <div class="field"><label>كلمة المرور</label><input id="lp" type="password" value="1234"></div>
- <button class="btn primary full" id="loginBtn">دخول</button>
+ <div class="brand">${t('app')}</div><div class="tag">${t('tag')}</div>
+ <div class="field"><label>${t('user')}</label><input id="lu" value="admin"></div>
+ <div class="field"><label>${t('pass')}</label><input id="lp" type="password" value="1234"></div>
+ <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'ar')}</select></div>
+ <button class="btn primary full" id="loginBtn">${t('login')}</button>
  <div class="hint" style="margin-top:12px">admin / 1234 · accountant / 1234 · mechanic / 1234 · warehouse / 1234</div>
  </div></div>`;
+ const lg=$('#loginLang');
+ if(lg){ lg.onchange=()=>{db.settings.uiLang=lg.value;save();login();}; }
  $('#loginBtn').onclick=()=>{
+  if(lg) {db.settings.uiLang=lg.value;save();}
   const u=db.users.find(x=>x.u===$('#lu').value&&x.p===$('#lp').value);
   if(!u)return toast('بيانات الدخول غير صحيحة');
   session={user:u,company:db.companies[0],page:'dashboard'};
@@ -461,18 +468,19 @@ function login(){
 }
 
 function render(){
+ applyUiLang();
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
- const allowed=nav.filter(([k])=>roleCan(k));
+ const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell">
- <aside class="sidebar" id="side"><div class="sidebrand">WerkPilot Pro</div><div class="nav">
+ <aside class="sidebar" id="side"><div class="sidebrand">${t("app")}</div><div class="nav">
  ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </div></aside>
  <main class="main">
   <div class="topbar">
    <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
    <select id="company">${db.companies.map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${c.name} · ${c.country}</option>`).join('')}</select>
-   <input class="searchbox" id="qsearch" placeholder="بحث: لوحة / زبون / قطعة / أمر"></div>
-   <div class="top-actions"><span class="badge hide-mobile"><span class="dot"></span>${session.user.name}</span><button class="btn ghost small" id="logout">خروج</button></div>
+   <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
+   <div class="top-actions"><span class="badge hide-mobile"><span class="dot"></span>${session.user.name}</span><button class="btn ghost small" id="logout">${t('logout')}</button></div>
   </div>
   <div class="content" id="content"></div>
  </main></div>`;
@@ -566,12 +574,38 @@ function buildDocHTML(type, id){
         return `<tr><td>${esc(x.supplier||'')}</td><td>${esc(x.invoice_number||x.item||'')}</td><td>${esc(x.date||'')}</td><td>${money(total)}</td><td>${esc(x.payment_status||'')}</td></tr>`;
       }).join('') + `</tbody></table>`;
   } else if(type === 'invoices'){
-    title = id ? 'فاتورة' : 'قائمة الفواتير';
-    let rows = companyRows('invoices');
-    if(id) rows = rows.filter(x => x.id === id);
-    body = `<table><thead><tr><th>النوع</th><th>السيارة</th><th>الصافي</th><th>الضريبة</th><th>الإجمالي</th><th>الدفع</th></tr></thead><tbody>` +
-      rows.map(x=>`<tr><td>${esc(x.type||'')}</td><td>${esc(vehicleName(x.vehicleId)||'بيع مباشر')}</td><td>${money(x.net)}</td><td>${x.tax||0}%</td><td>${money(x.total)}</td><td>${esc(x.payment||'')}</td></tr>`).join('') +
-      `</tbody></table>`;
+    const L = (docLang()==='de') ? WP_INV_DE : null;
+    if(L){
+      title = id ? L.invoice : L.invoices;
+      let rows = companyRows('invoices');
+      if(id) rows = rows.filter(x => x.id === id);
+      const x = id && rows[0];
+      if(x){
+        const cust = customerOfVehicle(x.vehicleId);
+        const veh = vehicleOf(x.vehicleId);
+        const lines = (x.lines&&x.lines.length)?x.lines:[{name:L.parts,qty:1,price:x.parts||0},{name:L.labor,qty:1,price:x.labor||0}];
+        body = `<div class="meta">${L.workshop}: ${esc(co)} · ${L.date}: ${new Date(x.date||Date.now()).toLocaleDateString('de-DE')}</div>
+        <p><b>${L.number}:</b> ${esc(x.number||x.id)}<br>
+        <b>${L.customer}:</b> ${esc(cust?.name||'-')}<br>
+        <b>${L.vehicle}:</b> ${esc(vehicleName(x.vehicleId)||L.cash)} ${veh&&veh.plate?(' / '+L.plate+': '+esc(veh.plate)) : ''}</p>
+        <table><thead><tr><th>${L.item}</th><th>${L.qty}</th><th>${L.price}</th><th>${L.total}</th></tr></thead><tbody>`+
+        lines.map(ln=>`<tr><td>${esc(ln.name)}</td><td>${ln.qty||1}</td><td>${money(ln.price)}</td><td>${money((ln.qty||1)*Number(ln.price||0))}</td></tr>`).join('')+
+        `</tbody></table>
+        <p>${L.net}: ${money(x.net)} · ${L.tax} ${x.tax||19}% · <b>${L.total}: ${money(x.total)}</b><br>${L.payment}: ${esc(x.payment||'-')}</p>
+        <p>${L.thanks}</p>`;
+      } else {
+        body = `<table><thead><tr><th>${L.number}</th><th>${L.type}</th><th>${L.vehicle}</th><th>${L.net}</th><th>${L.tax}</th><th>${L.total}</th><th>${L.payment}</th></tr></thead><tbody>`+
+          rows.map(r=>`<tr><td>${esc(r.number||r.id)}</td><td>${esc(r.type||L.invoice)}</td><td>${esc(vehicleName(r.vehicleId)||L.cash)}</td><td>${money(r.net)}</td><td>${r.tax||0}%</td><td>${money(r.total)}</td><td>${esc(r.payment||'')}</td></tr>`).join('')+
+          `</tbody></table>`;
+      }
+    } else {
+      title = id ? 'فاتورة' : 'قائمة الفواتير';
+      let rows = companyRows('invoices');
+      if(id) rows = rows.filter(x => x.id === id);
+      body = `<table><thead><tr><th>النوع</th><th>السيارة</th><th>الصافي</th><th>الضريبة</th><th>الإجمالي</th><th>الدفع</th></tr></thead><tbody>` +
+        rows.map(x=>`<tr><td>${esc(x.type||'')}</td><td>${esc(vehicleName(x.vehicleId)||'بيع مباشر')}</td><td>${money(x.net)}</td><td>${x.tax||0}%</td><td>${money(x.total)}</td><td>${esc(x.payment||'')}</td></tr>`).join('') +
+        `</tbody></table>`;
+    }
   } else if(type === 'inventory'){
     title = 'قائمة المخزون';
     const rows = companyRows('inventory');
@@ -596,8 +630,9 @@ function exportPrint(type, id){
   const html = buildDocHTML(type, id);
   const w = window.open('', '_blank', 'width=900,height=700');
   if(!w) return toast('اسمح بالنوافذ المنبثقة');
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>طباعة</title>
-    <style>body{font-family:Arial,sans-serif;padding:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ccc;padding:8px;text-align:right} th{background:#f3f4f6} h1{margin:0 0 8px}.meta{color:#555;margin-bottom:16px}</style>
+  const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":(WP_RTL.includes(db.settings.uiLang||"ar")?"rtl":"ltr");
+  w.document.write(`<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>${type==="invoices"&&dl==="de"?"Rechnung":"Print"}</title>
+    <style>body{font-family:Arial,sans-serif;padding:20px;direction:${ddr}} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ccc;padding:8px;text-align:${ddr==="rtl"?"right":"left"}} th{background:#f3f4f6} h1{margin:0 0 8px}.meta{color:#555;margin-bottom:16px}</style>
     </head><body>${html}<script>window.onload=()=>{window.print()}<\/script></body></html>`);
   w.document.close();
 }
@@ -1647,21 +1682,21 @@ function auditPage(){
  $('#content').innerHTML=head('سجل النشاط')+table(['الوقت','المستخدم','الإجراء','التفاصيل'],rows.map(a=>[new Date(a.ts).toLocaleString(),esc(a.user),esc(a.action),esc(a.detail)]));
 }
 function settings(){
- $('#content').innerHTML=head('الإعدادات')+`<div class="card"><div class="form-grid">
- <div class="field"><label>حجم الخط</label><input id="font" type="number" min="13" max="22" value="${db.settings.font}"></div>
- <div class="field"><label>اللغة</label><select id="lang"><option value="ar" ${db.settings.uiLang==='ar'?'selected':''}>العربية</option><option value="de" ${db.settings.uiLang==='de'?'selected':''}>Deutsch</option><option value="es" ${db.settings.uiLang==='es'?'selected':''}>Españول</option></select></div>
- <div class="field"><label>سعر ساعة العمل €</label><input id="hrate" type="number" step="0.01" value="${db.settings.hourlyRate||85}"></div>
- <div class="field"><label>هاتف الورشة / واتساب</label><input id="wphone" value="${esc(db.settings.workshopPhone||'')}"></div>
+ $('#content').innerHTML=head(t('settings'))+`<div class="card"><div class="form-grid">
+ <div class="field"><label>${t('font')}</label><input id="font" type="number" min="13" max="22" value="${db.settings.font}"></div>
+ <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'ar')}</select></div>
+ <div class="field"><label>${t('hourly')}</label><input id="hrate" type="number" step="0.01" value="${db.settings.hourlyRate||85}"></div>
+ <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(db.settings.workshopPhone||'')}"></div>
  </div>
+ <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
-  <button class="btn primary" id="saveset">حفظ الإعدادات</button>
-  <button class="btn" id="exportData">تصدير نسخة احتياطية</button>
-  <button class="btn" id="syncCloud">مزامنة من السحابة</button>
-  <button class="btn bad" id="reset">مسح بيانات التجربة</button>
+  <button class="btn primary" id="saveset">${t('save')}</button>
+  <button class="btn" id="exportData">${t('backup')}</button>
+  <button class="btn" id="syncCloud">${t('sync')}</button>
+  <button class="btn bad" id="reset">${t('reset')}</button>
  </div>
- <p class="muted" style="margin-top:12px">المشتريات والعملاء والمخزون يُحفظون محلياً + على Supabase عند التوفر.</p>
  </div>`;
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;save();toast('تم الحفظ');render()};
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;save();applyUiLang();toast(t('saved'));render()};
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
