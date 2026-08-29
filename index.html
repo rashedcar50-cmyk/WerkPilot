@@ -488,12 +488,27 @@ String(ai.total_amount||'0')
 .replace(',','.')
 .replace(/[^\d.-]/g,'')
 )||0;
+const fileName=`${Date.now()}-${f.name||'receipt.jpg'}`;
 
+const {error:uploadError}=await supabaseClient
+.storage
+.from('purchase-receipts')
+.upload(fileName,f);
+
+if(uploadError) throw uploadError;
+
+const {data:urlData}=supabaseClient
+.storage
+.from('purchase-receipts')
+.getPublicUrl(fileName);
+
+const receiptUrl=urlData.publicUrl;
 const purchase={
 id:id('p'),
 companyId:session.company.id,
 supplier:ai.supplier_name||'',
 invoice_number:ai.invoice_number||'',
+  receipt_url:receiptUrl, 
 date:ai.purchase_date||new Date().toISOString().slice(0,10),
 subtotal:subtotal,
 tax_amount:taxAmount,
