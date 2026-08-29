@@ -81,6 +81,13 @@ th{background:#111827;position:sticky;top:0}
 .print-doc th,.print-doc td{border:1px solid #ccc;padding:8px;text-align:right;font-size:13px}
 .print-doc th{background:#f3f4f6}
 .share-bar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
+.searchbox{min-width:220px;max-width:360px}
+.alert{background:#7f1d1d;border:1px solid #b91c1c;border-radius:12px;padding:10px 12px;margin:8px 0}
+.okbox{background:#14532d;border:1px solid #16a34a;border-radius:12px;padding:10px 12px;margin:8px 0}
+.today-item{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.status.bad{background:#7f1d1d}
+.status.info{background:#1e3a8a}
+
 
 </style>
 </head>
@@ -91,7 +98,7 @@ th{background:#111827;position:sticky;top:0}
 <script>
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
-const storeKey='werkpilot_pro_v2';
+const storeKey='werkpilot_pro_v3';
 const seed={
  users:[
   {u:'admin',p:'1234',name:'المدير',role:'manager'},
@@ -109,26 +116,29 @@ const seed={
   {id:'c_demo3',companyId:'de',name:'يوسف منصور',phone:'+49 160 9988776',email:'youssef@example.de',address:'München, Germany'}
  ],
  vehicles:[
-  {id:'v_demo1',companyId:'de',customerId:'c_demo1',plate:'B-AK 1234',vin:'WVWZZZ1JZYW123456',make:'VW',model:'Golf 7',year:'2018',engine:'CJZA',paint:'LC9X'},
-  {id:'v_demo2',companyId:'de',customerId:'c_demo2',plate:'HH-MS 55',vin:'WBA8E9G50JNU12345',make:'BMW',model:'320d',year:'2019',engine:'B47',paint:'300'},
-  {id:'v_demo3',companyId:'de',customerId:'c_demo3',plate:'M-YM 900',vin:'WDD2050041A123456',make:'Mercedes',model:'C 200',year:'2020',engine:'M264',paint:'197'}
+  {id:'v_demo1',companyId:'de',customerId:'c_demo1',plate:'B-AK 1234',vin:'WVWZZZ1JZYW123456',make:'VW',model:'Golf 7',year:'2018',engine:'CJZA',paint:'LC9X',km:86500,nextServiceKm:90000},
+  {id:'v_demo2',companyId:'de',customerId:'c_demo2',plate:'HH-MS 55',vin:'WBA8E9G50JNU12345',make:'BMW',model:'320d',year:'2019',engine:'B47',paint:'300',km:112000,nextServiceKm:120000},
+  {id:'v_demo3',companyId:'de',customerId:'c_demo3',plate:'M-YM 900',vin:'WDD2050041A123456',make:'Mercedes',model:'C 200',year:'2020',engine:'M264',paint:'197',km:54000,nextServiceKm:60000}
  ],
  repairs:[
-  {id:'r_demo1',companyId:'de',vehicleId:'v_demo1',description:'تغيير زيت + فلتر',tech:'الميكانيكي',hours:1.5,status:'جاري العمل'},
-  {id:'r_demo2',companyId:'de',vehicleId:'v_demo2',description:'فحص فرامل أمامية',tech:'الميكانيكي',hours:2,status:'جديد'}
+  {id:'r_demo1',companyId:'de',vehicleId:'v_demo1',description:'تغيير زيت + فلتر',complaint:'صوت من المحرك عند التشغيل',km:86500,fuel:'نصف',tech:'الميكانيكي',hours:1.5,status:'قيد التنفيذ',jobs:['تغيير زيت','تغيير فلتر زيت'],parts:[{sku:'OIL-5W30',name:'زيت محرك 5W30 5L',qty:1,price:35},{sku:'FIL-OIL-VW',name:'فلتر زيت VW',qty:1,price:9}],photos:[],date:new Date().toISOString().slice(0,10)},
+  {id:'r_demo2',companyId:'de',vehicleId:'v_demo2',description:'فحص فرامل أمامية',complaint:'صرير عند الفرملة',km:112000,fuel:'ربع',tech:'الميكانيكي',hours:2,status:'انتظار قطع',jobs:['فحص فرامل','تغيير فحمات إن لزم'],parts:[{sku:'BRK-PAD-F',name:'فحمات فرامل أمامية',qty:1,price:55}],photos:[],date:new Date().toISOString().slice(0,10)}
+ ],
+ appointments:[
+  {id:'ap_demo1',companyId:'de',vehicleId:'v_demo1',customerId:'c_demo1',date:new Date().toISOString().slice(0,10),time:'09:30',tech:'الميكانيكي',note:'تسليم بعد تغيير الزيت',status:'مؤكد'}
  ],
  estimates:[],
  invoices:[
-  {id:'i_demo1',companyId:'de',vehicleId:'v_demo1',type:'فاتورة',parts:45,labor:80,discount:0,tax:19,net:125,total:148.75,payment:'بطاقة',date:new Date().toISOString()}
+  {id:'i_demo1',companyId:'de',vehicleId:'v_demo1',number:'RE-2026-0001',type:'فاتورة',parts:45,labor:80,discount:0,tax:19,net:125,total:148.75,payment:'بطاقة',paid:true,date:new Date().toISOString(),lines:[{name:'زيت + فلتر',qty:1,price:45},{name:'أجور عمل',qty:1,price:80}]}
  ],
  purchases:[
   {id:'p_demo1',companyId:'de',supplier:'carparts-cat.com',invoice_number:'CP-10021',item:'فلتر زيت',qty:10,price:6.5,subtotal:65,tax_amount:12.35,total_amount:77.35,date:new Date().toISOString().slice(0,10),payment_status:'paid',notes:'طلب تجريبي',receipt_url:''}
  ],
  inventory:[
-  {id:'inv_demo1',companyId:'de',sku:'OIL-5W30',name:'زيت محرك 5W30 5L',qty:12,buy:22,sell:35},
-  {id:'inv_demo2',companyId:'de',sku:'FIL-OIL-VW',name:'فلتر زيت VW',qty:25,buy:4.5,sell:9},
-  {id:'inv_demo3',companyId:'de',sku:'BRK-PAD-F',name:'فحمات فرامل أمامية',qty:8,buy:28,sell:55},
-  {id:'inv_demo4',companyId:'de',sku:'BAT-12V-70',name:'بطارية 12V 70Ah',qty:4,buy:85,sell:140}
+  {id:'inv_demo1',companyId:'de',sku:'OIL-5W30',name:'زيت محرك 5W30 5L',qty:12,buy:22,sell:35,minQty:4},
+  {id:'inv_demo2',companyId:'de',sku:'FIL-OIL-VW',name:'فلتر زيت VW',qty:25,buy:4.5,sell:9,minQty:6},
+  {id:'inv_demo3',companyId:'de',sku:'BRK-PAD-F',name:'فحمات فرامل أمامية',qty:8,buy:28,sell:55,minQty:4},
+  {id:'inv_demo4',companyId:'de',sku:'BAT-12V-70',name:'بطارية 12V 70Ah',qty:2,buy:85,sell:140,minQty:3}
  ],
  employees:[
   {id:'e_demo1',companyId:'de',name:'الميكانيكي',role:'فني',phone:'+49 170 0000001',salary:2800},
@@ -139,7 +149,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:1,hourlyRate:85,workshopPhone:'+49 170 1112233'}
 };
 let db=load(), session=null;
 
@@ -150,7 +160,7 @@ function load(){
   const base=clone(seed);
   const merged={...base,...raw};
   // إذا المجموعات فاضية استخدم بيانات التجربة من seed
-  ['customers','vehicles','repairs','invoices','purchases','inventory','employees','expenses'].forEach(k=>{
+  ['customers','vehicles','repairs','invoices','purchases','inventory','employees','expenses','appointments','estimates','journal'].forEach(k=>{
    if(!Array.isArray(merged[k]) || merged[k].length===0) merged[k]=clone(seed[k]||[]);
   });
   if(!merged.settings) merged.settings=clone(seed.settings);
@@ -301,6 +311,113 @@ function money(v){return Number(v||0).toLocaleString('de-DE',{style:'currency',c
 function toast(t){const x=document.createElement('div');x.className='toast';x.textContent=t;document.body.append(x);setTimeout(()=>x.remove(),2200)}
 function audit(action,detail=''){db.audit.unshift({id:id('a'),ts:new Date().toISOString(),user:session?.user?.name||'system',company:session?.company?.id||'',action,detail});save()}
 function companyRows(name){return db[name].filter(x=>x.companyId===session.company.id)}
+
+function vehicleOf(vid){return db.vehicles.find(x=>x.id===vid)}
+function customerOfVehicle(vid){const v=vehicleOf(vid);return v?db.customers.find(c=>c.id===v.customerId):null}
+function nextInvoiceNumber(){
+  const y=new Date().getFullYear();
+  db.settings.invoiceSeq=Number(db.settings.invoiceSeq||0)+1;
+  save();
+  return 'RE-'+y+'-'+String(db.settings.invoiceSeq).padStart(4,'0');
+}
+function lowStock(){
+  return companyRows('inventory').filter(x=>Number(x.qty||0)<=Number(x.minQty||3));
+}
+function maintenanceDue(){
+  return companyRows('vehicles').filter(v=>v.nextServiceKm && v.km && Number(v.km)>=Number(v.nextServiceKm)-1500);
+}
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function openRepairs(){
+  return companyRows('repairs').filter(r=>!['مكتمل','مسلَّم','مسلم'].includes(r.status));
+}
+function unpaidInvoices(){
+  return companyRows('invoices').filter(x=>x.paid===false || (!x.paid && x.payment==='غير محدد'));
+}
+function repairPartsTotal(r){
+  return (r.parts||[]).reduce((s,p)=>s+Number(p.qty||0)*Number(p.price||0),0);
+}
+function repairLaborTotal(r){
+  return Number(r.hours||0)*Number(db.settings.hourlyRate||85);
+}
+function globalSearch(q){
+  q=(q||'').trim().toLowerCase();
+  if(!q) return {customers:[],vehicles:[],repairs:[],inventory:[]};
+  const has=s=>String(s||'').toLowerCase().includes(q);
+  return {
+    customers: companyRows('customers').filter(c=>has(c.name)||has(c.phone)||has(c.email)),
+    vehicles: companyRows('vehicles').filter(v=>has(v.plate)||has(v.vin)||has(v.make)||has(v.model)),
+    repairs: companyRows('repairs').filter(r=>has(r.description)||has(r.status)||has(vehicleName(r.vehicleId))),
+    inventory: companyRows('inventory').filter(i=>has(i.sku)||has(i.name))
+  };
+}
+function consumePartsFromRepair(r){
+  (r.parts||[]).forEach(p=>{
+    const inv=db.inventory.find(x=>x.companyId===r.companyId && (x.sku===p.sku || x.name===p.name));
+    if(inv){
+      inv.qty=Math.max(0, Number(inv.qty||0)-Number(p.qty||0));
+      upsertInventoryCloud(inv);
+    }
+  });
+  save();
+}
+function convertRepairToInvoice(rid){
+  const r=db.repairs.find(x=>x.id===rid);
+  if(!r) return toast('الأمر غير موجود');
+  const parts=repairPartsTotal(r);
+  const labor=repairLaborTotal(r);
+  const discount=0, tax=19;
+  const net=Math.max(0,parts+labor-discount);
+  const total=net*(1+tax/100);
+  const inv={
+    id:id('i'), companyId:session.company.id, vehicleId:r.vehicleId, repairId:r.id,
+    number:nextInvoiceNumber(), type:'فاتورة',
+    parts, labor, discount, tax, net, total, payment:'غير محدد', paid:false,
+    date:new Date().toISOString(),
+    lines:[
+      ...(r.parts||[]).map(p=>({name:p.name, qty:p.qty, price:p.price})),
+      {name:'أجور عمل ('+(r.hours||0)+' ساعة)', qty:1, price:labor}
+    ]
+  };
+  db.invoices.push(inv);
+  r.status='جاهز للتسليم';
+  consumePartsFromRepair(r);
+  db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:inv.number});
+  save();
+  audit('invoice.from_repair', inv.number);
+  toast('تم إنشاء الفاتورة '+inv.number);
+  session.page='invoices';
+  render();
+}
+function whatsappReady(rid){
+  const r=db.repairs.find(x=>x.id===rid);
+  if(!r) return;
+  const v=vehicleOf(r.vehicleId);
+  const c=customerOfVehicle(r.vehicleId);
+  const phone=(c?.phone||'').replace(/[^\d+]/g,'');
+  const msg=encodeURIComponent(
+    'مرحباً '+(c?.name||'')+'،\n'+
+    'سيارتك '+(v?((v.make||'')+' '+(v.model||'')+' — '+(v.plate||'')):'')+'\n'+
+    'أصبحت جاهزة للتسليم في الورشة.\n'+
+    'العمل: '+(r.description||'')+'\n'+
+    'يمكنكم الحضور خلال ساعات العمل.\n'+
+    'WerkPilot / Auto Service'
+  );
+  const num=phone.replace(/^\+/,'');
+  window.open(num?('https://wa.me/'+num+'?text='+msg):('https://wa.me/?text='+msg),'_blank');
+}
+function openPartsLink(vid){
+  const v=vehicleOf(vid);
+  const q=encodeURIComponent((v&& (v.vin||v.plate))||'');
+  window.open('https://www.partslink24.com/','_blank');
+  toast(v?.vin ? ('VIN: '+v.vin+' — انسخه في PartsLink24') : 'افتح حساب PartsLink24');
+}
+
+window.convertRepairToInvoice=convertRepairToInvoice;
+window.whatsappReady=whatsappReady;
+window.openPartsLink=openPartsLink;
+window.openRepair=function(rid){ repairEditModal(rid); };
+
+
 function customerName(cid){return db.customers.find(c=>c.id===cid)?.name||'-'}
 function vehicleName(vid){const v=db.vehicles.find(x=>x.id===vid);return v?`${v.plate||v.vin||'-'} · ${v.make||''} ${v.model||''}`:'-'}
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
@@ -308,13 +425,13 @@ function roleCan(section){
  const r=session.user.role;
  if(r==='manager') return true;
  if(r==='accountant') return !['settings'].includes(section);
- if(r==='mechanic') return ['dashboard','customers','vehicles','repairs','estimates','integrations'].includes(section);
+ if(r==='mechanic') return ['dashboard','customers','vehicles','repairs','estimates','appointments','integrations'].includes(section);
  if(r==='warehouse') return ['dashboard','inventory','purchases','integrations'].includes(section);
  return false;
 }
 
 const nav=[
- ['dashboard','الرئيسية'],['customers','العملاء'],['vehicles','السيارات'],['repairs','أوامر الإصلاح'],
+ ['dashboard','الرئيسية'],['customers','العملاء'],['vehicles','السيارات'],['repairs','أوامر الإصلاح'],['appointments','المواعيد'],
  ['estimates','Kostenvoranschlag'],['invoices','الفواتير و Barverkauf'],['purchases','المشتريات'],
  ['inventory','المخزون وقطع الغيار'],['employees','الموظفون والرواتب'],['expenses','المصاريف'],
  ['journal','دفتر اليومية'],['reports','التقارير'],['integrations','التكاملات'],
@@ -353,7 +470,8 @@ function render(){
  <main class="main">
   <div class="topbar">
    <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
-   <select id="company">${db.companies.map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${c.name} · ${c.country}</option>`).join('')}</select></div>
+   <select id="company">${db.companies.map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${c.name} · ${c.country}</option>`).join('')}</select>
+   <input class="searchbox" id="qsearch" placeholder="بحث: لوحة / زبون / قطعة / أمر"></div>
    <div class="top-actions"><span class="badge hide-mobile"><span class="dot"></span>${session.user.name}</span><button class="btn ghost small" id="logout">خروج</button></div>
   </div>
   <div class="content" id="content"></div>
@@ -362,10 +480,20 @@ function render(){
  $('#logout').onclick=()=>{audit('logout');session=null;login()};
  $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';render()};
  $('#menu').onclick=()=>$('#side').classList.toggle('open');
+ const qs=$('#qsearch');
+ if(qs){
+  qs.onkeydown=e=>{
+   if(e.key==='Enter'){
+     const q=qs.value.trim();
+     if(!q) return;
+     showSearchResults(q);
+   }
+  };
+ }
  page();
 }
 function page(){
- const m={dashboard,customers,vehicles,repairs,estimates,invoices,purchases,inventory,employees,expenses,journal,reports,integrations,audit:auditPage,settings};
+ const m={dashboard,customers,vehicles,repairs,appointments,estimates,invoices,purchases,inventory,employees,expenses,journal,reports,integrations,audit:auditPage,settings};
  (m[session.page]||dashboard)();
 }
 function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>${action}</div>`}
@@ -522,17 +650,39 @@ function modal(title,body,onSave,saveText='حفظ'){
 function closeModal(){$('#modalRoot').innerHTML=''}
 
 function dashboard(){
- const inv=companyRows('invoices'),exp=companyRows('expenses'),rep=companyRows('repairs'),veh=companyRows('vehicles');
+ const inv=companyRows('invoices'),exp=companyRows('expenses'),rep=openRepairs(),veh=companyRows('vehicles');
  const sales=inv.reduce((a,x)=>a+Number(x.total||0),0),costs=exp.reduce((a,x)=>a+Number(x.amount||0),0);
- $('#content').innerHTML=head('لوحة التحكم')+`<div class="grid">
- <div class="card"><div class="muted">العملاء</div><div class="metric">${companyRows('customers').length}</div></div>
- <div class="card"><div class="muted">السيارات</div><div class="metric">${veh.length}</div></div>
- <div class="card"><div class="muted">أوامر الإصلاح المفتوحة</div><div class="metric">${rep.filter(x=>x.status!=='مكتمل').length}</div></div>
- <div class="card"><div class="muted">إجمالي المبيعات</div><div class="metric">${money(sales)}</div></div>
- ${session.user.role==='manager'?`<div class="card"><div class="muted">صافي تقريبي</div><div class="metric">${money(sales-costs)}</div></div>`:''}
- </div><div class="card" style="margin-top:14px"><div class="kpi-row"><b>الشركة النشطة</b><span class="badge">${session.company.name} · ${session.company.country}</span></div>
- <p class="muted">كل البيانات معزولة حسب الشركة النشطة.</p></div>`;
+ const low=lowStock(), due=maintenanceDue();
+ const todayAp=companyRows('appointments').filter(a=>a.date===todayISO());
+ const inside=rep.filter(r=>['قيد التنفيذ','جاري العمل','استلام','تشخيص','انتظار قطع'].includes(r.status));
+ $('#content').innerHTML=head('لوحة اليوم')+`
+ <div class="grid">
+  <div class="card"><div class="muted">سيارات داخل الورشة</div><div class="metric">${inside.length}</div></div>
+  <div class="card"><div class="muted">أوامر مفتوحة</div><div class="metric">${rep.length}</div></div>
+  <div class="card"><div class="muted">مواعيد اليوم</div><div class="metric">${todayAp.length}</div></div>
+  <div class="card"><div class="muted">نقص مخزون</div><div class="metric">${low.length}</div></div>
+  <div class="card"><div class="muted">المبيعات</div><div class="metric">${money(sales)}</div></div>
+  ${session.user.role==='manager'?`<div class="card"><div class="muted">صافي تقريبي</div><div class="metric">${money(sales-costs)}</div></div>`:''}
+ </div>
+ ${low.length?`<div class="alert"><b>تنبيه مخزون:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+')').join(' · ')}</div>`:''}
+ ${due.length?`<div class="alert"><b>صيانة مستحقة:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' كم').join(' · ')}</div>`:''}
+ <div class="card" style="margin-top:12px"><b>سيارات اليوم / الأوامر النشطة</b>
+ ${inside.length?inside.map(r=>`<div class="today-item"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(r.description||'')} · ${esc(r.tech||'')}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(r.status)}</span>
+ <button class="btn small" onclick="openRepair('${r.id}')">فتح</button></div></div>`).join(''):'<p class="muted">لا توجد سيارات داخل الورشة الآن.</p>'}
+ </div>
+ <div class="card" style="margin-top:12px"><b>مواعيد اليوم</b>
+ ${todayAp.length?todayAp.map(a=>`<div class="today-item"><div>${esc(a.time||'')} · ${esc(vehicleName(a.vehicleId))}<div class="muted">${esc(a.note||'')} · ${esc(a.tech||'')}</div></div><span class="status info">${esc(a.status||'')}</span></div>`).join(''):'<p class="muted">لا مواعيد اليوم.</p>'}
+ </div>`;
 }
+function showSearchResults(q){
+  const s=globalSearch(q);
+  $('#content').innerHTML=head('نتائج البحث: '+esc(q))+`
+  <div class="card"><b>عملاء</b>${s.customers.length?table(['الاسم','هاتف','إيميل'],s.customers.map(c=>[esc(c.name),esc(c.phone),esc(c.email)]),'s_c'):'<p class="muted">لا نتائج</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>سيارات</b>${s.vehicles.length?table(['لوحة','VIN','ماركة','موديل','كم'],s.vehicles.map(v=>[esc(v.plate),esc(v.vin),esc(v.make),esc(v.model),v.km||'-']),'s_v'):'<p class="muted">لا نتائج</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>أوامر</b>${s.repairs.length?table(['سيارة','وصف','حالة'],s.repairs.map(r=>[vehicleName(r.vehicleId),esc(r.description),esc(r.status)]),'s_r'):'<p class="muted">لا نتائج</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>مخزون</b>${s.inventory.length?table(['SKU','اسم','كمية'],s.inventory.map(i=>[esc(i.sku),esc(i.name),i.qty]),'s_i'):'<p class="muted">لا نتائج</p>'}</div>`;
+}
+
 
 function customers(){
  const rows=companyRows('customers');
@@ -582,9 +732,11 @@ function vehicleModal(prefill={}){
  <div class="field"><label>قوة المحرك (kW)</label><input id="kw" type="number" value="${esc(prefill.engine_power_kw||'')}"></div>
  <div class="field"><label>كود المحرك</label><input id="en" value="${esc(prefill.engine||'')}"></div>
  <div class="field"><label>كود اللون</label><input id="pa" value="${esc(prefill.paint||'')}"></div>
+ <div class="field"><label>الكيلومتر الحالي</label><input id="vkm" type="number" value="${esc(prefill.km||'')}"></div>
+ <div class="field"><label>الصيانة القادمة عند كم</label><input id="vnext" type="number" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
   if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
-  const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ocrSource:prefill.ocrSource||''};
+  const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0)};
   db.vehicles.push(v);save();audit('vehicle.create',v.plate||v.vin);closeModal();render();
  });
   $('#partslinkBtn').onclick=()=>{
@@ -718,24 +870,100 @@ model,
 firstRegistration
 };
 }
+function repairStatusClass(st){
+  if(['مكتمل','مسلَّم','مسلم','جاهز للتسليم'].includes(st)) return 'ok';
+  if(['انتظار قطع','تشخيص'].includes(st)) return 'warn';
+  if(['قيد التنفيذ','جاري العمل'].includes(st)) return 'info';
+  return '';
+}
 function repairs(){
- const rows=companyRows('repairs');
+ const rows=companyRows('repairs').slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
  $('#content').innerHTML=head('أوامر الإصلاح',`<button class="btn primary" id="add">أمر إصلاح جديد</button>`)+
- table(['السيارة','الوصف','الفني','الساعات','الحالة'],rows.map(r=>[vehicleName(r.vehicleId),esc(r.description),esc(r.tech||'-'),esc(r.hours||0),`<span class="status ${r.status==='مكتمل'?'ok':r.status==='جاري العمل'?'warn':''}">${r.status}</span>`]));
+ table(['السيارة','العطل','الفني','ساعات','قطع €','حالة','إجراءات'],rows.map(r=>[
+  vehicleName(r.vehicleId),
+  esc(r.complaint||r.description||'-'),
+  esc(r.tech||'-'),
+  esc(r.hours||0),
+  money(repairPartsTotal(r)),
+  `<span class="status ${repairStatusClass(r.status)}">${esc(r.status)}</span>`,
+  `<button class="btn small" onclick="openRepair('${r.id}')">تفاصيل</button>
+   <button class="btn small ok" onclick="convertRepairToInvoice('${r.id}')">فاتورة</button>
+   <button class="btn small" onclick="whatsappReady('${r.id}')">واتساب جاهز</button>`
+ ]), 'repairs');
  $('#add').onclick=repairModal;
 }
-function repairModal(){
- modal('أمر إصلاح جديد',`<div class="form-grid">
- <div class="field"><label>السيارة</label><select id="rv">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
- <div class="field"><label>الفني</label><input id="rt"></div>
- <div class="field span2"><label>وصف العطل والعمل</label><textarea id="rd"></textarea></div>
- <div class="field"><label>ساعات العمل</label><input id="rh" type="number" step=".25"></div>
- <div class="field"><label>الحالة</label><select id="rs"><option>جديد</option><option>جاري العمل</option><option>مكتمل</option></select></div>
+function repairModal(existing){
+ const r=existing||{};
+ const jobs=(r.jobs||[]).join('\n');
+ const parts=(r.parts||[]).map(p=>[p.sku||'',p.name||'',p.qty||1,p.price||0].join('|')).join('\n');
+ modal(existing?'تعديل أمر الإصلاح':'أمر إصلاح جديد',`<div class="form-grid">
+ <div class="field"><label>السيارة</label><select id="rv">${companyRows('vehicles').map(v=>`<option value="${v.id}" ${v.id===r.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+ <div class="field"><label>الفني</label><input id="rt" value="${esc(r.tech||'')}"></div>
+ <div class="field"><label>الكيلومتر</label><input id="rkm" type="number" value="${r.km||''}"></div>
+ <div class="field"><label>الوقود</label><select id="rfuel"><option ${r.fuel==='فارغ'?'selected':''}>فارغ</option><option ${r.fuel==='ربع'?'selected':''}>ربع</option><option ${!r.fuel||r.fuel==='نصف'?'selected':''}>نصف</option><option ${r.fuel==='ممتلئ'?'selected':''}>ممتلئ</option></select></div>
+ <div class="field span2"><label>شكوى الزبون</label><textarea id="rc">${esc(r.complaint||'')}</textarea></div>
+ <div class="field span2"><label>وصف العمل</label><textarea id="rd">${esc(r.description||'')}</textarea></div>
+ <div class="field span2"><label>قائمة الأعمال (سطر لكل عمل)</label><textarea id="rjobs">${esc(jobs)}</textarea></div>
+ <div class="field span2"><label>القطع: SKU|الاسم|الكمية|السعر (سطر لكل قطعة)</label><textarea id="rparts">${esc(parts)}</textarea></div>
+ <div class="field"><label>ساعات العمل</label><input id="rh" type="number" step=".25" value="${r.hours||1}"></div>
+ <div class="field"><label>الحالة</label><select id="rs">
+  ${['استلام','تشخيص','انتظار قطع','قيد التنفيذ','جاهز للتسليم','مسلَّم'].map(s=>`<option ${r.status===s?'selected':''}>${s}</option>`).join('')}
+ </select></div>
  </div>`,()=>{
-  const r={id:id('r'),companyId:session.company.id,vehicleId:$('#rv').value,description:$('#rd').value,tech:$('#rt').value,hours:$('#rh').value,status:$('#rs').value};
-  db.repairs.push(r);save();audit('repair.create',r.description);closeModal();render();
- });
+  const parsedParts=$('#rparts').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+    const [sku,name,qty,price]=l.split('|');
+    return {sku:(sku||'').trim(), name:(name||sku||'').trim(), qty:Number(qty||1), price:Number(price||0)};
+  });
+  const obj={
+    id:r.id||id('r'), companyId:session.company.id, vehicleId:$('#rv').value,
+    complaint:$('#rc').value, description:$('#rd').value,
+    jobs:$('#rjobs').value.split('\n').map(x=>x.trim()).filter(Boolean),
+    parts:parsedParts, tech:$('#rt').value, hours:$('#rh').value,
+    status:$('#rs').value, km:$('#rkm').value, fuel:$('#rfuel').value,
+    photos:r.photos||[], date:r.date||todayISO()
+  };
+  const v=vehicleOf(obj.vehicleId);
+  if(v && obj.km){ v.km=Number(obj.km); }
+  if(existing){
+    const i=db.repairs.findIndex(x=>x.id===r.id);
+    if(i>=0) db.repairs[i]=obj;
+    audit('repair.update', obj.description);
+  } else {
+    db.repairs.push(obj);
+    audit('repair.create', obj.description);
+  }
+  save(); closeModal(); render();
+ }, existing?'حفظ التعديل':'إنشاء الأمر');
 }
+function repairEditModal(rid){
+  const r=db.repairs.find(x=>x.id===rid);
+  if(!r) return toast('الأمر غير موجود');
+  repairModal(r);
+}
+function appointments(){
+  const rows=companyRows('appointments').slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
+  $('#content').innerHTML=head('المواعيد',`<button class="btn primary" id="add">موعد جديد</button>`)+
+  table(['التاريخ','الوقت','السيارة','الزبون','الفني','ملاحظة','حالة'],rows.map(a=>[
+    esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(a.tech||'-'),esc(a.note||'-'),esc(a.status||'')
+  ]),'appointments');
+  $('#add').onclick=()=>{
+    modal('موعد جديد',`<div class="form-grid">
+      <div class="field"><label>السيارة</label><select id="av">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)}</option>`).join('')}</select></div>
+      <div class="field"><label>التاريخ</label><input id="ad" type="date" value="${todayISO()}"></div>
+      <div class="field"><label>الوقت</label><input id="at" type="time" value="09:00"></div>
+      <div class="field"><label>الفني</label><input id="atech" value="الميكانيكي"></div>
+      <div class="field span2"><label>ملاحظة</label><input id="an"></div>
+    </div>`,()=>{
+      const vid=$('#av').value; const v=vehicleOf(vid);
+      const clash=companyRows('appointments').some(x=>x.date===$('#ad').value && x.time===$('#at').value && x.tech===$('#atech').value);
+      if(clash) return toast('تعارض: نفس الفني ونفس الوقت محجوز');
+      db.appointments=db.appointments||[];
+      db.appointments.push({id:id('ap'),companyId:session.company.id,vehicleId:vid,customerId:v?.customerId||'',date:$('#ad').value,time:$('#at').value,tech:$('#atech').value,note:$('#an').value,status:'مؤكد'});
+      save(); audit('appointment.create',$('#ad').value+' '+$('#at').value); closeModal(); render();
+    });
+  };
+}
+
 function estimates(){
  const rows=companyRows('estimates');
  $('#content').innerHTML=head('Kostenvoranschlag',`<button class="btn primary" id="add">إنشاء تقدير</button>`)+
@@ -747,8 +975,8 @@ function invoices(){
  const rows=companyRows('invoices');
  $('#content').innerHTML=head('الفواتير و Barverkauf',`<div class="toolbar"><button class="btn primary" id="inv">فاتورة جديدة</button><button class="btn" id="bar">Barverkauf</button></div>`)+
  listShareBar('invoices')+
- table(['النوع','العميل/السيارة','الصافي','الضريبة','الإجمالي','الدفع','إرسال'],rows.map(x=>[
-  x.type, vehicleName(x.vehicleId)||'بيع مباشر', money(x.net), x.tax+'%', money(x.total), esc(x.payment||'غير محدد'),
+ table(['رقم','النوع','العميل/السيارة','الصافي','الضريبة','الإجمالي','الدفع','إرسال'],rows.map(x=>[
+  esc(x.number||x.id), x.type, vehicleName(x.vehicleId)||'بيع مباشر', money(x.net), x.tax+'%', money(x.total), esc(x.payment||'غير محدد'),
   `<button class="btn small" onclick="exportPrint('invoices','${x.id}')">🖨️</button>
    <button class="btn small" onclick="exportPDF('invoices','${x.id}')">📄</button>
    <button class="btn small" onclick="exportEmail('invoices','${x.id}')">✉️</button>
@@ -767,9 +995,18 @@ function financeModal(type){
  ${type==='estimate'?'<div class="field"><label>رسوم إعداد التقدير €</label><input id="ff" type="number" step=".01" value="0"></div>':'<div class="field"><label>طريقة الدفع</label><select id="pay"><option>غير محدد</option><option>نقدي</option><option>بطاقة</option><option>تحويل بنكي</option></select></div>'}
  </div>`,()=>{
   const parts=+$('#fp').value||0,labor=+$('#fl').value||0,discount=+$('#fd').value||0,tax=+$('#ft').value||0,net=Math.max(0,parts+labor-discount),total=net*(1+tax/100);
-  const obj={id:id(type[0]),companyId:session.company.id,vehicleId:$('#fv').value,parts,labor,discount,tax,net,total};
+  const obj={id:id(type[0]),companyId:session.company.id,vehicleId:$('#fv').value,parts,labor,discount,tax,net,total,date:new Date().toISOString()};
   if(type==='estimate'){obj.fee=+$('#ff').value||0;db.estimates.push(obj);audit('estimate.create',money(total))}
-  else{obj.type=type==='bar'?'Barverkauf':'فاتورة';obj.payment=$('#pay').value;db.invoices.push(obj);audit('invoice.create',money(total))}
+  else{
+    obj.type=type==='bar'?'Barverkauf':'فاتورة';
+    obj.payment=$('#pay').value;
+    obj.paid=['نقدي','بطاقة'].includes(obj.payment);
+    obj.number=nextInvoiceNumber();
+    obj.lines=[{name:'قطع',qty:1,price:parts},{name:'أجور',qty:1,price:labor}];
+    db.invoices.push(obj);
+    db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
+    audit('invoice.create',obj.number);
+  }
   save();closeModal();render();
  });
 }
@@ -1251,10 +1488,15 @@ async function openCameraForPurchase(onCapture){
 
 function inventory(){
  const rows=companyRows('inventory');
+ const low=lowStock();
  $('#content').innerHTML=head('المخزون وقطع الغيار',`<button class="btn primary" id="add">قطعة جديدة</button>`)+
  listShareBar('inventory')+
- table(['رقم القطعة','الاسم','الكمية','سعر الشراء','سعر البيع'],rows.map(x=>[esc(x.sku),esc(x.name),x.qty,money(x.buy),money(x.sell)]), 'inventory');
- $('#add').onclick=()=>simpleModal('قطعة جديدة',[['sku','رقم القطعة'],['name','الاسم'],['qty','الكمية','number'],['buy','سعر الشراء','number'],['sell','سعر البيع','number']],o=>{o.companyId=session.company.id;o.id=id('i');db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
+ (low.length?`<div class="alert"><b>تحت الحد الأدنى:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+' / حد '+ (x.minQty||3)+')').join(' · ')}</div>`:'')+
+ table(['رقم القطعة','الاسم','الكمية','الحد الأدنى','شراء','بيع','حالة'],rows.map(x=>{
+   const lowFlag=Number(x.qty||0)<=Number(x.minQty||3);
+   return [esc(x.sku),esc(x.name),x.qty,x.minQty||3,money(x.buy),money(x.sell), lowFlag?`<span class="status warn">نقص</span>`:`<span class="status ok">متوفر</span>`];
+ }), 'inventory');
+ $('#add').onclick=()=>simpleModal('قطعة جديدة',[['sku','رقم القطعة'],['name','الاسم'],['qty','الكمية','number'],['minQty','الحد الأدنى','number'],['buy','سعر الشراء','number'],['sell','سعر البيع','number']],o=>{o.companyId=session.company.id;o.id=id('i');o.qty=Number(o.qty||0);o.minQty=Number(o.minQty||3);db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
 }
 function employees(){
  const rows=companyRows('employees');
@@ -1363,21 +1605,42 @@ function journal(){
 }
 function reports(){
  const inv=companyRows('invoices'),exp=companyRows('expenses'),pur=companyRows('purchases');
- const sales=inv.reduce((a,x)=>a+Number(x.total||0),0),costs=exp.reduce((a,x)=>a+Number(x.amount||0),0)+pur.reduce((a,x)=>a+Number(x.qty||0)*Number(x.price||0),0);
+ const sales=inv.reduce((a,x)=>a+Number(x.total||0),0);
+ const purCost=pur.reduce((a,x)=>a+Number(x.total_amount||(x.qty||0)*(x.price||0)||0),0);
+ const costs=exp.reduce((a,x)=>a+Number(x.amount||0),0)+purCost;
+ const unpaid=inv.filter(x=>!x.paid && x.payment==='غير محدد');
+ const hours=companyRows('repairs').reduce((a,x)=>a+Number(x.hours||0),0);
+ const topParts={};
+ companyRows('repairs').forEach(r=>(r.parts||[]).forEach(p=>{topParts[p.name]=(topParts[p.name]||0)+Number(p.qty||0)}));
+ const top=Object.entries(topParts).sort((a,b)=>b[1]-a[1]).slice(0,5);
  $('#content').innerHTML=head('التقارير')+`<div class="grid">
  <div class="card"><div class="muted">المبيعات</div><div class="metric">${money(sales)}</div></div>
- <div class="card"><div class="muted">المصاريف والمشتريات</div><div class="metric">${money(costs)}</div></div>
+ <div class="card"><div class="muted">المصاريف + المشتريات</div><div class="metric">${money(costs)}</div></div>
  <div class="card"><div class="muted">الفرق التقريبي</div><div class="metric">${money(sales-costs)}</div></div>
- <div class="card"><div class="muted">الفواتير</div><div class="metric">${inv.length}</div></div>
+ <div class="card"><div class="muted">فواتير غير مسددة</div><div class="metric">${unpaid.length}</div></div>
+ <div class="card"><div class="muted">ساعات العمل المسجّلة</div><div class="metric">${hours}</div></div>
+ <div class="card"><div class="muted">أوامر مفتوحة</div><div class="metric">${openRepairs().length}</div></div>
+ </div>
+ <div class="card" style="margin-top:12px"><b>أكثر القطع استخداماً</b>
+ ${top.length?table(['القطعة','الكمية'],top.map(([n,q])=>[esc(n),q]),'top_parts'):'<p class="muted">لا بيانات بعد.</p>'}
+ </div>
+ <div class="card" style="margin-top:12px"><b>ديون الزبائن (فواتير غير مسددة)</b>
+ ${unpaid.length?table(['رقم','السيارة','الإجمالي'],unpaid.map(x=>[esc(x.number||x.id),vehicleName(x.vehicleId),money(x.total)]),'unpaid'):'<p class="muted">لا ديون ظاهرة.</p>'}
  </div>`;
 }
 function integrations(){
+ const cars=companyRows('vehicles');
  $('#content').innerHTML=head('التكاملات')+`<div class="grid">
- <div class="card"><b>TSE / Kasse</b><p class="muted">نقطة تكامل جاهزة. الربط الحقيقي يحتاج مزوداً معتمداً وواجهة API.</p></div>
- <div class="card"><b>البنك</b><p class="muted">يتطلب مزود Open Banking وخادماً آمناً.</p></div>
- <div class="card"><b>PartsLink24</b><p class="muted">يتطلب حساباً وواجهة API مرخّصة.</p></div>
- <div class="card"><b>MATIS / مزودات أخرى</b><p class="muted">يمكن ربطها لاحقاً حسب بيانات الوصول.</p></div>
+ <div class="card"><b>PartsLink24</b><p class="muted">افتح الموقع مع VIN السيارة المحددة.</p>
+  <select id="plCar">${cars.map(v=>`<option value="${v.id}">${esc(v.plate||'')} · ${esc(v.vin||'')}</option>`).join('')}</select>
+  <button class="btn primary" style="margin-top:8px" id="plOpen">فتح PartsLink24</button>
+ </div>
+ <div class="card"><b>واتساب الورشة</b><p class="muted">إرسال جاهزية السيارة من شاشة أوامر الإصلاح.</p></div>
+ <div class="card"><b>TSE / Kasse</b><p class="muted">نقطة تكامل جاهزة. الربط الحقيقي يحتاج مزوداً معتمداً.</p></div>
+ <div class="card"><b>البنك / MATIS</b><p class="muted">يتطلب حساب وواجهة مرخّصة.</p></div>
  </div>`;
+ const btn=$('#plOpen');
+ if(btn) btn.onclick=()=>openPartsLink($('#plCar').value);
 }
 function auditPage(){
  const rows=db.audit.filter(a=>!session.company||a.company===session.company.id||!a.company).slice(0,200);
@@ -1386,7 +1649,9 @@ function auditPage(){
 function settings(){
  $('#content').innerHTML=head('الإعدادات')+`<div class="card"><div class="form-grid">
  <div class="field"><label>حجم الخط</label><input id="font" type="number" min="13" max="22" value="${db.settings.font}"></div>
- <div class="field"><label>اللغة</label><select id="lang"><option value="ar" ${db.settings.uiLang==='ar'?'selected':''}>العربية</option><option value="de" ${db.settings.uiLang==='de'?'selected':''}>Deutsch</option><option value="es" ${db.settings.uiLang==='es'?'selected':''}>Español</option></select></div>
+ <div class="field"><label>اللغة</label><select id="lang"><option value="ar" ${db.settings.uiLang==='ar'?'selected':''}>العربية</option><option value="de" ${db.settings.uiLang==='de'?'selected':''}>Deutsch</option><option value="es" ${db.settings.uiLang==='es'?'selected':''}>Españول</option></select></div>
+ <div class="field"><label>سعر ساعة العمل €</label><input id="hrate" type="number" step="0.01" value="${db.settings.hourlyRate||85}"></div>
+ <div class="field"><label>هاتف الورشة / واتساب</label><input id="wphone" value="${esc(db.settings.workshopPhone||'')}"></div>
  </div>
  <div class="toolbar" style="margin-top:12px">
   <button class="btn primary" id="saveset">حفظ الإعدادات</button>
@@ -1396,7 +1661,7 @@ function settings(){
  </div>
  <p class="muted" style="margin-top:12px">المشتريات والعملاء والمخزون يُحفظون محلياً + على Supabase عند التوفر.</p>
  </div>`;
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;save();toast('تم الحفظ');render()};
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;save();toast('تم الحفظ');render()};
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
@@ -1430,6 +1695,11 @@ function simpleModal(title,fields,onSave){
   window.viewReceiptPDF = typeof viewReceiptPDF !== 'undefined' ? viewReceiptPDF : null;
   window.deletePurchase = typeof deletePurchase !== 'undefined' ? deletePurchase : null;
   window.openCameraForPurchase = typeof openCameraForPurchase !== 'undefined' ? openCameraForPurchase : null;
+  window.convertRepairToInvoice = convertRepairToInvoice;
+  window.whatsappReady = whatsappReady;
+  window.openRepair = function(rid){ repairEditModal(rid); };
+  window.openPartsLink = openPartsLink;
+
 
 login();
   async function openCamera(){
