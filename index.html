@@ -415,197 +415,444 @@ function financeModal(type){
  });
 }
 function purchases(){
- const rows=companyRows('purchases');
- $('#content').innerHTML=head('المشتريات','<button class="btn primary" id="scanPurchase">📷 تصوير فاتورة شراء</button> <button class="btn primary" id="add">شراء جديد</button>')+
- table(['المورد','الصنف','الكمية','السعر','الإجمالي','الفاتورة'],rows.map(x=>[
-esc(x.supplier),
-esc(x.item),
-x.qty,
-money(x.price),
-money(x.qty*x.price),
-x.receipt_url ? `<button class="btn small primary" onclick="viewReceiptPDF('${x.receipt_url}')">📄 عرض PDF</button>` : '-'
-]));
- $('#add').onclick=()=>simpleModal('شراء جديد',[['supplier','المورد'],['item','الصنف'],['qty','الكمية','number'],['price','السعر','number']],o=>{o.companyId=session.company.id;o.id=id('p');db.purchases.push(o);save();audit('purchase.create',o.item);render()});
-  $('#scanPurchase').onclick=scanPurchaseDocument; 
-}
-   async function viewReceiptPDF(url){
-if(!url) return toast('لا توجد فاتورة محفوظة');
+  const rows = companyRows('purchases').slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const totalSpend = rows.reduce((s,x)=> s + Number(x.total_amount || (x.qty||0)*(x.price||0) || 0), 0);
 
-const pdfWindow=window.open('','_blank');
-if(!pdfWindow) return toast('اسمح بفتح النوافذ المنبثقة لعرض PDF');
-try{
-const response=await fetch(url);
-if(!response.ok) throw new Error('تعذر تحميل الفاتورة');
+  $('#content').innerHTML = head('المشتريات', `
+    <div class="toolbar">
+      <button class="btn primary" id="scanPurchase">📷 تصوير / رفع فاتورة</button>
+      <button class="btn primary" id="add">+ شراء يدوي</button>
+    </div>
+  `) + `
+  <div class="grid" style="margin-bottom:14px">
+    <div class="card"><div class="muted">عدد الفواتير</div><div class="metric">${rows.length}</div></div>
+    <div class="card"><div class="muted">إجمالي المشتريات</div><div class="metric">${money(totalSpend)}</div></div>
+  </div>
+  ` + table(
+    ['المورد','رقم الفاتورة','التاريخ','الإجمالي','الحالة','المستند','إجراءات'],
+    rows.map(x=>{
+      const total = Number(x.total_amount || (Number(x.qty||0)*Number(x.price||0)) || 0);
+      const status = x.payment_status || 'pending';
+      const statusLabel = status==='paid' ? 'مدفوع' : status==='pending' ? 'معلق' : status;
+      const statusClass = status==='paid' ? 'ok' : 'warn';
+      return [
+        esc(x.supplier || '-'),
+        esc(x.invoice_number || x.item || '-'),
+        esc(x.date || '-'),
+        money(total),
+        `<span class="status ${statusClass}">${esc(statusLabel)}</span>`,
+        x.receipt_url
+          ? `<button class="btn small primary" onclick="viewReceipt(${JSON.stringify(x.receipt_url)})">📄 عرض</button>`
+          : '<span class="muted">—</span>',
+        `<button class="btn small bad" onclick="deletePurchase('${x.id}')">حذف</button>`
+      ];
+    })
+  );
 
-const blob=await response.blob();
-
-const dataUrl=await new Promise((resolve,reject)=>{
-const reader=new FileReader();
-reader.onload=()=>resolve(reader.result);
-reader.onerror=reject;
-reader.readAsDataURL(blob);
-});
-
-const img=await new Promise((resolve,reject)=>{
-const image=new Image();
-image.onload=()=>resolve(image);
-image.onerror=reject;
-image.src=dataUrl;
-});
-
-const {jsPDF}=window.jspdf;
-
-const orientation=img.width>img.height ? 'landscape' : 'portrait';
-const pdf=new jsPDF({
-orientation:orientation,
-unit:'mm',
-format:'a4'
-});
-
-const pageWidth=pdf.internal.pageSize.getWidth();
-const pageHeight=pdf.internal.pageSize.getHeight();
-
-const ratio=Math.min(
-(pageWidth-10)/img.width,
-(pageHeight-10)/img.height
-);
-
-const width=img.width*ratio;
-const height=img.height*ratio;
-
-const format=blob.type.includes('png') ? 'PNG' : 'JPEG';
-
-pdf.addImage(
-dataUrl,
-format,
-(pageWidth-width)/2,
-(pageHeight-height)/2,
-width,
-height
-);
-
-pdfWindow.location.href=pdf.output('bloburl');
-
-}catch(e){
-console.error(e);
-if(pdfWindow) pdfWindow.close();
-toast('تعذر فتح الفاتورة PDF');
-}
+  $('#add').onclick = () => purchaseManualModal();
+  $('#scanPurchase').onclick = scanPurchaseDocument;
 }
 
-   async function scanPurchaseDocument(){
-modal('تصوير فاتورة شراء',`
-<div class="field">
-<label>صوّر فاتورة الشراء أو اختر صورة</label>
-<input id="purchaseCamera" type="file" accept="image/*" capture="environment">
-<input id="doc" type="file" accept="image/*" style="display:none">
-<button type="button" class="btn primary" onclick="openCamera()">💻 فتح كاميرا اللابتوب</button>
-<label>📁 اختيار صورة أو ملف</label>
-<input id="purchaseFile" type="file" accept="image/*">
-<div class="hint">سيتم قراءة الفاتورة وإضافتها تلقائيًا إلى المشتريات.</div>
-<img id="purchaseImg" class="ocr-preview hidden">
-<div id="purchaseStatus" class="hint"></div>
-</div>
-`,async()=>{
-const f=$('#purchaseCamera').files[0] || $('#purchaseFile').files[0] || $('#doc').files[0];
-if(!f)return toast('اختر أو صوّر فاتورة الشراء أولاً');
+function purchaseManualModal(){
+  modal('شراء يدوي', `
+    <div class="form-grid">
+      <div class="field"><label>المورد</label><input id="p_supplier" placeholder="مثال: carparts-cat.com"></div>
+      <div class="field"><label>رقم الفاتورة</label><input id="p_inv"></div>
+      <div class="field"><label>التاريخ</label><input id="p_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="field"><label>الإجمالي €</label><input id="p_total" type="number" step="0.01" value="0"></div>
+      <div class="field"><label>الحالة</label>
+        <select id="p_status">
+          <option value="pending">معلق</option>
+          <option value="paid">مدفوع</option>
+        </select>
+      </div>
+      <div class="field span2"><label>ملاحظات / الأصناف</label><textarea id="p_notes" placeholder="وصف القطع أو ملاحظات"></textarea></div>
+    </div>
+  `, ()=>{
+    const supplier = $('#p_supplier').value.trim();
+    const total = Number($('#p_total').value)||0;
+    if(!supplier) return toast('أدخل اسم المورد');
+    if(total <= 0) return toast('أدخل المبلغ الإجمالي');
 
-try{
-$('#msave').disabled=true;
-$('#purchaseStatus').textContent='جاري قراءة فاتورة الشراء...';
-
-const imageData=await new Promise((resolve,reject)=>{
-const reader=new FileReader();
-reader.onload=()=>resolve(reader.result);
-reader.onerror=reject;
-reader.readAsDataURL(f);
-});
-
-$('#purchaseImg').src=imageData;
-$('#purchaseImg').classList.remove('hidden');
-
-const response=await fetch(
-`${window.SUPABASE_URL}/functions/v1/purchase-ocr`,
-{
-method:'POST',
-headers:{
-'Content-Type':'application/json',
-'apikey':window.SUPABASE_KEY,
-'Authorization':`Bearer ${window.SUPABASE_KEY}`
-},
-body:JSON.stringify({image:imageData})
-}
-);
-
-const ai=await response.json();
-
-if(!response.ok){
-console.error(ai);
-throw new Error(ai.error||'تعذرت قراءة فاتورة الشراء');
+    const purchase = {
+      id: id('p'),
+      companyId: session.company.id,
+      supplier,
+      invoice_number: $('#p_inv').value.trim(),
+      date: $('#p_date').value || new Date().toISOString().slice(0,10),
+      total_amount: total,
+      subtotal: total,
+      tax_amount: 0,
+      payment_status: $('#p_status').value,
+      notes: $('#p_notes').value.trim(),
+      receipt_url: ''
+    };
+    db.purchases.push(purchase);
+    save();
+    audit('purchase.create', purchase.supplier);
+    closeModal();
+    render();
+    toast('تمت إضافة الشراء');
+  });
 }
 
-const subtotal=Number(
-String(ai.subtotal||'0')
-.replace(',','.')
-.replace(/[^\d.-]/g,'')
-)||0;
-
-const taxAmount=Number(
-String(ai.tax_amount||'0')
-.replace(',','.')
-.replace(/[^\d.-]/g,'')
-)||0;
-
-const totalAmount=Number(
-String(ai.total_amount||'0')
-.replace(',','.')
-.replace(/[^\d.-]/g,'')
-)||0;
-const fileName=`${Date.now()}-${f.name||'receipt.jpg'}`;
-
-const {error:uploadError}=await supabaseClient
-.storage
-.from('purchase-receipts')
-.upload(fileName,f);
-
-if(uploadError) throw uploadError;
-
-const {data:urlData}=supabaseClient
-.storage
-.from('purchase-receipts')
-.getPublicUrl(fileName);
-
-const receiptUrl=urlData.publicUrl;
-const purchase={
-id:id('p'),
-companyId:session.company.id,
-supplier:ai.supplier_name||'',
-invoice_number:ai.invoice_number||'',
-  receipt_url:receiptUrl, 
-date:ai.purchase_date||new Date().toISOString().slice(0,10),
-subtotal:subtotal,
-tax_amount:taxAmount,
-total_amount:totalAmount,
-payment_status:ai.payment_status||'pending',
-notes:ai.notes||''
-};
-
-db.purchases.push(purchase);
-save();
-audit('purchase.create',purchase.invoice_number||purchase.supplier);
-closeModal();
-render();
-toast('تمت إضافة المشتريات بنجاح');
-
-}catch(e){
-console.error(e);
-$('#purchaseStatus').textContent='تعذرت قراءة فاتورة الشراء';
-toast(e.message||'حدث خطأ');
-$('#msave').disabled=false;
+function deletePurchase(pid){
+  if(!confirm('حذف فاتورة الشراء؟')) return;
+  db.purchases = db.purchases.filter(x => x.id !== pid);
+  save();
+  audit('purchase.delete', pid);
+  render();
+  toast('تم الحذف');
 }
-},'قراءة وإضافة');
 
+async function viewReceipt(url){
+  if(!url) return toast('لا توجد فاتورة محفوظة');
+  // افتح الرابط مباشرة (صورة أو ملف من Supabase)
+  const w = window.open(url, '_blank');
+  if(!w) toast('اسمح بالنوافذ المنبثقة لعرض الفاتورة');
 }
+
+async function viewReceiptPDF(url){
+  // توافق مع الاستدعاءات القديمة
+  return viewReceipt(url);
+}
+
+
+/** تصغير وضغط الصورة قبل OCR — أسرع وأقل حجماً */
+function compressImageForOCR(file, maxSide=1280, quality=0.72){
+  return new Promise((resolve, reject)=>{
+    if(!file.type.startsWith('image/')){
+      // PDF أو غير صورة: أرجعه كما هو
+      const reader = new FileReader();
+      reader.onload = ()=> resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        let { width, height } = img;
+        const scale = Math.min(1, maxSide / Math.max(width, height));
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        // JPEG دائماً للـ OCR
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      }catch(e){
+        URL.revokeObjectURL(url);
+        reject(e);
+      }
+    };
+    img.onerror = (e)=>{ URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+
+async function scanPurchaseDocument(){
+  // حالة مؤقتة للفترة بين الرفع والحفظ
+  let pendingFile = null;
+  let pendingPreviewUrl = null;
+  let pendingAi = {};
+  let pendingReceiptUrl = '';
+
+  modal('تصوير / رفع فاتورة شراء', `
+    <div class="field">
+      <label>1) صوّر أو ارفع الفاتورة</label>
+      <div class="filebox" style="margin-top:8px">
+        <input id="purchaseFile" type="file" accept="image/*,.pdf" capture="environment">
+        <div class="muted" style="margin-top:6px">صور أو PDF</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn" id="btnOpenCam">💻 كاميرا اللابتوب</button>
+        <button type="button" class="btn primary" id="btnRead" disabled>⚡ قراءة البيانات</button>
+        <button type="button" class="btn ghost" id="btnPreview" disabled>👁️ عرض الفاتورة</button>
+      </div>
+      <img id="purchaseImg" class="ocr-preview hidden" style="margin-top:12px;max-height:280px;cursor:pointer" title="اضغط للعرض الكامل">
+      <div id="purchaseStatus" class="hint" style="margin-top:8px">اختر صورة أولاً ثم اضغط «قراءة البيانات»</div>
+    </div>
+
+    <div id="purchaseFormBox" class="hidden" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+      <div class="muted" style="margin-bottom:10px">2) راجع البيانات قبل الحفظ</div>
+      <div class="form-grid">
+        <div class="field"><label>المورد</label><input id="p_supplier" placeholder="اسم المورد"></div>
+        <div class="field"><label>رقم الفاتورة</label><input id="p_inv"></div>
+        <div class="field"><label>التاريخ</label><input id="p_date" type="date"></div>
+        <div class="field"><label>الإجمالي €</label><input id="p_total" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>الصافي €</label><input id="p_sub" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>الضريبة €</label><input id="p_tax" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>الحالة</label>
+          <select id="p_status">
+            <option value="pending">معلق</option>
+            <option value="paid">مدفوع</option>
+          </select>
+        </div>
+        <div class="field span2"><label>ملاحظات / الأصناف</label><textarea id="p_notes" rows="2"></textarea></div>
+      </div>
+    </div>
+  `, async ()=>{
+    // الحفظ النهائي فقط
+    const supplier = ($('#p_supplier')?.value || '').trim();
+    const total = Number($('#p_total')?.value) || 0;
+    if(!pendingFile && !pendingReceiptUrl) return toast('ارفع فاتورة أولاً');
+    if(!supplier) return toast('أدخل اسم المورد');
+    if(total <= 0) return toast('أدخل المبلغ الإجمالي');
+
+    try{
+      $('#msave').disabled = true;
+      $('#purchaseStatus').textContent = 'جاري الحفظ...';
+
+      // ارفع الملف الآن فقط عند التأكيد (أسرع في مرحلة القراءة)
+      let receiptUrl = pendingReceiptUrl;
+      if(!receiptUrl && pendingFile){
+        const sb = window.supabaseClient;
+        if(!sb) throw new Error('Supabase غير مهيأ');
+        const fileName = `${Date.now()}-${(pendingFile.name||'receipt.jpg').replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+        const { error: uploadError } = await sb.storage
+          .from('purchase-receipts')
+          .upload(fileName, pendingFile, { contentType: pendingFile.type || 'image/jpeg', upsert: false });
+        if(uploadError) throw uploadError;
+        const { data: urlData } = sb.storage.from('purchase-receipts').getPublicUrl(fileName);
+        receiptUrl = urlData.publicUrl;
+      }
+
+      const purchase = {
+        id: id('p'),
+        companyId: session.company.id,
+        supplier,
+        invoice_number: ($('#p_inv')?.value || '').trim(),
+        receipt_url: receiptUrl || '',
+        date: $('#p_date')?.value || new Date().toISOString().slice(0,10),
+        subtotal: Number($('#p_sub')?.value) || 0,
+        tax_amount: Number($('#p_tax')?.value) || 0,
+        total_amount: total,
+        payment_status: $('#p_status')?.value || 'pending',
+        notes: ($('#p_notes')?.value || '').trim()
+      };
+
+      db.purchases.push(purchase);
+      save();
+      audit('purchase.create', purchase.invoice_number || purchase.supplier);
+      if(pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+      closeModal();
+      render();
+      toast('تم حفظ الفاتورة');
+    }catch(e){
+      console.error(e);
+      $('#purchaseStatus').textContent = 'خطأ: ' + (e.message||'');
+      toast(e.message || 'فشل الحفظ');
+      $('#msave').disabled = false;
+    }
+  }, 'حفظ الفاتورة');
+
+  // تعطيل زر الحفظ في البداية
+  setTimeout(()=>{
+    const saveBtn = $('#msave');
+    if(saveBtn) saveBtn.disabled = true;
+
+    const fileInput = $('#purchaseFile');
+    const btnRead = $('#btnRead');
+    const btnPreview = $('#btnPreview');
+    const btnCam = $('#btnOpenCam');
+    const img = $('#purchaseImg');
+    const status = $('#purchaseStatus');
+    const formBox = $('#purchaseFormBox');
+
+    function setPreviewFromFile(f){
+      pendingFile = f;
+      if(pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+      pendingPreviewUrl = null;
+      pendingAi = {};
+      pendingReceiptUrl = '';
+      formBox.classList.add('hidden');
+      if(saveBtn) saveBtn.disabled = true;
+
+      if(f.type.startsWith('image/')){
+        pendingPreviewUrl = URL.createObjectURL(f);
+        img.src = pendingPreviewUrl;
+        img.classList.remove('hidden');
+      } else {
+        img.classList.add('hidden');
+      }
+      btnRead.disabled = false;
+      btnPreview.disabled = false;
+      status.textContent = 'جاهز — اضغط «قراءة البيانات» أو «عرض الفاتورة»';
+    }
+
+    fileInput.onchange = ()=>{
+      const f = fileInput.files[0];
+      if(f) setPreviewFromFile(f);
+    };
+
+    // عرض كامل قبل الحفظ
+    function openFullPreview(){
+      if(pendingPreviewUrl){
+        window.open(pendingPreviewUrl, '_blank');
+        return;
+      }
+      if(pendingFile){
+        const url = URL.createObjectURL(pendingFile);
+        window.open(url, '_blank');
+        setTimeout(()=>URL.revokeObjectURL(url), 60000);
+        return;
+      }
+      toast('لا توجد صورة للعرض');
+    }
+    btnPreview.onclick = openFullPreview;
+    img.onclick = openFullPreview;
+
+    btnCam.onclick = ()=> openCameraForPurchase((file)=>{
+      // وضع الملف في الـ input
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      setPreviewFromFile(file);
+    });
+
+    // قراءة سريعة: OCR فقط بدون رفع
+    btnRead.onclick = async ()=>{
+      const f = pendingFile || fileInput.files[0];
+      if(!f) return toast('اختر صورة أولاً');
+
+      btnRead.disabled = true;
+      status.textContent = '⚡ جاري قراءة البيانات...';
+      const t0 = performance.now();
+
+      try{
+        // تصغير وضغط الصورة أولاً → أسرع في الإرسال والقراءة
+        status.textContent = '⚡ جاري تجهيز الصورة...';
+        const imageData = await compressImageForOCR(f, 1280, 0.72);
+        const approxKB = Math.round((imageData.length * 0.75) / 1024);
+        status.textContent = `⚡ جاري قراءة البيانات (~${approxKB}KB)...`;
+
+        let ai = {};
+        try{
+          const controller = new AbortController();
+          const timeout = setTimeout(()=> controller.abort(), 15000); // أقصى 15 ثانية
+
+          const response = await fetch(`${window.SUPABASE_URL}/functions/v1/purchase-ocr`, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': window.SUPABASE_KEY,
+              'Authorization': `Bearer ${window.SUPABASE_KEY}`
+            },
+            body: JSON.stringify({ image: imageData })
+          });
+          clearTimeout(timeout);
+
+          if(response.ok){
+            ai = await response.json();
+          } else {
+            console.warn('OCR failed', await response.text());
+          }
+        } catch(ocrErr){
+          console.warn('OCR error/timeout', ocrErr);
+        }
+
+        pendingAi = ai || {};
+        const parseNum = (v) => Number(String(v||'0').replace(',','.').replace(/[^\d.-]/g,'')) || 0;
+
+        // املأ النموذج فوراً
+        $('#p_supplier').value = ai.supplier_name || ai.supplier || '';
+        $('#p_inv').value = ai.invoice_number || '';
+        $('#p_date').value = (ai.purchase_date || ai.date || new Date().toISOString().slice(0,10)).toString().slice(0,10);
+        $('#p_sub').value = parseNum(ai.subtotal);
+        $('#p_tax').value = parseNum(ai.tax_amount);
+        const total = parseNum(ai.total_amount) || (parseNum(ai.subtotal) + parseNum(ai.tax_amount));
+        $('#p_total').value = total;
+        $('#p_notes').value = ai.notes || ai.item || '';
+        if(ai.payment_status) $('#p_status').value = ai.payment_status;
+
+        formBox.classList.remove('hidden');
+        if(saveBtn) saveBtn.disabled = false;
+
+        const ms = Math.round(performance.now() - t0);
+        const hasData = !!(ai.supplier_name || ai.supplier || ai.invoice_number || total);
+        status.textContent = hasData
+          ? `✓ تمت القراءة خلال ${ms}ms — راجع البيانات ثم احفظ`
+          : `⚠ لم تُستخرج بيانات كافية (${ms}ms) — أكمل يدوياً ثم احفظ`;
+
+      } catch(e){
+        console.error(e);
+        status.textContent = 'خطأ في القراءة: ' + (e.message||'');
+        // افتح النموذج يدوياً حتى لو فشل OCR
+        formBox.classList.remove('hidden');
+        if(saveBtn) saveBtn.disabled = false;
+        $('#p_date').value = new Date().toISOString().slice(0,10);
+      } finally {
+        btnRead.disabled = false;
+      }
+    };
+  }, 30);
+}
+
+async function openCameraForPurchase(onCapture){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    return toast('الكاميرا غير مدعومة في هذا المتصفح');
+  }
+
+  const box = document.createElement('div');
+  box.className = 'modal-back';
+  box.innerHTML = `
+    <div class="modal" style="max-width:700px">
+      <div class="modal-head">
+        <b>📷 تصوير فاتورة الشراء</b>
+        <button id="camClose" class="btn bad">✕</button>
+      </div>
+      <video id="cameraVideo" autoplay playsinline style="width:100%;border-radius:12px;background:#000;max-height:60vh"></video>
+      <div style="margin-top:12px;text-align:center;display:flex;gap:8px;justify-content:center">
+        <button id="takePhoto" class="btn primary">📸 التقاط</button>
+        <button id="camClose2" class="btn ghost">إلغاء</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(box);
+
+  const video = box.querySelector('#cameraVideo');
+  let stream;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+      audio: false
+    });
+    video.srcObject = stream;
+
+    const close = ()=>{
+      if(stream) stream.getTracks().forEach(t=>t.stop());
+      box.remove();
+    };
+    box.querySelector('#camClose').onclick = close;
+    box.querySelector('#camClose2').onclick = close;
+
+    box.querySelector('#takePhoto').onclick = ()=>{
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      canvas.toBlob(blob=>{
+        if(!blob){ toast('فشل التقاط الصورة'); return; }
+        const file = new File([blob], 'purchase-receipt.jpg', { type: 'image/jpeg' });
+        close();
+        if(typeof onCapture === 'function') onCapture(file);
+        else toast('تم التقاط الصورة');
+      }, 'image/jpeg', 0.85); // جودة 0.85 = أسرع وأصغر
+    };
+  } catch(e){
+    box.remove();
+    toast('لم يتم السماح باستخدام الكاميرا');
+    console.error(e);
+  }
+}
+
+
 function inventory(){
  const rows=companyRows('inventory');
  $('#content').innerHTML=head('المخزون وقطع الغيار',`<button class="btn primary" id="add">قطعة جديدة</button>`)+
@@ -756,7 +1003,16 @@ function simpleModal(title,fields,onSave){
 
    const SUPABASE_URL = window.SUPABASE_URL;
   const SUPABASE_KEY = window.SUPABASE_KEY;
-   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // جعله عالمياً عشان دوال المشتريات تقدر تستخدمه
+  window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const supabaseClient = window.supabaseClient;
+
+  // تعريض الدوال المستخدمة من onclick
+  window.viewReceipt = typeof viewReceipt !== 'undefined' ? viewReceipt : null;
+  window.viewReceiptPDF = typeof viewReceiptPDF !== 'undefined' ? viewReceiptPDF : null;
+  window.deletePurchase = typeof deletePurchase !== 'undefined' ? deletePurchase : null;
+  window.openCameraForPurchase = typeof openCameraForPurchase !== 'undefined' ? openCameraForPurchase : null;
+
 login();
   async function openCamera(){
 if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
