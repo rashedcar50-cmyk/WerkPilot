@@ -425,7 +425,8 @@ modal('تصوير فاتورة شراء',`
 <div class="field">
 <label>صوّر فاتورة الشراء أو اختر صورة</label>
 <input id="purchaseCamera" type="file" accept="image/*" capture="environment">
-
+<input id="doc" type="file" accept="image/*" style="display:none">
+<button type="button" class="btn primary" onclick="openCamera()">💻 فتح كاميرا اللابتوب</button>
 <label>📁 اختيار صورة أو ملف</label>
 <input id="purchaseFile" type="file" accept="image/*">
 <div class="hint">سيتم قراءة الفاتورة وإضافتها تلقائيًا إلى المشتريات.</div>
@@ -433,7 +434,7 @@ modal('تصوير فاتورة شراء',`
 <div id="purchaseStatus" class="hint"></div>
 </div>
 `,async()=>{
-const f=$('#purchaseCamera').files[0] || $('#purchaseFile').files[0];
+const f=$('#purchaseCamera').files[0] || $('#purchaseFile').files[0] || $('#doc').files[0];
 if(!f)return toast('اختر أو صوّر فاتورة الشراء أولاً');
 
 try{
