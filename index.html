@@ -74,7 +74,7 @@ th{background:#111827;position:sticky;top:0}
 <script>
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
-const storeKey='werkpilot_pro_v1';
+const storeKey='werkpilot_pro_v2';
 const seed={
  users:[
   {u:'admin',p:'1234',name:'المدير',role:'manager'},
@@ -86,14 +86,62 @@ const seed={
   {id:'de',name:'Auto Service',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
- customers:[],vehicles:[],repairs:[],estimates:[],invoices:[],purchases:[],inventory:[],
- employees:[],expenses:[],journal:[],audit:[],
+ customers:[
+  {id:'c_demo1',companyId:'de',name:'أحمد الخليل',phone:'+49 170 1112233',email:'ahmad@example.de',address:'Berlin, Germany'},
+  {id:'c_demo2',companyId:'de',name:'Maria Schmidt',phone:'+49 151 4455667',email:'maria@example.de',address:'Hamburg, Germany'},
+  {id:'c_demo3',companyId:'de',name:'يوسف منصور',phone:'+49 160 9988776',email:'youssef@example.de',address:'München, Germany'}
+ ],
+ vehicles:[
+  {id:'v_demo1',companyId:'de',customerId:'c_demo1',plate:'B-AK 1234',vin:'WVWZZZ1JZYW123456',make:'VW',model:'Golf 7',year:'2018',engine:'CJZA',paint:'LC9X'},
+  {id:'v_demo2',companyId:'de',customerId:'c_demo2',plate:'HH-MS 55',vin:'WBA8E9G50JNU12345',make:'BMW',model:'320d',year:'2019',engine:'B47',paint:'300'},
+  {id:'v_demo3',companyId:'de',customerId:'c_demo3',plate:'M-YM 900',vin:'WDD2050041A123456',make:'Mercedes',model:'C 200',year:'2020',engine:'M264',paint:'197'}
+ ],
+ repairs:[
+  {id:'r_demo1',companyId:'de',vehicleId:'v_demo1',description:'تغيير زيت + فلتر',tech:'الميكانيكي',hours:1.5,status:'جاري العمل'},
+  {id:'r_demo2',companyId:'de',vehicleId:'v_demo2',description:'فحص فرامل أمامية',tech:'الميكانيكي',hours:2,status:'جديد'}
+ ],
+ estimates:[],
+ invoices:[
+  {id:'i_demo1',companyId:'de',vehicleId:'v_demo1',type:'فاتورة',parts:45,labor:80,discount:0,tax:19,net:125,total:148.75,payment:'بطاقة',date:new Date().toISOString()}
+ ],
+ purchases:[
+  {id:'p_demo1',companyId:'de',supplier:'carparts-cat.com',invoice_number:'CP-10021',item:'فلتر زيت',qty:10,price:6.5,subtotal:65,tax_amount:12.35,total_amount:77.35,date:new Date().toISOString().slice(0,10),payment_status:'paid',notes:'طلب تجريبي',receipt_url:''}
+ ],
+ inventory:[
+  {id:'inv_demo1',companyId:'de',sku:'OIL-5W30',name:'زيت محرك 5W30 5L',qty:12,buy:22,sell:35},
+  {id:'inv_demo2',companyId:'de',sku:'FIL-OIL-VW',name:'فلتر زيت VW',qty:25,buy:4.5,sell:9},
+  {id:'inv_demo3',companyId:'de',sku:'BRK-PAD-F',name:'فحمات فرامل أمامية',qty:8,buy:28,sell:55},
+  {id:'inv_demo4',companyId:'de',sku:'BAT-12V-70',name:'بطارية 12V 70Ah',qty:4,buy:85,sell:140}
+ ],
+ employees:[
+  {id:'e_demo1',companyId:'de',name:'الميكانيكي',role:'فني',phone:'+49 170 0000001',salary:2800},
+  {id:'e_demo2',companyId:'de',name:'أمين المستودع',role:'مستودع',phone:'+49 170 0000002',salary:2400}
+ ],
+ expenses:[
+  {id:'x_demo1',companyId:'de',date:new Date().toISOString().slice(0,10),note:'إيجار الورشة',amount:1200,category:'تشغيل'}
+ ],
+ journal:[],
+ audit:[],
  settings:{theme:'dark',font:16,uiLang:'ar'}
 };
 let db=load(), session=null;
 
 function clone(x){return JSON.parse(JSON.stringify(x))}
-function load(){try{return {...clone(seed),...JSON.parse(localStorage.getItem(storeKey)||'{}')}}catch{return clone(seed)}}
+function load(){
+ try{
+  const raw=JSON.parse(localStorage.getItem(storeKey)||'{}');
+  const base=clone(seed);
+  const merged={...base,...raw};
+  // إذا المجموعات فاضية استخدم بيانات التجربة من seed
+  ['customers','vehicles','repairs','invoices','purchases','inventory','employees','expenses'].forEach(k=>{
+   if(!Array.isArray(merged[k]) || merged[k].length===0) merged[k]=clone(seed[k]||[]);
+  });
+  if(!merged.settings) merged.settings=clone(seed.settings);
+  if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
+  if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
+  return merged;
+ }catch{return clone(seed)}
+}
 function save(){localStorage.setItem(storeKey,JSON.stringify(db))}
 
 /* ===== Supabase data layer (purchases أولاً) ===== */
@@ -180,6 +228,57 @@ async function deletePurchaseCloud(pid){
   }catch(e){ console.warn(e); }
 }
 
+async function loadCustomersFromCloud(){
+  try{
+    const sb=window.supabaseClient; if(!sb) return false;
+    const {data,error}=await sb.from('customers').select('*');
+    if(error||!Array.isArray(data)||!data.length) return false;
+    const mapped=data.map(r=>({
+      id:'c_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+      name:r.name||'', phone:r.phone||'', email:r.email||'', address:r.address||''
+    })).filter(x=>x.name);
+    if(mapped.length){ db.customers=mapped; save(); return true; }
+  }catch(e){console.warn(e)}
+  return false;
+}
+async function upsertCustomerCloud(c){
+  try{
+    const sb=window.supabaseClient; if(!sb) return;
+    const row={name:c.name||'',phone:c.phone||'',email:c.email||'',address:c.address||''};
+    if(c.cloudId){ await sb.from('customers').update(row).eq('id',c.cloudId); }
+    else {
+      const {data,error}=await sb.from('customers').insert(row).select('id').single();
+      if(!error && data?.id){ c.cloudId=data.id; save(); }
+    }
+  }catch(e){console.warn(e)}
+}
+async function loadInventoryFromCloud(){
+  try{
+    const sb=window.supabaseClient; if(!sb) return false;
+    const {data,error}=await sb.from('inventory').select('*');
+    if(error||!Array.isArray(data)||!data.length) return false;
+    const mapped=data.map(r=>({
+      id:'inv_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+      sku:r.sku||'', name:r.name||'', qty:Number(r.qty||0), buy:Number(r.buy||0), sell:Number(r.sell||0)
+    })).filter(x=>x.name||x.sku);
+    if(mapped.length){ db.inventory=mapped; save(); return true; }
+  }catch(e){console.warn(e)}
+  return false;
+}
+async function upsertInventoryCloud(item){
+  try{
+    const sb=window.supabaseClient; if(!sb) return;
+    const row={sku:item.sku||'',name:item.name||'',qty:Number(item.qty||0),buy:Number(item.buy||0),sell:Number(item.sell||0)};
+    if(item.cloudId){ await sb.from('inventory').update(row).eq('id',item.cloudId); }
+    else {
+      const {data,error}=await sb.from('inventory').insert(row).select('id').single();
+      if(!error && data?.id){ item.cloudId=data.id; save(); }
+    }
+  }catch(e){console.warn(e)}
+}
+
+
+
 function id(p='x'){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function money(v){return Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'})}
 function toast(t){const x=document.createElement('div');x.className='toast';x.textContent=t;document.body.append(x);setTimeout(()=>x.remove(),2200)}
@@ -219,7 +318,11 @@ function login(){
   if(!u)return toast('بيانات الدخول غير صحيحة');
   session={user:u,company:db.companies[0],page:'dashboard'};
   audit('login');
-  loadPurchasesFromCloud().then(()=>render()).catch(()=>render());
+  Promise.all([
+    loadPurchasesFromCloud(),
+    loadCustomersFromCloud(),
+    loadInventoryFromCloud()
+  ]).finally(()=>render());
  };
 }
 
@@ -291,7 +394,7 @@ function customerModal(){
  </div>`,()=>{
   const c={id:id('c'),companyId:session.company.id,name:$('#n').value.trim(),phone:$('#ph').value,email:$('#em').value,address:$('#ad').value};
   if(!c.name)return toast('أدخل اسم العميل');
-  db.customers.push(c);save();audit('customer.create',c.name);closeModal();render();
+  db.customers.push(c);save();upsertCustomerCloud(c);audit('customer.create',c.name);closeModal();render();
  });
 }
 
@@ -500,6 +603,34 @@ function financeModal(type){
   save();closeModal();render();
  });
 }
+
+function applyPurchaseToInventory(p){
+  const name = (p.item || p.notes || '').trim();
+  const qty = Number(p.qty || 0);
+  const price = Number(p.price || 0);
+  if(!name || qty <= 0) return;
+  let inv = db.inventory.find(x => x.companyId === (p.companyId||session?.company?.id) && (x.name === name || x.sku === name));
+  if(inv){
+    inv.qty = Number(inv.qty||0) + qty;
+    if(price > 0) inv.buy = price;
+    save();
+    upsertInventoryCloud(inv);
+  } else {
+    const item = {
+      id: id('inv'),
+      companyId: p.companyId || session?.company?.id || 'de',
+      sku: (p.invoice_number || 'AUTO') + '-' + Date.now().toString(36).slice(-4),
+      name,
+      qty,
+      buy: price,
+      sell: price ? Math.round(price * 1.6 * 100) / 100 : 0
+    };
+    db.inventory.push(item);
+    save();
+    upsertInventoryCloud(item);
+  }
+}
+
 function purchases(){
   const rows = companyRows('purchases').slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
   const totalSpend = rows.reduce((s,x)=> s + Number(x.total_amount || (x.qty||0)*(x.price||0) || 0), 0);
@@ -574,6 +705,7 @@ function purchaseManualModal(){
       receipt_url: ''
     };
     db.purchases.push(purchase);
+    applyPurchaseToInventory(purchase);
     save();
     upsertPurchaseCloud(purchase);
     audit('purchase.create', purchase.supplier);
@@ -725,6 +857,7 @@ async function scanPurchaseDocument(){
       };
 
       db.purchases.push(purchase);
+      applyPurchaseToInventory(purchase);
       save();
       upsertPurchaseCloud(purchase);
       audit('purchase.create', purchase.invoice_number || purchase.supplier);
@@ -946,7 +1079,7 @@ function inventory(){
  const rows=companyRows('inventory');
  $('#content').innerHTML=head('المخزون وقطع الغيار',`<button class="btn primary" id="add">قطعة جديدة</button>`)+
  table(['رقم القطعة','الاسم','الكمية','سعر الشراء','سعر البيع'],rows.map(x=>[esc(x.sku),esc(x.name),x.qty,money(x.buy),money(x.sell)]));
- $('#add').onclick=()=>simpleModal('قطعة جديدة',[['sku','رقم القطعة'],['name','الاسم'],['qty','الكمية','number'],['buy','سعر الشراء','number'],['sell','سعر البيع','number']],o=>{o.companyId=session.company.id;o.id=id('i');db.inventory.push(o);save();audit('inventory.create',o.name);render()});
+ $('#add').onclick=()=>simpleModal('قطعة جديدة',[['sku','رقم القطعة'],['name','الاسم'],['qty','الكمية','number'],['buy','سعر الشراء','number'],['sell','سعر البيع','number']],o=>{o.companyId=session.company.id;o.id=id('i');db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
 }
 function employees(){
  const rows=companyRows('employees');
@@ -1078,10 +1211,31 @@ function auditPage(){
 function settings(){
  $('#content').innerHTML=head('الإعدادات')+`<div class="card"><div class="form-grid">
  <div class="field"><label>حجم الخط</label><input id="font" type="number" min="13" max="22" value="${db.settings.font}"></div>
- <div class="field"><label>اللغة</label><select id="lang"><option value="ar">العربية</option><option value="de">Deutsch</option><option value="es">Español</option></select></div>
- </div><button class="btn primary" id="saveset">حفظ الإعدادات</button>
- <button class="btn bad" id="reset" style="margin-right:8px">مسح بيانات التجربة</button></div>`;
+ <div class="field"><label>اللغة</label><select id="lang"><option value="ar" ${db.settings.uiLang==='ar'?'selected':''}>العربية</option><option value="de" ${db.settings.uiLang==='de'?'selected':''}>Deutsch</option><option value="es" ${db.settings.uiLang==='es'?'selected':''}>Español</option></select></div>
+ </div>
+ <div class="toolbar" style="margin-top:12px">
+  <button class="btn primary" id="saveset">حفظ الإعدادات</button>
+  <button class="btn" id="exportData">تصدير نسخة احتياطية</button>
+  <button class="btn" id="syncCloud">مزامنة من السحابة</button>
+  <button class="btn bad" id="reset">مسح بيانات التجربة</button>
+ </div>
+ <p class="muted" style="margin-top:12px">المشتريات والعملاء والمخزون يُحفظون محلياً + على Supabase عند التوفر.</p>
+ </div>`;
  $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;save();toast('تم الحفظ');render()};
+ $('#exportData').onclick=()=>{
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='werkpilot-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  toast('تم التصدير');
+ };
+ $('#syncCloud').onclick=async()=>{
+  toast('جاري المزامنة...');
+  await Promise.all([loadPurchasesFromCloud(),loadCustomersFromCloud(),loadInventoryFromCloud()]);
+  render();
+  toast('تمت المزامنة');
+ };
  $('#reset').onclick=()=>{if(confirm('سيتم حذف كل البيانات المحلية. متابعة؟')){db=clone(seed);save();toast('تمت إعادة الضبط');render()}};
 }
 function simpleModal(title,fields,onSave){
