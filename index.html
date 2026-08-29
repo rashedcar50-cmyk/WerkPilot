@@ -415,9 +415,104 @@ function financeModal(type){
 }
 function purchases(){
  const rows=companyRows('purchases');
- $('#content').innerHTML=head('المشتريات',`<button class="btn primary" id="add">شراء جديد</button>`)+
+ $('#content').innerHTML=head('المشتريات','<button class="btn primary" id="scanPurchase">📷 تصوير فاتورة شراء</button> <button class="btn primary" id="add">شراء جديد</button>')+
  table(['المورد','الصنف','الكمية','السعر','الإجمالي'],rows.map(x=>[esc(x.supplier),esc(x.item),x.qty,money(x.price),money(x.qty*x.price)]));
  $('#add').onclick=()=>simpleModal('شراء جديد',[['supplier','المورد'],['item','الصنف'],['qty','الكمية','number'],['price','السعر','number']],o=>{o.companyId=session.company.id;o.id=id('p');db.purchases.push(o);save();audit('purchase.create',o.item);render()});
+
+}
+   async function scanPurchaseDocument(){
+modal('تصوير فاتورة شراء',`
+<div class="field">
+<label>صوّر فاتورة الشراء أو اختر صورة</label>
+<input id="doc" type="file" accept="image/*">
+<button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
+<div class="hint">سيتم قراءة الفاتورة وإضافتها تلقائيًا إلى المشتريات.</div>
+<img id="purchaseImg" class="ocr-preview hidden">
+<div id="purchaseStatus" class="hint"></div>
+</div>
+`,async()=>{
+const f=$('#doc').files[0];
+if(!f)return toast('اختر أو صوّر فاتورة الشراء أولاً');
+
+try{
+$('#msave').disabled=true;
+$('#purchaseStatus').textContent='جاري قراءة فاتورة الشراء...';
+
+const imageData=await new Promise((resolve,reject)=>{
+const reader=new FileReader();
+reader.onload=()=>resolve(reader.result);
+reader.onerror=reject;
+reader.readAsDataURL(f);
+});
+
+$('#purchaseImg').src=imageData;
+$('#purchaseImg').classList.remove('hidden');
+
+const response=await fetch(
+`${window.SUPABASE_URL}/functions/v1/purchase-ocr`,
+{
+method:'POST',
+headers:{
+'Content-Type':'application/json',
+'apikey':window.SUPABASE_KEY,
+'Authorization':`Bearer ${window.SUPABASE_KEY}`
+},
+body:JSON.stringify({image:imageData})
+}
+);
+
+const ai=await response.json();
+
+if(!response.ok){
+console.error(ai);
+throw new Error(ai.error||'تعذرت قراءة فاتورة الشراء');
+}
+
+const subtotal=Number(
+String(ai.subtotal||'0')
+.replace(',','.')
+.replace(/[^\d.-]/g,'')
+)||0;
+
+const taxAmount=Number(
+String(ai.tax_amount||'0')
+.replace(',','.')
+.replace(/[^\d.-]/g,'')
+)||0;
+
+const totalAmount=Number(
+String(ai.total_amount||'0')
+.replace(',','.')
+.replace(/[^\d.-]/g,'')
+)||0;
+
+const purchase={
+id:id('p'),
+companyId:session.company.id,
+supplier:ai.supplier_name||'',
+invoice_number:ai.invoice_number||'',
+date:ai.purchase_date||new Date().toISOString().slice(0,10),
+subtotal:subtotal,
+tax_amount:taxAmount,
+total_amount:totalAmount,
+payment_status:ai.payment_status||'pending',
+notes:ai.notes||''
+};
+
+db.purchases.push(purchase);
+save();
+audit('purchase.create',purchase.invoice_number||purchase.supplier);
+closeModal();
+render();
+toast('تمت إضافة المشتريات بنجاح');
+
+}catch(e){
+console.error(e);
+$('#purchaseStatus').textContent='تعذرت قراءة فاتورة الشراء';
+toast(e.message||'حدث خطأ');
+$('#msave').disabled=false;
+}
+},'قراءة وإضافة');
 }
 function inventory(){
  const rows=companyRows('inventory');
