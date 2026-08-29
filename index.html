@@ -425,7 +425,7 @@ modal('تصوير فاتورة شراء',`
 <div class="field">
 <label>صوّر فاتورة الشراء أو اختر صورة</label>
 <input id="doc" type="file" accept="image/*">
-<button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
+<button type="button" class="btn primary" id="purchaseCamOpen">📷 فتح الكاميرا</button>
 <div class="hint">سيتم قراءة الفاتورة وإضافتها تلقائيًا إلى المشتريات.</div>
 <img id="purchaseImg" class="ocr-preview hidden">
 <div id="purchaseStatus" class="hint"></div>
@@ -513,6 +513,7 @@ toast(e.message||'حدث خطأ');
 $('#msave').disabled=false;
 }
 },'قراءة وإضافة');
+     $('#purchaseCamOpen').onclick=openCamera; 
 }
 function inventory(){
  const rows=companyRows('inventory');
