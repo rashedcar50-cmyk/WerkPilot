@@ -418,7 +418,7 @@ function purchases(){
  $('#content').innerHTML=head('المشتريات','<button class="btn primary" id="scanPurchase">📷 تصوير فاتورة شراء</button> <button class="btn primary" id="add">شراء جديد</button>')+
  table(['المورد','الصنف','الكمية','السعر','الإجمالي'],rows.map(x=>[esc(x.supplier),esc(x.item),x.qty,money(x.price),money(x.qty*x.price)]));
  $('#add').onclick=()=>simpleModal('شراء جديد',[['supplier','المورد'],['item','الصنف'],['qty','الكمية','number'],['price','السعر','number']],o=>{o.companyId=session.company.id;o.id=id('p');db.purchases.push(o);save();audit('purchase.create',o.item);render()});
-
+  $('#scanPurchase').onclick=scanPurchaseDocument; 
 }
    async function scanPurchaseDocument(){
 modal('تصوير فاتورة شراء',`
