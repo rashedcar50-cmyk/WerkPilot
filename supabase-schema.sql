@@ -78,3 +78,82 @@ drop policy if exists "wp_companies_all" on companies;
 create policy "wp_companies_all" on companies for all using (true) with check (true);
 
 -- تأكيد bucket الإيصالات (إذا مش موجود أنشئه من Storage يدوياً: purchase-receipts / Public)
+
+-- ===== v2: تشغيل الورشة الكامل =====
+alter table vehicles add column if not exists km numeric;
+alter table vehicles add column if not exists next_service_km numeric;
+alter table vehicles add column if not exists photo text;
+alter table inventory add column if not exists min_qty numeric default 3;
+
+create table if not exists repairs (
+  id bigint generated always as identity primary key,
+  company_id text,
+  vehicle_id text,
+  description text,
+  complaint text,
+  tech text,
+  hours numeric default 0,
+  status text,
+  km numeric,
+  fuel text,
+  jobs text,
+  parts text,
+  repair_date date,
+  created_at timestamptz default now()
+);
+
+create table if not exists appointments (
+  id bigint generated always as identity primary key,
+  company_id text,
+  vehicle_id text,
+  customer_id text,
+  appt_date date,
+  appt_time text,
+  tech text,
+  note text,
+  status text,
+  created_at timestamptz default now()
+);
+
+create table if not exists invoices (
+  id bigint generated always as identity primary key,
+  company_id text,
+  vehicle_id text,
+  repair_id text,
+  number text,
+  type text,
+  parts numeric default 0,
+  labor numeric default 0,
+  discount numeric default 0,
+  tax numeric default 19,
+  net numeric default 0,
+  total numeric default 0,
+  payment text,
+  paid boolean default false,
+  lines text,
+  issued_at timestamptz default now()
+);
+
+create table if not exists expenses (
+  id bigint generated always as identity primary key,
+  company_id text,
+  expense_date date,
+  note text,
+  amount numeric default 0,
+  category text,
+  created_at timestamptz default now()
+);
+
+alter table repairs enable row level security;
+alter table appointments enable row level security;
+alter table invoices enable row level security;
+alter table expenses enable row level security;
+
+drop policy if exists "wp_repairs_all" on repairs;
+create policy "wp_repairs_all" on repairs for all using (true) with check (true);
+drop policy if exists "wp_appointments_all" on appointments;
+create policy "wp_appointments_all" on appointments for all using (true) with check (true);
+drop policy if exists "wp_invoices_all" on invoices;
+create policy "wp_invoices_all" on invoices for all using (true) with check (true);
+drop policy if exists "wp_expenses_all" on expenses;
+create policy "wp_expenses_all" on expenses for all using (true) with check (true);

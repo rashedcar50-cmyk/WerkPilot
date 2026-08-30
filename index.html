@@ -334,6 +334,105 @@ async function upsertInventoryCloud(item){
   }catch(e){console.warn(e)}
 }
 
+async function loadVehiclesFromCloud(){
+  try{
+    const sb=window.supabaseClient; if(!sb) return false;
+    const {data,error}=await sb.from('vehicles').select('*');
+    if(error||!Array.isArray(data)||!data.length) return false;
+    db.vehicles=data.map(r=>({
+      id:'v_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+      customerId:r.customer_id||'', plate:r.plate||'', vin:r.vin||'',
+      make:r.make||'', model:r.model||'', year:r.year||'', engine:r.engine||'',
+      paint:r.paint||'', km:r.km||0, nextServiceKm:r.next_service_km||0, photo:r.photo||''
+    }));
+    save(); return true;
+  }catch(e){console.warn(e);return false}
+}
+async function upsertVehicleCloud(v){
+  try{
+    const sb=window.supabaseClient; if(!sb) return;
+    const row={company_id:v.companyId||'de',customer_id:v.customerId||'',plate:v.plate||'',vin:v.vin||'',make:v.make||'',model:v.model||'',year:String(v.year||''),engine:v.engine||'',paint:v.paint||'',km:Number(v.km||0),next_service_km:Number(v.nextServiceKm||0),photo:(v.photo&&v.photo.length<180000)?v.photo:''};
+    if(v.cloudId){ await sb.from('vehicles').update(row).eq('id',v.cloudId); }
+    else { const {data,error}=await sb.from('vehicles').insert(row).select('id').single(); if(!error&&data?.id){v.cloudId=data.id;save();} }
+  }catch(e){console.warn(e)}
+}
+async function loadRepairsFromCloud(){
+  try{
+    const sb=window.supabaseClient; if(!sb) return false;
+    const {data,error}=await sb.from('repairs').select('*');
+    if(error||!Array.isArray(data)||!data.length) return false;
+    db.repairs=data.map(r=>({
+      id:'r_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de', vehicleId:r.vehicle_id||'',
+      description:r.description||'', complaint:r.complaint||'', tech:r.tech||'', hours:r.hours||0,
+      status:r.status||'استلام', km:r.km||'', fuel:r.fuel||'', date:r.repair_date||'',
+      jobs: r.jobs? (typeof r.jobs==='string'? JSON.parse(r.jobs||'[]'):r.jobs):[],
+      parts: r.parts? (typeof r.parts==='string'? JSON.parse(r.parts||'[]'):r.parts):[],
+      photos:[]
+    }));
+    save(); return true;
+  }catch(e){console.warn(e);return false}
+}
+async function upsertRepairCloud(r){
+  try{
+    const sb=window.supabaseClient; if(!sb) return;
+    const row={company_id:r.companyId||'de',vehicle_id:r.vehicleId||'',description:r.description||'',complaint:r.complaint||'',tech:r.tech||'',hours:Number(r.hours||0),status:r.status||'',km:Number(r.km||0)||null,fuel:r.fuel||'',jobs:JSON.stringify(r.jobs||[]),parts:JSON.stringify(r.parts||[]),repair_date:r.date||new Date().toISOString().slice(0,10)};
+    if(r.cloudId){ await sb.from('repairs').update(row).eq('id',r.cloudId); }
+    else { const {data,error}=await sb.from('repairs').insert(row).select('id').single(); if(!error&&data?.id){r.cloudId=data.id;save();} }
+  }catch(e){console.warn(e)}
+}
+async function loadAppointmentsFromCloud(){
+  try{
+    const sb=window.supabaseClient; if(!sb) return false;
+    const {data,error}=await sb.from('appointments').select('*');
+    if(error||!Array.isArray(data)||!data.length) return false;
+    db.appointments=data.map(r=>({
+      id:'ap_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+      vehicleId:r.vehicle_id||'', customerId:r.customer_id||'',
+      date:r.appt_date||'', time:r.appt_time||'', tech:r.tech||'', note:r.note||'', status:r.status||''
+    }));
+    save(); return true;
+  }catch(e){console.warn(e);return false}
+}
+async function upsertAppointmentCloud(a){
+  try{
+    const sb=window.supabaseClient; if(!sb) return;
+    const row={company_id:a.companyId||'de',vehicle_id:a.vehicleId||'',customer_id:a.customerId||'',appt_date:a.date||null,appt_time:a.time||'',tech:a.tech||'',note:a.note||'',status:a.status||'مؤكد'};
+    if(a.cloudId){ await sb.from('appointments').update(row).eq('id',a.cloudId); }
+    else { const {data,error}=await sb.from('appointments').insert(row).select('id').single(); if(!error&&data?.id){a.cloudId=data.id;save();} }
+  }catch(e){console.warn(e)}
+}
+async function loadInvoicesFromCloud(){
+  try{
+    const sb=window.supabaseClient; if(!sb) return false;
+    const {data,error}=await sb.from('invoices').select('*');
+    if(error||!Array.isArray(data)||!data.length) return false;
+    db.invoices=data.map(r=>({
+      id:'i_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de', vehicleId:r.vehicle_id||'',
+      repairId:r.repair_id||'', number:r.number||'', type:r.type||'فاتورة',
+      parts:r.parts||0, labor:r.labor||0, discount:r.discount||0, tax:r.tax||19,
+      net:r.net||0, total:r.total||0, payment:r.payment||'', paid:!!r.paid,
+      date:r.issued_at||'', lines: r.lines? (typeof r.lines==='string'?JSON.parse(r.lines||'[]'):r.lines):[]
+    }));
+    save(); return true;
+  }catch(e){console.warn(e);return false}
+}
+async function upsertInvoiceCloud(inv){
+  try{
+    const sb=window.supabaseClient; if(!sb) return;
+    const row={company_id:inv.companyId||'de',vehicle_id:inv.vehicleId||'',repair_id:inv.repairId||'',number:inv.number||'',type:inv.type||'',parts:Number(inv.parts||0),labor:Number(inv.labor||0),discount:Number(inv.discount||0),tax:Number(inv.tax||19),net:Number(inv.net||0),total:Number(inv.total||0),payment:inv.payment||'',paid:!!inv.paid,lines:JSON.stringify(inv.lines||[])};
+    if(inv.cloudId){ await sb.from('invoices').update(row).eq('id',inv.cloudId); }
+    else { const {data,error}=await sb.from('invoices').insert(row).select('id').single(); if(!error&&data?.id){inv.cloudId=data.id;save();} }
+  }catch(e){console.warn(e)}
+}
+function syncAllCloud(){
+  return Promise.all([
+    loadPurchasesFromCloud(), loadCustomersFromCloud(), loadInventoryFromCloud(),
+    loadVehiclesFromCloud(), loadRepairsFromCloud(), loadAppointmentsFromCloud(), loadInvoicesFromCloud()
+  ]);
+}
+
+
+
 
 
 function id(p='x'){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
@@ -409,6 +508,7 @@ function convertRepairToInvoice(rid){
     ]
   };
   db.invoices.push(inv);
+  upsertInvoiceCloud(inv);
   r.status='جاهز للتسليم';
   consumePartsFromRepair(r);
   db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:inv.number});
@@ -494,11 +594,7 @@ function login(){
   window._loginFails=0;
   session={user:u,company:db.companies[0],page:'dashboard'};
   audit('login');
-  Promise.all([
-    loadPurchasesFromCloud(),
-    loadCustomersFromCloud(),
-    loadInventoryFromCloud()
-  ]).finally(()=>render());
+  syncAllCloud().finally(()=>render());
  };
 }
 
@@ -861,7 +957,7 @@ function vehicleModal(prefill={}){
  </div>`,()=>{
   if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
   const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0)};
-  db.vehicles.push(v);save();audit('vehicle.create',v.plate||v.vin);closeModal();render();
+  db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render();
   if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200);
  });
   $('#partslinkBtn').onclick=()=>{
@@ -1044,7 +1140,7 @@ function repairDesk(rid){
 }
 window.setRepairStatus=function(rid,st){
   const r=db.repairs.find(x=>x.id===rid); if(!r) return;
-  r.status=st; save(); audit('repair.status',st); render();
+  r.status=st; save(); upsertRepairCloud(r); audit('repair.status',st); render();
 };
 
 function repairModal(existing){
@@ -1082,9 +1178,11 @@ function repairModal(existing){
   if(existing){
     const i=db.repairs.findIndex(x=>x.id===r.id);
     if(i>=0) db.repairs[i]=obj;
+    upsertRepairCloud(obj);
     audit('repair.update', obj.description);
   } else {
     db.repairs.push(obj);
+    upsertRepairCloud(obj);
     audit('repair.create', obj.description);
   }
   save(); closeModal(); render();
@@ -1115,7 +1213,7 @@ function appointments(){
       if(clash) return toast('تعارض: نفس الفني ونفس الوقت محجوز');
       db.appointments=db.appointments||[];
       db.appointments.push({id:id('ap'),companyId:session.company.id,vehicleId:vid,customerId:v?.customerId||'',date:$('#ad').value,time:$('#at').value,tech:$('#atech').value,note:$('#an').value,status:'مؤكد'});
-      save(); audit('appointment.create',$('#ad').value+' '+$('#at').value); closeModal(); render();
+      upsertAppointmentCloud(db.appointments[db.appointments.length-1]); save(); audit('appointment.create',$('#ad').value+' '+$('#at').value); closeModal(); render();
     });
   };
 }
@@ -1160,6 +1258,7 @@ function financeModal(type){
     obj.number=nextInvoiceNumber();
     obj.lines=[{name:'قطع',qty:1,price:parts},{name:'أجور',qty:1,price:labor}];
     db.invoices.push(obj);
+    upsertInvoiceCloud(obj);
     db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
     audit('invoice.create',obj.number);
   }
@@ -1828,7 +1927,7 @@ function settings(){
  };
  $('#syncCloud').onclick=async()=>{
   toast('جاري المزامنة...');
-  await Promise.all([loadPurchasesFromCloud(),loadCustomersFromCloud(),loadInventoryFromCloud()]);
+  await syncAllCloud();
   render();
   toast('تمت المزامنة');
  };
