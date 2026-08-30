@@ -23,6 +23,27 @@ WP.run = function(name, ctx){
 };
 WP.has = function(flag){ return !!WP.features[flag]; };
 WP.emit = WP.run;
+WP._loading = {};
+WP.loadScript = function(src){
+  if(WP._loading[src]) return WP._loading[src];
+  WP._loading[src] = new Promise(function(resolve, reject){
+    const s=document.createElement('script');
+    s.src=src; s.async=true;
+    s.onload=function(){ resolve(true); };
+    s.onerror=function(){ reject(new Error('load '+src)); };
+    document.head.appendChild(s);
+  });
+  return WP._loading[src];
+};
+WP.loadPdf = function(){
+  return Promise.all([
+    WP.loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
+    WP.loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')
+  ]);
+};
+WP.loadOcr = function(){
+  return WP.loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+};
 window.t = window.t || function(k){ return k; };
 window.applyUiLang = window.applyUiLang || function(){
   try{

@@ -253,9 +253,10 @@ function exportPrint(type, id){
   requestAnimationFrame(()=>requestAnimationFrame(run));
 }
 
-function exportPDF(type, id){
+async function exportPDF(type, id){
   if(type==='invoices' && id) return exportInvoicePDF(id);
   try{
+    await WP.loadPdf();
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const text = plainTextDoc(type, id);
@@ -278,8 +279,9 @@ function exportPDF(type, id){
 async function exportInvoicePDF(iid){
   const inv=(db.invoices||[]).find(x=>x.id===iid);
   if(!inv) return toast(t('invMissing'));
-  if(!window.html2canvas || !window.jspdf) return toast('مكتبة PDF غير محمّلة — حدّث الصفحة');
   toast('جاري تجهيز PDF...');
+  try{ await WP.loadPdf(); }catch(e){ return toast('تعذر تحميل مكتبة PDF'); }
+  if(!window.html2canvas || !window.jspdf) return toast('مكتبة PDF غير محمّلة — حدّث الصفحة');
   const page=printDocMarkup('invoices', iid);
   const host=document.createElement('div');
   host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1';
@@ -742,6 +744,7 @@ async function readScheinAI(file){
   }catch(e){ console.warn('vehicle-ocr', e); }
   let local={};
   try{
+    try{ await WP.loadOcr(); }catch(e){}
     if(window.Tesseract){
       const res=await Tesseract.recognize(imageData,'deu');
       local=parseVehicleOCR(res&&res.data&&res.data.text||'');
@@ -813,6 +816,7 @@ function scanScheinStartRepair(){
       catch(err){
         const compressed=await compressVehiclePhoto(f);
         let text='';
+        try{ await WP.loadOcr(); }catch(e){}
         if(window.Tesseract){
           const res=await Tesseract.recognize(compressed,'deu+eng');
           text=res?.data?.text||'';
