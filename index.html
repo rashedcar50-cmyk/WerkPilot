@@ -1577,7 +1577,6 @@ function buildWorkshopRechnung(x){
   const leistDate=deDate(x.date);
   return `<div class="rechnung" dir="ltr" lang="de"><div class="rh-main">
     <div class="rh-title">${esc(w.brand || 'Autoservice und Autoteile, Tabah UG')}</div>
-    <div class="rh-legal">${esc(w.name)}</div>
     <div class="rh-sub">${esc(w.address)}</div>
     <div class="rh-grid">
       <div class="rh-cust">
@@ -1636,7 +1635,7 @@ function buildWorkshopRechnung(x){
     <p class="rh-pay">Bei Zahlung bitte Kd-Nr und Beleg-Nr angeben. Zahlbar sofort und ohne Abzug.</p>
     </div>
     <div class="rh-foot">
-      <div>Geschäftsführer: ${esc(w.owner)}<br>${esc(w.address)}</div>
+      <div>${esc(w.name)}<br>Geschäftsführer: ${esc(w.owner)}<br>${esc(w.address)}</div>
       <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>${esc(w.court)}<br>Mobil: ${esc(w.phone)}</div>
       <div>${esc(w.email)}<br>${esc(w.bank)}<br>Kto.-Inh.: ${esc(w.accountHolder)}<br>IBAN: ${esc(w.iban)}</div>
     </div>
