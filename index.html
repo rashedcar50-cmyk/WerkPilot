@@ -186,7 +186,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',workshopBrand:'Autoservice und Autoteile, Tabah UG',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',workshopBrand:'Autoservice und Autoteile, Tabah UG',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',invoiceTpl:'werkstatt',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
 };
 let db=load(), session=null;
 
@@ -818,6 +818,14 @@ function exportPrint(type, id){
       .rh-pay{font-size:11px;margin-top:10px}
       .rh-foot{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #111;margin-top:auto;padding-top:10px;font-size:10px}
       .rh-foot>div{flex:1}
+      .rh-band{display:flex;justify-content:space-between;align-items:flex-end;background:#142033;color:#fff;padding:16px 18px;margin:0 -8mm 14px}
+      .rh-band .rh-title{color:#f4c95d;text-align:left;font-size:20px}
+      .rh-doc{font-size:26px;font-weight:800;letter-spacing:1px}
+      .tpl-classic{border-left:6px solid #1f3a5f;padding-left:12px}
+      .tpl-classic .rh-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+      .tpl-classic .rh-title{text-align:left}
+      .tpl-atelier .rh-split{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px}
+      .tpl-atelier .rh-title{text-align:left;font-size:18px}
       h1{margin:0 0 8px}.meta{color:#555;margin-bottom:16px}
       table{width:100%;border-collapse:collapse}
     </style>
@@ -1553,19 +1561,15 @@ function deDate(d){
 }
 function lineSum(ln){ return Number(ln.qty||1)*Number(ln.price||0); }
 function isLaborLine(ln){ return ln.kind==='labor' || ln.kind==='اجر' || /lohn|أجر|arbeit|Arbeitswert/i.test(String(ln.kind||ln.name||ln.sku||'')); }
-function buildWorkshopRechnung(x){
+function invoiceModel(x){
   const w=workshopInfo();
   const cust=customerOfVehicle(x.vehicleId) || db.customers.find(c=>c.id===x.customerId) || {};
   const veh=vehicleOf(x.vehicleId) || {};
   const lines=(x.lines&&x.lines.length)?x.lines:[{sku:'',name:'Arbeitswert',qty:1,price:x.labor||0,tax:19}].filter(l=>lineSum(l)||l.name);
   const filled=lines.map((ln,i)=>({
-    pos:i+1,
-    sku:ln.sku||ln.number||'',
-    name:ln.name||'',
-    qty:Number(ln.qty||1),
-    price:Number(ln.price||0),
-    tax:Number(ln.tax||x.tax||19),
-    sum:lineSum(ln)
+    pos:i+1, sku:ln.sku||ln.number||'', name:ln.name||'',
+    qty:Number(ln.qty||1), price:Number(ln.price||0),
+    tax:Number(ln.tax||x.tax||19), sum:lineSum(ln)
   }));
   const teile=filled.filter(l=>!isLaborLine(l)).reduce((s,l)=>s+l.sum,0);
   const leist=filled.filter(l=>isLaborLine(l)).reduce((s,l)=>s+l.sum,0);
@@ -1574,72 +1578,93 @@ function buildWorkshopRechnung(x){
   const total=Number(x.total||net+vat);
   const kd=cust.kdNr||cust.number||'';
   const beleg=String(x.number||'').replace(/^RE-\d+-/,'') || x.number || '';
-  const leistDate=deDate(x.date);
-  return `<div class="rechnung" dir="ltr" lang="de"><div class="rh-main">
-    <div class="rh-title">${esc(w.brand || 'Autoservice und Autoteile, Tabah UG')}</div>
-    <div class="rh-sub">${esc(w.address)}</div>
-    <div class="rh-grid">
-      <div class="rh-cust">
-        <div class="muted">Firma</div>
-        <div>${esc(cust.name||'')}</div>
-        <div>${esc(cust.contact||'')}</div>
-        <div>${esc(cust.address||'')}</div>
-        <div>${esc(cust.phone||'')}</div>
-      </div>
-      <div class="rh-meta">
-        <table class="meta-tbl">
-          <tr><td>Kundennummer:</td><td>${esc(kd||'-')}</td></tr>
-          <tr><td>Belegnummer:</td><td>${esc(beleg)}</td></tr>
-          <tr><td>Seite:</td><td>1</td></tr>
-          <tr><td>Datum:</td><td>${deDate(x.date)}</td></tr>
-          <tr><td>Leistungsdatum:</td><td>${leistDate} bis ${leistDate}</td></tr>
-          <tr><td>Kennzeichen:</td><td>${esc(veh.plate||'-')}</td></tr>
-          <tr><td>Hersteller:</td><td>${esc(veh.make||'-')}</td></tr>
-          <tr><td>Modell:</td><td>${esc(veh.model||'-')}</td></tr>
-          <tr><td>Ident-Nummer:</td><td>${esc(veh.vin||'-')}</td></tr>
-          <tr><td>Erstzulassung:</td><td>${esc(veh.firstRegistration||veh.year||'')}</td></tr>
-          <tr><td>KBA-Nr.:</td><td>${esc(veh.kba||'')}</td></tr>
-          <tr><td>km-Stand:</td><td>${esc(x.km||veh.km||'')}</td></tr>
-          <tr><td>Nächste-HU:</td><td>${esc(veh.nextHu||'')}</td></tr>
-        </table>
-      </div>
+  return {w,cust,veh,filled,teile,leist,net,vat,total,kd,beleg,leistDate:deDate(x.date),x};
+}
+function posTable(filled){
+  return `<table class="pos-tbl">
+    <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th></tr></thead>
+    <tbody>${filled.map(l=>`<tr>
+      <td>${l.pos}</td><td>${esc(l.sku)}</td><td>${esc(l.name)}</td>
+      <td>${l.qty.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td>${l.price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td>${l.sum.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td>${l.tax}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+function totBlock(m){
+  return `<div class="rh-tot">
+    <div>
+      <div>Nettobetrag Teile<span>${m.teile.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+      <div>Nettobetrag Leistungen<span>${m.leist.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+      <div>Nettobetrag Sonstiges<span>0,00</span></div>
+      <div>Nettobetrag Fahrzeuge<span>0,00</span></div>
+      <div>Durchl. gem. §10 / 1 UStG<span>0,00</span></div>
     </div>
-    <h2 class="rh-h">Rechnung</h2>
-    <table class="pos-tbl">
-      <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th></tr></thead>
-      <tbody>${filled.map(l=>`<tr>
-        <td>${l.pos}</td><td>${esc(l.sku)}</td><td>${esc(l.name)}</td>
-        <td>${l.qty.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-        <td>${l.price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-        <td>${l.sum.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-        <td>${l.tax}</td>
-      </tr>`).join('')}</tbody>
-    </table>
-    <div class="rh-tot">
-      <div>
-        <div>Nettobetrag Teile<span>${teile.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
-        <div>Nettobetrag Leistungen<span>${leist.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
-        <div>Nettobetrag Sonstiges<span>0,00</span></div>
-        <div>Nettobetrag Fahrzeuge<span>0,00</span></div>
-        <div>Durchl. gem. §10 / 1 UStG<span>0,00</span></div>
-      </div>
-      <div>
-        <div>Total EUR ohne MwSt.<span>${net.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
-        <div>19% MwSt.<span>${vat.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
-        <div>7% MwSt.<span>0,00</span></div>
-        <div>AT-MwSt.<span>0,00</span></div>
-        <div class="grand">Gesamtbetrag EUR inkl. MwSt.<span>${total.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
-      </div>
+    <div>
+      <div>Total EUR ohne MwSt.<span>${m.net.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+      <div>19% MwSt.<span>${m.vat.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+      <div>7% MwSt.<span>0,00</span></div>
+      <div>AT-MwSt.<span>0,00</span></div>
+      <div class="grand">Gesamtbetrag EUR inkl. MwSt.<span>${m.total.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
     </div>
-    <p class="rh-thanks">Vielen Dank für Ihr Vertrauen — wir wünschen eine sichere Fahrt.</p>
-    <p class="rh-pay">Bei Zahlung bitte Kd-Nr und Beleg-Nr angeben. Zahlbar sofort und ohne Abzug.</p>
-    </div>
-    <div class="rh-foot">
-      <div>${esc(w.name)}<br>Geschäftsführer: ${esc(w.owner)}<br>${esc(w.address)}</div>
-      <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>${esc(w.court)}<br>Mobil: ${esc(w.phone)}</div>
-      <div>${esc(w.email)}<br>${esc(w.bank)}<br>Kto.-Inh.: ${esc(w.accountHolder)}<br>IBAN: ${esc(w.iban)}</div>
-    </div>
+  </div>
+  <p class="rh-thanks">Vielen Dank für Ihr Vertrauen — wir wünschen eine sichere Fahrt.</p>
+  <p class="rh-pay">Bei Zahlung bitte Kd-Nr und Beleg-Nr angeben. Zahlbar sofort und ohne Abzug.</p>`;
+}
+function footBlock(w){
+  return `<div class="rh-foot">
+    <div>${esc(w.name)}<br>Geschäftsführer: ${esc(w.owner)}<br>${esc(w.address)}</div>
+    <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>${esc(w.court)}<br>Mobil: ${esc(w.phone)}</div>
+    <div>${esc(w.email)}<br>${esc(w.bank)}<br>Kto.-Inh.: ${esc(w.accountHolder)}<br>IBAN: ${esc(w.iban)}</div>
   </div>`;
+}
+function metaTbl(m){
+  const {cust,veh,kd,beleg,leistDate,x}=m;
+  return `<table class="meta-tbl">
+    <tr><td>Kundennummer:</td><td>${esc(kd||'-')}</td></tr>
+    <tr><td>Belegnummer:</td><td>${esc(beleg)}</td></tr>
+    <tr><td>Seite:</td><td>1</td></tr>
+    <tr><td>Datum:</td><td>${deDate(x.date)}</td></tr>
+    <tr><td>Leistungsdatum:</td><td>${leistDate} bis ${leistDate}</td></tr>
+    <tr><td>Kennzeichen:</td><td>${esc(veh.plate||'-')}</td></tr>
+    <tr><td>Hersteller:</td><td>${esc(veh.make||'-')}</td></tr>
+    <tr><td>Modell:</td><td>${esc(veh.model||'-')}</td></tr>
+    <tr><td>Ident-Nummer:</td><td>${esc(veh.vin||'-')}</td></tr>
+    <tr><td>Erstzulassung:</td><td>${esc(veh.firstRegistration||veh.year||'')}</td></tr>
+    <tr><td>KBA-Nr.:</td><td>${esc(veh.kba||'')}</td></tr>
+    <tr><td>km-Stand:</td><td>${esc(x.km||veh.km||'')}</td></tr>
+    <tr><td>Nächste-HU:</td><td>${esc(veh.nextHu||'')}</td></tr>
+  </table>`;
+}
+function buildWorkshopRechnung(x){
+  const m=invoiceModel(x);
+  const tpl=db.settings.invoiceTpl||'werkstatt';
+  const {w,cust}=m;
+  if(tpl==='modern'){
+    return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
+      <div class="rh-band"><div class="rh-title">${esc(w.brand)}</div><div class="rh-doc">RECHNUNG</div></div>
+      <div class="rh-sub">${esc(w.address)} · Tel. ${esc(w.phone)}</div>
+      <div class="rh-grid"><div class="rh-cust"><div class="muted">Rechnungsempfänger</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
+      ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
+  }
+  if(tpl==='classic'){
+    return `<div class="rechnung tpl-classic" dir="ltr" lang="de"><div class="rh-main">
+      <div class="rh-top"><div><div class="rh-title">${esc(w.brand)}</div><div class="rh-sub">${esc(w.address)}</div></div><div class="rh-doc">Rechnung</div></div>
+      <div class="rh-grid"><div class="rh-cust"><div class="muted">Kunde</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
+      ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
+  }
+  if(tpl==='atelier'){
+    return `<div class="rechnung tpl-atelier" dir="ltr" lang="de"><div class="rh-main">
+      <div class="rh-split"><div class="rh-title">${esc(w.brand)}</div><div><div class="rh-doc">Rechnung</div><div class="rh-sub">Beleg ${esc(m.beleg)} · ${deDate(x.date)}</div></div></div>
+      <div class="rh-grid"><div class="rh-cust"><div class="muted">An</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
+      ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
+  }
+  return `<div class="rechnung tpl-werkstatt" dir="ltr" lang="de"><div class="rh-main">
+    <div class="rh-title">${esc(w.brand)}</div>
+    <div class="rh-sub">${esc(w.address)}</div>
+    <div class="rh-grid"><div class="rh-cust"><div class="muted">Firma</div><div>${esc(cust.name||'')}</div><div>${esc(cust.contact||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
+    <h2 class="rh-h">Rechnung</h2>
+    ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
 }
 
 
@@ -2525,6 +2550,12 @@ function settings(){
  <div class="field"><label>${t('hourly')}</label><input id="hrate" type="number" step="0.01" value="${db.settings.hourlyRate||85}"></div>
  <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(db.settings.workshopPhone||'')}"></div>
  <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(db.settings.workshopAddress||'')}"></div>
+ <div class="field span2"><label>قالب الفاتورة</label><select id="itpl">
+  <option value="werkstatt" ${(db.settings.invoiceTpl||'werkstatt')==='werkstatt'?'selected':''}>ورشة — مثل فاتورتكم الحالية</option>
+  <option value="modern" ${db.settings.invoiceTpl==='modern'?'selected':''}>حديث — شريط كحلي وذهبي</option>
+  <option value="classic" ${db.settings.invoiceTpl==='classic'?'selected':''}>كلاسيكي — إطار أزرق رسمي</option>
+  <option value="atelier" ${db.settings.invoiceTpl==='atelier'?'selected':''}>أتيليه — عنوان عريض وBeleg بارز</option>
+ </select></div>
  <div class="field span2"><label>اسم الورشة التجاري</label><input id="wbrand" value="${esc(db.settings.workshopBrand||'Autoservice und Autoteile, Tabah UG')}"></div>
  <div class="field span2"><label>الاسم القانوني على الفاتورة</label><input id="wname" value="${esc(db.settings.workshopName||'')}"></div>
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(db.settings.workshopTaxId||'')}"></div>
@@ -2544,7 +2575,7 @@ function settings(){
   <button class="btn bad" id="reset">${t('reset')}</button>
  </div>
  </div>`;
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;if($('#wbrand')) db.settings.workshopBrand=$('#wbrand').value;if($('#wname')) db.settings.workshopName=$('#wname').value;if($('#wstnr')) db.settings.workshopSteuerNr=$('#wstnr').value;if($('#wbank')) db.settings.workshopBank=$('#wbank').value;if($('#wmail')) db.settings.workshopEmail=$('#wmail').value;if($('#wcourt')) db.settings.workshopCourt=$('#wcourt').value;if($('#wowner')) db.settings.workshopOwner=$('#wowner').value;const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;if($('#itpl')) db.settings.invoiceTpl=$('#itpl').value;if($('#wbrand')) db.settings.workshopBrand=$('#wbrand').value;if($('#wname')) db.settings.workshopName=$('#wname').value;if($('#wstnr')) db.settings.workshopSteuerNr=$('#wstnr').value;if($('#wbank')) db.settings.workshopBank=$('#wbank').value;if($('#wmail')) db.settings.workshopEmail=$('#wmail').value;if($('#wcourt')) db.settings.workshopCourt=$('#wcourt').value;if($('#wowner')) db.settings.workshopOwner=$('#wowner').value;const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
