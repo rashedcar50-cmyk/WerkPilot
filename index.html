@@ -187,7 +187,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:''}
 };
 let db=load(), session=null;
 
@@ -532,13 +532,53 @@ async function lookupVinEdge(vin){
   }catch(e){}
   return out;
 }
+async function sha1hex(s){
+  const buf=await crypto.subtle.digest('SHA-1', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function vagModelFromVin(vin){
+  const w=vin.slice(0,3), code=vin.slice(6,8);
+  if(!/^(WVW|WV1|WV2|WVG|WAU|WUA|TRU|TMB|TMK|VSS)$/.test(w)) return '';
+  const map={'1J':'Golf IV / Bora','1K':'Golf V / Jetta','5K':'Golf VI','5G':'Golf VII','CD':'Golf VIII','6R':'Polo','6C':'Polo','AW':'Polo','9N':'Polo','3C':'Passat B6/B7','3G':'Passat B8','7L':'Touareg','7P':'Touareg','5N':'Tiguan','AD':'Tiguan','5T':'Touran','1T':'Touran','7H':'T5','7E':'T5/T6','SH':'T6.1','8P':'A3 8P','8V':'A3 8V','8Y':'A3 8Y','8E':'A4 B6/B7','8K':'A4 B8','8W':'A4 B9','4B':'A6 C5','4F':'A6 C6','4G':'A6 C7','4K':'A6 C8','4L':'Q7','8U':'Q3','8R':'Q5','1Z':'Octavia II','5E':'Octavia III','NE':'Octavia IV','5J':'Fabia II','NJ':'Fabia III'};
+  return map[code]||'';
+}
+async function lookupVinVincario(vin){
+  const key=(db.settings.vincarioKey||'').trim();
+  const secret=(db.settings.vincarioSecret||'').trim();
+  if(!key||!secret) return {};
+  try{
+    const sum=(await sha1hex(vin+'|decode|'+key+'|'+secret)).slice(0,10);
+    const url='https://api.vincario.com/3.2/'+encodeURIComponent(key)+'/'+sum+'/decode/'+vin+'.json';
+    const res=await fetch(url);
+    if(!res.ok) return {};
+    const j=await res.json();
+    const bag={};
+    (j.decode||j.data||[]).forEach(x=>{
+      const label=String(x.label||x.key||'').toLowerCase();
+      const val=pickVinVal(x.value);
+      if(label&&val) bag[label]=val;
+    });
+    const g=k=>bag[k]||'';
+    return {
+      make:g('make')||g('manufacturer'),
+      model:g('model')||g('series'),
+      year:g('model year')||g('year'),
+      engine:g('engine code')||g('engine')||g('engine model'),
+      fuel_type:g('fuel type')||g('fuel'),
+      engine_power_kw:(g('engine power (kw)')||g('power kw')||g('engine power')).replace(/[^\d.]/g,''),
+      engine_displacement_cm3:(g('engine displacement (ccm)')||g('displacement si')||g('engine displacement')).replace(/[^\d]/g,''),
+      body:g('body')||g('body type'),
+      paint:g('color')||g('colour')||''
+    };
+  }catch(e){ return {}; }
+}
 async function lookupVin(vin){
   vin=cleanVin(vin);
   if(vin.length!==17) throw new Error('VIN لازم 17 خانة');
-  const [a,b]=await Promise.all([lookupVinNhtsa(vin), lookupVinEdge(vin)]);
-  const merge=(k)=>pickVinVal(a[k])||pickVinVal(b[k])||'';
+  const [vinc,a,b]=await Promise.all([lookupVinVincario(vin), lookupVinNhtsa(vin), lookupVinEdge(vin)]);
+  const merge=(k)=>pickVinVal(vinc[k])||pickVinVal(a[k])||pickVinVal(b[k])||'';
   let make=merge('make')||vinMakeFromWmi(vin);
-  let model=merge('model');
+  let model=merge('model')||vagModelFromVin(vin);
   let year=merge('year')||vinModelYear(vin);
   let engine=merge('engine');
   let cc=merge('engine_displacement_cm3');
@@ -550,7 +590,7 @@ async function lookupVin(vin){
     engine_power_kw: merge('engine_power_kw'),
     engine_displacement_cm3: cc,
     body: merge('body'),
-    paint: ''
+    paint: merge('paint')
   };
   if(!make && !model && !year) throw new Error('ما انلقطت بيانات لهالـ VIN');
   return info;
@@ -565,6 +605,7 @@ function fillVinFields(info, ids){
   if(ids.fuel) set(ids.fuel, info.fuel_type);
   if(ids.kw) set(ids.kw, info.engine_power_kw);
   if(ids.en) set(ids.en, info.engine);
+  if(ids.pa && info.paint) set(ids.pa, info.paint);
 }
 function bindVinEnter(inputId, ids){
   const el=$(inputId); if(!el) return;
@@ -1252,7 +1293,7 @@ function vehicleModal(prefill={}){
   $('#partslinkBtn').onclick=()=>{
 window.open('https://www.partslink24.com/','_blank');
 };
-  bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en'});
+  bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en',pa:'#pa'});
 }
 function scanVehicleDocument(){
  modal('تصوير/رفع ورقة السيارة',`<div class="field">
@@ -2841,6 +2882,8 @@ function integrations(){
  <div class="card"><b>TSE / Kasse</b><p class="muted">نقطة تكامل جاهزة. الربط الحقيقي يحتاج مزوداً معتمداً.</p></div>
  <div class="card"><b>Matthies Katy / ماتيس</b>
   <p class="muted">سجّل دخولك مرة. بعدها اكتب رقم القطعة بالفاتورة وبنجيب الاسم والسعر من المخزون أو من القطع المحفوظة. الربط السعري المباشر مع سيرفر Katy يحتاج واجهة رسمية من Matthies.</p>
+  <div class="field"><label>Vincario API Key</label><input id="vinKey" value="${esc(db.settings.vincarioKey||'')}" placeholder="للبيانات الأوروبية الدقيقة"></div>
+  <div class="field"><label>Vincario Secret</label><input id="vinSec" value="${esc(db.settings.vincarioSecret||'')}" type="password"></div>
   <div class="field"><label>مستخدم Katy</label><input id="katyU" value="${esc(db.settings.katyUser||'')}"></div>
   <div class="field"><label>كلمة سر Katy</label><input id="katyP" type="password" value="${esc(db.settings.katyPass||'')}"></div>
   <div class="toolbar"><button class="btn primary" id="katySave">حفظ الدخول</button>
@@ -2853,6 +2896,8 @@ function integrations(){
  const btn=$('#plOpen');
  if(btn) btn.onclick=()=>openPartsLink($('#plCar').value);
  if($('#katySave')) $('#katySave').onclick=()=>{
+   if($('#vinKey')) db.settings.vincarioKey=$('#vinKey').value.trim();
+   if($('#vinSec')) db.settings.vincarioSecret=$('#vinSec').value.trim();
    db.settings.katyUser=$('#katyU').value.trim();
    db.settings.katyPass=$('#katyP').value;
    db.settings.katyLogged=true;
