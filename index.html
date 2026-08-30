@@ -1129,6 +1129,83 @@ model,
 firstRegistration
 };
 }
+async function readScheinAI(file){
+  const imageData = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const response = await fetch(`${window.SUPABASE_URL}/functions/v1/vehicle-ocr`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': window.SUPABASE_KEY,
+      'Authorization': `Bearer ${window.SUPABASE_KEY}`
+    },
+    body: JSON.stringify({ image: imageData })
+  });
+  const ai = await response.json();
+  if (!response.ok) throw new Error(ai.error || 'تعذرت قراءة ورقة السيارة');
+  return ai;
+}
+function findOrCreateFromSchein(ai){
+  const plate = (ai.license_plate || ai.plate || '').trim();
+  const vin = (ai.vin || '').trim().toUpperCase();
+  let v = db.vehicles.find(x => (vin && (x.vin||'').toUpperCase()===vin) || (plate && x.plate===plate));
+  const ownerName = (ai.owner_name || ai.holder || ai.customer_name || '').trim() || (plate ? ('مالك '+plate) : 'زبون جديد');
+  const ownerPhone = (ai.phone || ai.owner_phone || '').trim();
+  const ownerAddr = (ai.address || ai.owner_address || '').trim();
+  let c = v ? db.customers.find(x=>x.id===v.customerId) : db.customers.find(x=>x.companyId===session.company.id && x.name===ownerName);
+  if(!c){
+    c={id:id('c'),companyId:session.company.id,name:ownerName,phone:ownerPhone,email:'',address:ownerAddr};
+    db.customers.push(c); upsertCustomerCloud(c);
+  }
+  if(!v){
+    v={id:id('v'),companyId:session.company.id,customerId:c.id,cloudId:undefined,
+      plate, vin, make:ai.brand||ai.make||'', model:ai.model||'', year:ai.year||'',
+      engine:ai.engine_code||ai.engine||'', paint:ai.color||ai.paint||'',
+      engine_displacement_cm3:ai.engine_displacement_cm3||'', fuel_type:ai.fuel_type||'',
+      engine_power_kw:ai.engine_power_kw||'', km:0, nextServiceKm:0, photo:'',
+      ocrSource:'fahrzeugschein'};
+    db.vehicles.push(v); upsertVehicleCloud(v);
+  } else if(c && v.customerId!==c.id && !v.customerId){
+    v.customerId=c.id;
+  }
+  return {c,v};
+}
+function scanScheinStartRepair(){
+  modal('تصوير ورقة السيارة — فتح أمر',`<div class="field">
+    <label>صوّر الـ Fahrzeugschein. البرنامج بسجّل السيارة والعميل ويفتح الأمر. أنت بتضيف الكم فقط.</label>
+    <input id="doc" type="file" accept="image/*">
+    <button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
+    <img id="ocrImg" class="ocr-preview hidden">
+    <div id="ocrStatus" class="hint"></div>
+  </div>`, async()=>{
+    const f=$('#doc').files[0];
+    if(!f) return toast('صوّر الورقة أولاً');
+    $('#ocrStatus').textContent='جاري القراءة...';
+    $('#msave').disabled=true;
+    try{
+      const ai=await readScheinAI(f);
+      const {v}=findOrCreateFromSchein(ai);
+      const r={id:id('r'),companyId:session.company.id,vehicleId:v.id,complaint:'استلام من ورقة السيارة',description:'',jobs:[],parts:[],photos:[],tech:session.user.name||'',hours:1,status:'استلام',km:'',fuel:'نصف',date:todayISO()};
+      db.repairs.push(r); upsertRepairCloud(r); save();
+      audit('repair.from_schein', v.plate||v.vin);
+      closeModal();
+      session.repairId=r.id; session.page='repairs';
+      render();
+      toast('تم تسجيل السيارة. أدخل الكيلومتر فقط');
+      setTimeout(()=>{ const el=$('#deskKm'); if(el){ el.focus(); el.scrollIntoView({behavior:'smooth',block:'center'}); } }, 200);
+    }catch(e){
+      console.error(e);
+      $('#ocrStatus').textContent='تعذرت القراءة. جرّب صورة أوضح.';
+      $('#msave').disabled=false;
+    }
+  }, 'قراءة وفتح الأمر');
+  $('#doc').onchange=()=>{const f=$('#doc').files[0]; if(f){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); }};
+}
+window.scanScheinStartRepair=scanScheinStartRepair;
 function repairStatusClass(st){
   if(['مكتمل','مسلَّم','مسلم','جاهز للتسليم'].includes(st)) return 'ok';
   if(['انتظار قطع','تشخيص'].includes(st)) return 'warn';
@@ -1144,10 +1221,11 @@ function repairs(){
     <div class="muted">${esc(r.complaint||r.description||'-')}</div>
     <div class="muted">${esc(r.tech||'-')} · ${esc(r.hours||0)} س · ${money(repairPartsTotal(r))}</div>
   </div>`).join('') || '<div class="card muted">لا أوامر بعد.</div>';
- $('#content').innerHTML=head('أوامر الإصلاح',canEdit()?`<button class="btn primary" id="add">أمر إصلاح جديد</button>`:'')+cards+
- (canEdit()?`<div class="bottom-action"><button class="btn primary" id="add2">+ أمر إصلاح جديد</button></div>`:'');
+ $('#content').innerHTML=head('أوامر الإصلاح',`<div class="toolbar"><button class="btn ok" id="scanSchein">📷 تصوير ورقة السيارة</button>${canEdit()?`<button class="btn primary" id="add">أمر يدوي</button>`:''}</div>`)+cards+
+ `<div class="bottom-action"><button class="btn ok" id="scanSchein2">📷 تصوير ورقة السيارة وفتح أمر</button></div>`;
  if(canEdit() && $('#add')) $('#add').onclick=repairModal;
- if(canEdit() && $('#add2')) $('#add2').onclick=repairModal;
+ $('#scanSchein').onclick=scanScheinStartRepair;
+ if($('#scanSchein2')) $('#scanSchein2').onclick=scanScheinStartRepair;
 }
 function openRepairDesk(rid){ session.repairId=rid; session.page='repairs'; render(); }
 window.openRepairDesk=openRepairDesk;
@@ -1168,8 +1246,12 @@ function repairDesk(rid){
     ${v&&v.photo?`<img class="car-thumb" src="${v.photo}">`:''}
   </div>
   <div class="steps">${sts.map(s=>`<button class="btn small ${r.status===s?'primary':''}" onclick="setRepairStatus('${r.id}','${s}')">${s}</button>`).join('')}</div>
+  <div class="field"><label>الكيلومتر الحالي — هذا اللي بتضيفه أنت</label>
+    <div class="toolbar"><input id="deskKm" type="number" value="${esc(r.km||'')}">
+    <button class="btn primary" id="saveKm">حفظ الكم</button></div>
+  </div>
   <p><b>الشكوى:</b> ${esc(r.complaint||'-')}<br><b>العمل:</b> ${esc(r.description||'-')}<br>
-  <b>كم:</b> ${esc(r.km||'-')} · <b>وقود:</b> ${esc(r.fuel||'-')} · <b>فني:</b> ${esc(r.tech||'-')}</p>
+  <b>وقود:</b> ${esc(r.fuel||'-')} · <b>فني:</b> ${esc(r.tech||'-')}</p>
   <p><b>الأعمال</b><br>${(r.jobs||[]).map(j=>'• '+esc(j)).join('<br>')||'-'}</p>
   <h3>صرف قطعة من المخزون</h3>
   <div class="toolbar">
@@ -1191,6 +1273,12 @@ function repairDesk(rid){
   </div>
  </div>`;
  $('#backRep').onclick=()=>{session.repairId=null;render()};
+ const kmBtn=$('#saveKm');
+ if(kmBtn) kmBtn.onclick=()=>{
+   r.km=$('#deskKm').value;
+   if(v){ v.km=Number(r.km||0); upsertVehicleCloud(v); }
+   upsertRepairCloud(r); save(); toast('تم حفظ الكيلومتر'); render();
+ };
  const add=$('#addStock');
  if(add) add.onclick=()=>{
    const item=db.inventory.find(x=>x.id===$('#stockPick').value);
