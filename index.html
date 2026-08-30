@@ -141,7 +141,7 @@ const seed={
   {u:'warehouse',p:'1234',name:'أمين المستودع',role:'warehouse'}
  ],
  companies:[
-  {id:'de',name:'Auto Service',country:'DE',currency:'EUR',docLang:'de'},
+  {id:'de',name:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
  customers:[
@@ -183,7 +183,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:1,hourlyRate:85,workshopPhone:'+49 170 1112233',workshopAddress:'Musterstraße 12, 10115 Berlin',workshopTaxId:'DE123456789',workshopIban:'DE89 3704 0044 0532 0130 00'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',workshopAddress:'HANS-KOCH-RING 12, 21493 SCHWARZENBEK',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'RASHID TABAH',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)'}
 };
 let db=load(), session=null;
 
@@ -199,6 +199,19 @@ function load(){
   });
   if(!merged.settings) merged.settings=clone(seed.settings);
   merged.settings={...clone(seed.settings),...merged.settings};
+  const placeholders=['Musterstraße 12, 10115 Berlin','DE123456789','DE89 3704 0044 0532 0130 00','+49 170 1112233'];
+  if(!merged.settings.workshopName || /BayMeister|WerkPilot|Auto Service/.test(merged.settings.workshopName||''))
+    merged.settings.workshopName=seed.settings.workshopName;
+  if(placeholders.includes(merged.settings.workshopAddress)) merged.settings.workshopAddress=seed.settings.workshopAddress;
+  if(placeholders.includes(merged.settings.workshopTaxId)) merged.settings.workshopTaxId=seed.settings.workshopTaxId;
+  if(placeholders.includes(merged.settings.workshopIban)) merged.settings.workshopIban=seed.settings.workshopIban;
+  if(placeholders.includes(merged.settings.workshopPhone)) merged.settings.workshopPhone=seed.settings.workshopPhone;
+  ['workshopEmail','workshopSteuerNr','workshopCourt','workshopOwner','workshopBank','workshopAccountHolder'].forEach(k=>{
+    if(!merged.settings[k]) merged.settings[k]=seed.settings[k];
+  });
+  const deCo=(merged.companies||[]).find(c=>c.id==='de');
+  if(deCo && /^(Auto Service|WerkPilot)/.test(deCo.name||'')) deCo.name=seed.companies[0].name;
+
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
   if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'owner',p:'bm-dev-2026',name:'صاحب الورشة / تطوير',role:'developer'});
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
@@ -743,22 +756,8 @@ function buildDocHTML(type, id){
         const cust = customerOfVehicle(x.vehicleId);
         const veh = vehicleOf(x.vehicleId);
         const lines = (x.lines&&x.lines.length)?x.lines:[{name:L.parts,qty:1,price:x.parts||0},{name:L.labor,qty:1,price:x.labor||0}];
-        const w=workshopInfo();
-        body = `<div class="inv-head" style="display:flex;justify-content:space-between;gap:16px;border-bottom:3px solid #E8A54B;padding-bottom:10px;margin-bottom:14px">
-          <div><div style="font-size:22px;font-weight:800">BayMeister</div>
-          <div>${esc(w.name)}<br>${esc(w.address)}<br>${esc(w.phone)}<br>USt-IdNr.: ${esc(w.taxId)}</div></div>
-          <div style="text-align:left"><div style="font-size:28px;font-weight:800">RECHNUNG</div>
-          <div>${L.number}: <b>${esc(x.number||x.id)}</b><br>${L.date}: ${new Date(x.date||Date.now()).toLocaleDateString('de-DE')}</div></div>
-        </div>
-        <p><b>${L.customer}:</b> ${esc(cust?.name||'-')}<br>
-        ${esc(cust?.address||'')}<br>${esc(cust?.phone||'')}<br>
-        <b>${L.vehicle}:</b> ${esc(vehicleName(x.vehicleId)||L.cash)} ${veh&&veh.vin?('<br>VIN: '+esc(veh.vin)) : ''}</p>
-        <table><thead><tr><th>${L.item}</th><th>${L.qty}</th><th>${L.price}</th><th>${L.total}</th></tr></thead><tbody>`+
-        lines.map(ln=>`<tr><td>${esc(ln.name)}</td><td>${ln.qty||1}</td><td>${money(ln.price)}</td><td>${money((ln.qty||1)*Number(ln.price||0))}</td></tr>`).join('')+
-        `</tbody></table>
-        <p style="text-align:left">${L.net}: ${money(x.net)}<br>${L.tax} ${x.tax||19}%: ${money((x.total||0)-(x.net||0))}<br>
-        <b style="font-size:18px">${L.total}: ${money(x.total)}</b><br>${L.payment}: ${esc(x.payment||'-')}</p>
-        <p>IBAN: ${esc(w.iban)}<br>${L.thanks}</p>`;
+        body = buildWorkshopRechnung(x);
+        title = "";
       } else {
         body = `<table><thead><tr><th>${L.number}</th><th>${L.type}</th><th>${L.vehicle}</th><th>${L.net}</th><th>${L.tax}</th><th>${L.total}</th><th>${L.payment}</th></tr></thead><tbody>`+
           rows.map(r=>`<tr><td>${esc(r.number||r.id)}</td><td>${esc(r.type||L.invoice)}</td><td>${esc(vehicleName(r.vehicleId)||L.cash)}</td><td>${money(r.net)}</td><td>${r.tax||0}%</td><td>${money(r.total)}</td><td>${esc(r.payment||'')}</td></tr>`).join('')+
@@ -783,6 +782,7 @@ function buildDocHTML(type, id){
     body = '<p>لا توجد بيانات</p>';
   }
 
+  if(type==='invoices' && id) return `<div class="print-doc inv-a4">${body}</div>`;
   return `<div class="print-doc"><h1>${title}</h1><div class="meta">${esc(co)} · ${now}</div>${body}</div>`;
 }
 
@@ -798,7 +798,32 @@ function exportPrint(type, id){
   if(!w) return toast('اسمح بالنوافذ المنبثقة');
   const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":(WP_RTL.includes(db.settings.uiLang||"ar")?"rtl":"ltr");
   w.document.write(`<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>${type==="invoices"&&dl==="de"?"Rechnung":"Print"}</title>
-    <style>body{font-family:Arial,sans-serif;padding:20px;direction:${ddr}} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ccc;padding:8px;text-align:${ddr==="rtl"?"right":"left"}} th{background:#f3f4f6} h1{margin:0 0 8px}.meta{color:#555;margin-bottom:16px}</style>
+    <style>
+      @page{size:A4;margin:12mm}
+      body{font-family:Arial,Helvetica,sans-serif;padding:8mm;direction:${ddr};color:#111;font-size:12px}
+      .rechnung{max-width:190mm;margin:0 auto}
+      .rh-title{text-align:center;font-size:20px;font-weight:800;letter-spacing:.2px;margin:0 0 6px}
+      .rh-sub{font-size:10px;text-decoration:underline;margin-bottom:16px}
+      .rh-grid{display:flex;justify-content:space-between;gap:20px;margin-bottom:18px}
+      .rh-cust{font-size:13px;line-height:1.35}
+      .meta-tbl{font-size:12px;border-collapse:collapse}
+      .meta-tbl td{padding:1px 8px 1px 0;border:0;text-align:left}
+      .meta-tbl td:first-child{font-weight:700;padding-right:10px}
+      .rh-h{font-size:22px;margin:10px 0 8px}
+      .pos-tbl{width:100%;border-collapse:collapse;margin-top:6px}
+      .pos-tbl th{text-align:left;border-bottom:1px solid #111;padding:4px 6px;font-size:12px;background:transparent}
+      .pos-tbl td{border:0;border-bottom:1px solid #eee;padding:4px 6px;text-align:left}
+      .pos-tbl td:nth-child(4),.pos-tbl td:nth-child(5),.pos-tbl td:nth-child(6),.pos-tbl td:nth-child(7){text-align:right}
+      .rh-tot{display:flex;justify-content:space-between;gap:24px;margin-top:28px;font-size:12px}
+      .rh-tot>div{min-width:46%}
+      .rh-tot div div{display:flex;justify-content:space-between;padding:2px 0}
+      .grand{font-weight:800;border-top:1px solid #111;margin-top:4px;padding-top:4px}
+      .rh-pay{font-size:11px;margin-top:16px}
+      .rh-foot{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #ddd;margin-top:28px;padding-top:10px;font-size:10px}
+      .rh-foot>div{flex:1}
+      h1{margin:0 0 8px}.meta{color:#555;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse}
+    </style>
     </head><body>${html}<script>window.onload=()=>{window.print()}<\/script></body></html>`);
   w.document.close();
 }
@@ -1512,13 +1537,111 @@ function invoices(){
 function workshopInfo(){
   const s=db.settings||{};
   return {
-    name: session?.company?.name || 'BayMeister Werkstatt',
-    address: s.workshopAddress || '',
-    phone: s.workshopPhone || '',
-    taxId: s.workshopTaxId || '',
-    iban: s.workshopIban || ''
+    name: s.workshopName || session?.company?.name || 'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',
+    address: s.workshopAddress || 'HANS-KOCH-RING 12, 21493 SCHWARZENBEK',
+    phone: s.workshopPhone || '016096585124',
+    email: s.workshopEmail || 'rashed.car50@gmail.com',
+    taxId: s.workshopTaxId || 'DE369361489',
+    steuerNr: s.workshopSteuerNr || '22 290/41079',
+    court: s.workshopCourt || 'Amtsgericht Lübeck',
+    owner: s.workshopOwner || 'RASHID TABAH',
+    bank: s.workshopBank || 'Raiffeisenbank eG',
+    iban: s.workshopIban || 'DE36230631290000273384',
+    accountHolder: s.workshopAccountHolder || 'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)'
   };
 }
+function deDate(d){
+  try{ return new Date(d||Date.now()).toLocaleDateString('de-DE'); }catch(e){ return d||''; }
+}
+function lineSum(ln){ return Number(ln.qty||1)*Number(ln.price||0); }
+function isLaborLine(ln){ return /arbeit|lohn|leistung|std\.?|ساعة/i.test(String(ln.name||ln.sku||'')); }
+function buildWorkshopRechnung(x){
+  const w=workshopInfo();
+  const cust=customerOfVehicle(x.vehicleId) || db.customers.find(c=>c.id===x.customerId) || {};
+  const veh=vehicleOf(x.vehicleId) || {};
+  const lines=(x.lines&&x.lines.length)?x.lines:[{sku:'',name:'Arbeitswert',qty:1,price:x.labor||0,tax:19}].filter(l=>lineSum(l)||l.name);
+  const filled=lines.map((ln,i)=>({
+    pos:i+1,
+    sku:ln.sku||ln.number||'',
+    name:ln.name||'',
+    qty:Number(ln.qty||1),
+    price:Number(ln.price||0),
+    tax:Number(ln.tax||x.tax||19),
+    sum:lineSum(ln)
+  }));
+  const teile=filled.filter(l=>!isLaborLine(l)).reduce((s,l)=>s+l.sum,0);
+  const leist=filled.filter(l=>isLaborLine(l)).reduce((s,l)=>s+l.sum,0);
+  const net=Number(x.net!=null?x.net:(teile+leist-Number(x.discount||0)));
+  const vat=Number(x.total||0)-net || net*0.19;
+  const total=Number(x.total||net+vat);
+  const kd=cust.kdNr||cust.number||'';
+  const beleg=String(x.number||'').replace(/^RE-\d+-/,'') || x.number || '';
+  const leistDate=deDate(x.date);
+  return `<div class="rechnung" dir="ltr" lang="de">
+    <div class="rh-title">${esc(w.name)}</div>
+    <div class="rh-sub">${esc(w.name)} , ${esc(w.address)}</div>
+    <div class="rh-grid">
+      <div class="rh-cust">
+        <div class="muted">Firma</div>
+        <div>${esc(cust.name||'')}</div>
+        <div>${esc(cust.contact||'')}</div>
+        <div>${esc(cust.address||'')}</div>
+        <div>${esc(cust.phone||'')}</div>
+      </div>
+      <div class="rh-meta">
+        <table class="meta-tbl">
+          <tr><td>Kundennummer:</td><td>${esc(kd||'-')}</td></tr>
+          <tr><td>Belegnummer:</td><td>${esc(beleg)}</td></tr>
+          <tr><td>Seite:</td><td>1</td></tr>
+          <tr><td>Datum:</td><td>${deDate(x.date)}</td></tr>
+          <tr><td>Leistungsdatum:</td><td>${leistDate} bis ${leistDate}</td></tr>
+          <tr><td>Kennzeichen:</td><td>${esc(veh.plate||'-')}</td></tr>
+          <tr><td>Hersteller:</td><td>${esc(veh.make||'-')}</td></tr>
+          <tr><td>Modell:</td><td>${esc(veh.model||'-')}</td></tr>
+          <tr><td>Ident-Nummer:</td><td>${esc(veh.vin||'-')}</td></tr>
+          <tr><td>Erstzulassung:</td><td>${esc(veh.firstRegistration||veh.year||'')}</td></tr>
+          <tr><td>KBA-Nr.:</td><td>${esc(veh.kba||'')}</td></tr>
+          <tr><td>km-Stand:</td><td>${esc(x.km||veh.km||'')}</td></tr>
+          <tr><td>Nächste-HU:</td><td>${esc(veh.nextHu||'')}</td></tr>
+        </table>
+      </div>
+    </div>
+    <h2 class="rh-h">Rechnung</h2>
+    <table class="pos-tbl">
+      <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th></tr></thead>
+      <tbody>${filled.map(l=>`<tr>
+        <td>${l.pos}</td><td>${esc(l.sku)}</td><td>${esc(l.name)}</td>
+        <td>${l.qty.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        <td>${l.price.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        <td>${l.sum.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        <td>${l.tax}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div class="rh-tot">
+      <div>
+        <div>Nettobetrag Teile<span>${teile.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+        <div>Nettobetrag Leistungen<span>${leist.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+        <div>Nettobetrag Sonstiges<span>0,00</span></div>
+        <div>Nettobetrag Fahrzeuge<span>0,00</span></div>
+        <div>Durchl. gem. §10 / 1 UStG<span>0,00</span></div>
+      </div>
+      <div>
+        <div>Total EUR ohne MwSt.<span>${net.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+        <div>19% MwSt.<span>${vat.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+        <div>7% MwSt.<span>0,00</span></div>
+        <div>AT-MwSt.<span>0,00</span></div>
+        <div class="grand">Gesamtbetrag EUR inkl. MwSt.<span>${total.toLocaleString('de-DE',{minimumFractionDigits:2})}</span></div>
+      </div>
+    </div>
+    <p class="rh-pay">Bei Zahlung bitte Kd-Nr und Beleg-Nr angeben. Zahlbar sofort und ohne Abzug.</p>
+    <div class="rh-foot">
+      <div>GF: ${esc(w.owner)}<br>${esc(w.address)}</div>
+      <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>${esc(w.court)}<br>Mobil: ${esc(w.phone)}</div>
+      <div>${esc(w.email)}<br>${esc(w.bank)}<br>Kto.-Inh.: ${esc(w.accountHolder)}<br>IBAN: ${esc(w.iban)}</div>
+    </div>
+  </div>`;
+}
+
 function invoiceDesigner(kind='invoice'){
   const title = kind==='bar' ? 'Barverkauf' : 'إنشاء فاتورة';
   modal(title, `<div class="form-grid">
@@ -2224,8 +2347,14 @@ function settings(){
  <div class="field"><label>${t('hourly')}</label><input id="hrate" type="number" step="0.01" value="${db.settings.hourlyRate||85}"></div>
  <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(db.settings.workshopPhone||'')}"></div>
  <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(db.settings.workshopAddress||'')}"></div>
+ <div class="field span2"><label>اسم الورشة على الفاتورة</label><input id="wname" value="${esc(db.settings.workshopName||'')}"></div>
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(db.settings.workshopTaxId||'')}"></div>
+ <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(db.settings.workshopSteuerNr||'')}"></div>
  <div class="field"><label>IBAN</label><input id="wiban" value="${esc(db.settings.workshopIban||'')}"></div>
+ <div class="field"><label>البنك</label><input id="wbank" value="${esc(db.settings.workshopBank||'')}"></div>
+ <div class="field"><label>إيميل الفاتورة</label><input id="wmail" value="${esc(db.settings.workshopEmail||'')}"></div>
+ <div class="field"><label>Amtsgericht</label><input id="wcourt" value="${esc(db.settings.workshopCourt||'')}"></div>
+ <div class="field"><label>GF / صاحب الورشة</label><input id="wowner" value="${esc(db.settings.workshopOwner||'')}"></div>
  <div class="field"><label>كلمة سر جديدة لحسابك</label><input id="newpass" type="password" placeholder="فارغة = بدون تغيير"></div>
  </div>
  <p class="okbox">${t('invoiceNote')}</p>
@@ -2236,7 +2365,7 @@ function settings(){
   <button class="btn bad" id="reset">${t('reset')}</button>
  </div>
  </div>`;
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;if($('#wname')) db.settings.workshopName=$('#wname').value;if($('#wstnr')) db.settings.workshopSteuerNr=$('#wstnr').value;if($('#wbank')) db.settings.workshopBank=$('#wbank').value;if($('#wmail')) db.settings.workshopEmail=$('#wmail').value;if($('#wcourt')) db.settings.workshopCourt=$('#wcourt').value;if($('#wowner')) db.settings.workshopOwner=$('#wowner').value;const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
