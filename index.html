@@ -66,6 +66,8 @@ th{background:#10141c;position:sticky;top:0}
 .modal.wide{width:min(980px,100%)}
 .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.span2{grid-column:1/-1}
+.kba-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kba-row input{text-transform:uppercase;letter-spacing:.06em;font-weight:700}
 .filebox{border:1px dashed #64748b;border-radius:12px;padding:12px;background:#0f172a}
 .ocr-preview{max-width:100%;max-height:220px;border-radius:10px;margin-top:10px}
 .progress{height:8px;background:#334155;border-radius:999px;overflow:hidden;margin:8px 0}.progress>div{height:100%;width:0;background:#3b82f6}
@@ -693,10 +695,21 @@ function bindKbaEnter(hsnId,tsnId,fillIds){
     if(info.model || info.engine_power_kw) toast((info.make||'')+' '+(info.model||'')+(info.engine_displacement_cm3?(' · '+info.engine_displacement_cm3+' cm³'):'')+(info.engine_power_kw?(' · '+info.engine_power_kw+' kW'):''));
     else toast((info.make||'KBA')+' — الموديل مو موجود بهالمصدر المجاني، كمّل يدوياً');
   };
-  [hsnId,tsnId].forEach(id=>{
-    const el=$(id); if(!el) return;
-    el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run(); }});
-  });
+  const hEl=$(hsnId), tEl=$(tsnId);
+  if(hEl){
+    hEl.addEventListener('input',()=>{
+      hEl.value=hEl.value.replace(/\D/g,'').slice(0,4);
+      if(hEl.value.length===4 && tEl) tEl.focus();
+    });
+    hEl.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(hEl.value.length===4 && tEl) tEl.focus(); }});
+  }
+  if(tEl){
+    tEl.addEventListener('input',()=>{
+      tEl.value=tEl.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,3);
+      if(tEl.value.length===3) run();
+    });
+    tEl.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run(); }});
+  }
 }
 function nextInvoiceNumber(){
   const y=new Date().getFullYear();
@@ -1249,8 +1262,12 @@ function customerModal(existing){
  <div class="field span2"><b>سيارة العميل</b></div>
  <div class="field"><label>اللوحة</label><input id="vplate" placeholder="HH-AB 1234"></div>
  <div class="field"><label>VIN (Enter لجلب البيانات)</label><input id="vvin" maxlength="17" placeholder="17 خانة ثم Enter"></div>
- <div class="field"><label>مفتاح KBA — HSN</label><input id="vhsn" maxlength="4" placeholder="2.1"></div>
- <div class="field"><label>مفتاح KBA — TSN</label><input id="vtsn" maxlength="3" placeholder="2.2"></div>
+ <div class="field span2"><label>مفتاح KBA</label>
+  <div class="kba-row">
+    <input id="vhsn" maxlength="4" inputmode="numeric" placeholder="HSN 2.1">
+    <input id="vtsn" maxlength="3" placeholder="TSN 2.2">
+  </div>
+ </div>
  <div class="field"><label>الماركة</label><input id="vmake"></div>
  <div class="field"><label>الموديل</label><input id="vmodel"></div>
  <div class="field"><label>السنة</label><input id="vyear"></div>
@@ -1346,8 +1363,12 @@ function vehicleModal(prefill={}){
  <div class="field"><label>العميل</label><select id="cu"><option value="">اختر العميل</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
  <div class="field"><label>رقم اللوحة</label><input id="pl" value="${esc(prefill.plate||'')}"></div>
  <div class="field"><label>VIN (Enter لجلب البيانات)</label><input id="vin" value="${esc(prefill.vin||'')}" maxlength="17" placeholder="17 خانة ثم Enter"></div>
- <div class="field"><label>مفتاح KBA — HSN</label><input id="hsn" value="${esc(prefill.hsn||'')}" maxlength="4" placeholder="2.1"></div>
- <div class="field"><label>مفتاح KBA — TSN</label><input id="tsn" value="${esc(prefill.tsn||'')}" maxlength="3" placeholder="2.2"></div>
+ <div class="field span2"><label>مفتاح KBA</label>
+  <div class="kba-row">
+    <input id="hsn" value="${esc(prefill.hsn||'')}" maxlength="4" inputmode="numeric" placeholder="HSN 2.1">
+    <input id="tsn" value="${esc(prefill.tsn||'')}" maxlength="3" placeholder="TSN 2.2">
+  </div>
+ </div>
  <div class="field"><label>Partslink24</label><button type="button" class="btn" id="partslinkBtn">فتح partslink24</button></div>
  <div class="field"><label>الماركة</label><input id="mk" value="${esc(prefill.make||'')}"></div>
  <div class="field"><label>الموديل</label><input id="mo" value="${esc(prefill.model||'')}"></div>
