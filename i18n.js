@@ -3,23 +3,11 @@
    Invoices/print for DE companies stay German. */
 window.WP_RTL = ['ar','fa','ur','he','ps','sd','ug','dv','yi'];
 window.WP_LANGS = [
-['en','English'],['de','Deutsch'],['ar','العربية'],['es','Español'],['fr','Français'],['tr','Türkçe'],['ru','Русский'],
-['pl','Polski'],['it','Italiano'],['nl','Nederlands'],['pt','Português'],['uk','Українська'],['fa','فارسی'],
-['hi','हिन्दी'],['zh','中文'],['ja','日本語'],['ko','한국어'],['ro','Română'],['cs','Čeština'],['sk','Slovenčina'],
-['hu','Magyar'],['el','Ελληνικά'],['sv','Svenska'],['da','Dansk'],['fi','Suomi'],['no','Norsk'],['bg','Български'],
-['hr','Hrvatski'],['sr','Српски'],['bs','Bosanski'],['sl','Slovenščina'],['lt','Lietuvių'],['lv','Latviešu'],
-['et','Eesti'],['th','ไทย'],['vi','Tiếng Việt'],['id','Bahasa Indonesia'],['ms','Bahasa Melayu'],['fil','Filipino'],
-['bn','বাংলা'],['ur','اردو'],['he','עברית'],['sw','Kiswahili'],['am','አማርኛ'],['ha','Hausa'],['yo','Yorùbá'],
-['ig','Igbo'],['zu','isiZulu'],['af','Afrikaans'],['sq','Shqip'],['mk','Македонски'],['ka','ქართული'],
-['hy','Հայերեն'],['az','Azərbaycan'],['kk','Қазақ'],['uz','Oʻzbek'],['tg','Тоҷикӣ'],['ky','Кыргызча'],
-['mn','Монгол'],['ne','नेपाली'],['si','සිංහල'],['ta','தமிழ்'],['te','తెలుగు'],['ml','മലയാളം'],['kn','ಕನ್ನಡ'],
-['gu','ગુજરાતી'],['pa','ਪੰਜਾਬੀ'],['mr','मराठी'],['or','ଓଡ଼ିଆ'],['my','မြန်မာ'],['km','ខ្មែរ'],['lo','ລາວ'],
-['ka','ქართული'],['eu','Euskara'],['ca','Català'],['gl','Galego'],['cy','Cymraeg'],['ga','Gaeilge'],['is','Íslenska'],
-['mt','Malti'],['lb','Lëtzebuergesch'],['be','Беларуская'],['mo','Moldovenească'],['kmr','Kurdî'],['ku','کوردی'],
-['ps','پښتو'],['so','Soomaali'],['rw','Kinyarwanda'],['ny','Chichewa'],['sn','ChiShona'],['xh','isiXhosa'],
-['st','Sesotho'],['tn','Setswana'],['mg','Malagasy'],['mi','Māori'],['sm','Samoan'],['to','Lea faka-Tonga'],
-['ty','Reo Tahiti'],['haw','ʻŌlelo Hawaiʻi'],['gn','Guaraní'],['qu','Runasimi'],['ay','Aymar'],['eo','Esperanto']
+  ['ar','العربية'],
+  ['de','Deutsch'],
+  ['en','English']
 ];
+window.WP_ALLOWED_LANGS = ['ar','de','en'];
 
 window.WP_I18N = {
 en:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
@@ -160,9 +148,206 @@ window.WP_INV_DE = {
   unpaid:'offen', paid:'bezahlt', labor:'Arbeitslohn', parts:'Ersatzteile'
 };
 
+(function(){
+  const extra={
+    en:{
+      noData:'No data yet.',noResults:'No results',records:'records',showing:'Showing',of:'of',
+      searchResults:'Search results',photo:'Photo',noPhoto:'No photo',savePhoto:'Save photo',
+      photoSaved:'Photo saved',carMissing:'Vehicle not found',photoFail:'Could not save photo',
+      takeOrUploadPhoto:'Take or upload a vehicle photo after saving the data',
+      openCam:'Open camera',loginBlocked:'Too many attempts. Refresh the page shortly.',
+      loginBad:'Incorrect username or password',newWorkshop:'New workshop',
+      email:'Email',date:'Date',time:'Time',status:'Status',note:'Note',tech:'Technician',
+      hours:'Hours',qty:'Qty',skuCol:'Part no.',buy:'Buy',sell:'Sell',minQty:'Min. qty',
+      inStock:'In stock',shortStock:'Low',underMin:'Below minimum',
+      newPart:'New part',newEmployee:'New employee',roleJob:'Role',salary:'Salary',
+      newExpense:'New expense',scanBill:'Scan receipt',amount:'Amount',category:'Category',
+      statement:'Description',newEntry:'New entry',account:'Account',debit:'Debit',credit:'Credit',
+      sales:'Sales',costsPurch:'Expenses + purchases',approxDiff:'Approximate difference',
+      unpaidInvoices:'Unpaid invoices',hoursLogged:'Logged labor hours',topParts:'Most used parts',
+      customerDebts:'Customer debts',noDebts:'No open debts.',
+      listCustomers:'Customer list',listVehicles:'Vehicle list',listPurchases:'Purchase list',
+      listInventory:'Inventory list',report:'Report',purchaseInv:'Purchase invoice',
+      supplier:'Supplier',invNum:'Invoice no.',
+      repairOrders:'Repair orders',manualOrder:'Manual order',scanSchein:'Scan registration',
+      scanScheinOpen:'Scan registration and open job',noOrders:'No repair orders yet.',
+      jobCard:'Job card',back:'Back',saveKm:'Save mileage',complaint:'Complaint',work:'Work',
+      fuel:'Fuel',jobsList:'Jobs',issuePart:'Issue part from stock',issue:'Issue',
+      labor:'Labor',parts:'Parts',photosBA:'Photos before / after',before:'Before',after:'After',
+      toInvoice:'Convert to invoice',waReady:'WhatsApp ready',editOrder:'Edit repair order',
+      newOrder:'New repair order',saveEdit:'Save changes',createOrder:'Create job',
+      orderMissing:'Job not found',kmNow:'Current mileage',
+      fuelEmpty:'Empty',fuelQ:'1/4',fuelH:'1/2',fuelF:'Full',
+      jobsOnePerLine:'Jobs (one per line)',partsLineFmt:'Parts: SKU|name|qty|price (one per line)',
+      appointmentsTitle:'Appointments',newApptBtn:'+ New appointment',convertJob:'Convert to job',
+      converted:'Converted',apptMissing:'Appointment not found',
+      clash:'Conflict: same technician and time already booked',
+      createQuote:'Create quote',partsCol:'Parts',laborCol:'Labor',discount:'Discount',tax:'VAT',
+      quoteFee:'Quote fee',
+      stReady:'Ready for pickup',stDelivered:'Delivered',
+      activeWs:'Active workshop',wsOnly:'Every invoice and stock item belongs to this workshop only.',
+      langHint:'The interface changes immediately. Printed invoices stay German for DE companies.',
+      invAddr:'Workshop address on invoice',invTpl:'Invoice template',
+      tplShop:'Workshop — current invoice style',tplModern:'Modern — black & gold',
+      tplClassic:'Classic — blue frame',tplAtelier:'Atelier — wide header',
+      brandName:'Trade name',legalName:'Legal name on invoice',payDays:'Payment term (days)',
+      paper:'Paper',margins:'Print margins',printColors:'Print colors',
+      marginTight:'Tight 6 mm',marginDef:'Default 8 mm',marginNorm:'Normal 12 mm',
+      colorYes:'Color (black/gold)',colorNo:'Black & white',
+      bank:'Bank',invEmail:'Invoice email',ownerGf:'Managing director',
+      newPass:'New password for your account',passUnchanged:'Leave empty to keep current password',
+      integrationsTitle:'Integrations',auditTitle:'Activity log',when:'Time',userCol:'User',
+      actionCol:'Action',detailCol:'Details',
+      journalTitle:'Journal',reportsTitle:'Reports',
+      expensesTitle:'Expenses',employeesTitle:'Staff & payroll',
+      inventoryTitle:'Inventory & parts',
+      readAdd:'Read and add',readingInv:'Reading invoice...',
+      pickBillFirst:'Choose or photograph the receipt first',
+      expenseAdded:'Expense added',errGeneric:'An error occurred',
+      camDenied:'Camera permission denied',shotOk:'Photo captured',
+      pdfOk:'PDF created',pdfFail:'Could not create PDF',pdfWait:'Preparing PDF...',
+      printFail:'Could not open printer',
+      workshopAdded:'Workshop added — complete legal data in Settings',
+      needWsName:'Enter a workshop name',
+      resetAsk:'Delete all local data?',synced:'Synced',syncing:'Syncing...',
+      exported:'Exported',
+      hoursShort:'h'
+    },
+    de:{
+      noData:'Noch keine Daten.',noResults:'Keine Treffer',records:'Datensätze',showing:'Anzeige',of:'von',
+      searchResults:'Suchergebnisse',photo:'Foto',noPhoto:'Kein Foto',savePhoto:'Foto speichern',
+      photoSaved:'Foto gespeichert',carMissing:'Fahrzeug nicht gefunden',photoFail:'Foto konnte nicht gespeichert werden',
+      takeOrUploadPhoto:'Fahrzeugfoto nach dem Speichern aufnehmen oder hochladen',
+      openCam:'Kamera öffnen',loginBlocked:'Zu viele Versuche. Seite in Kürze neu laden.',
+      loginBad:'Benutzername oder Passwort falsch',newWorkshop:'Neue Werkstatt',
+      email:'E-Mail',date:'Datum',time:'Uhrzeit',status:'Status',note:'Notiz',tech:'Techniker',
+      hours:'Stunden',qty:'Menge',skuCol:'Art.-Nr.',buy:'EK',sell:'VK',minQty:'Mindestbestand',
+      inStock:'Vorrätig',shortStock:'Knapp',underMin:'Unter Mindestbestand',
+      newPart:'Neues Teil',newEmployee:'Neuer Mitarbeiter',roleJob:'Funktion',salary:'Gehalt',
+      newExpense:'Neue Ausgabe',scanBill:'Beleg scannen',amount:'Betrag',category:'Kategorie',
+      statement:'Bezeichnung',newEntry:'Neuer Buchungssatz',account:'Konto',debit:'Soll',credit:'Haben',
+      sales:'Umsatz',costsPurch:'Ausgaben + Einkäufe',approxDiff:'Ungefährer Saldo',
+      unpaidInvoices:'Offene Rechnungen',hoursLogged:'Erfasste Arbeitsstunden',topParts:'Meistgenutzte Teile',
+      customerDebts:'Kundenforderungen',noDebts:'Keine offenen Forderungen.',
+      listCustomers:'Kundenliste',listVehicles:'Fahrzeugliste',listPurchases:'Einkaufsliste',
+      listInventory:'Lagerliste',report:'Bericht',purchaseInv:'Einkaufsbeleg',
+      supplier:'Lieferant',invNum:'Belegnr.',
+      repairOrders:'Reparaturaufträge',manualOrder:'Manueller Auftrag',scanSchein:'Fahrzeugschein scannen',
+      scanScheinOpen:'Schein scannen und Auftrag öffnen',noOrders:'Noch keine Aufträge.',
+      jobCard:'Auftragskarte',back:'Zurück',saveKm:'km speichern',complaint:'Kundenangabe',work:'Arbeit',
+      fuel:'Kraftstoff',jobsList:'Arbeiten',issuePart:'Teil aus Lager entnehmen',issue:'Entnehmen',
+      labor:'Lohn',parts:'Teile',photosBA:'Fotos vorher / nachher',before:'Vorher',after:'Nachher',
+      toInvoice:'In Rechnung wandeln',waReady:'WhatsApp fertig',editOrder:'Auftrag bearbeiten',
+      newOrder:'Neuer Auftrag',saveEdit:'Änderung speichern',createOrder:'Auftrag anlegen',
+      orderMissing:'Auftrag nicht gefunden',kmNow:'Aktueller Kilometerstand',
+      fuelEmpty:'Leer',fuelQ:'1/4',fuelH:'1/2',fuelF:'Voll',
+      jobsOnePerLine:'Arbeiten (eine je Zeile)',partsLineFmt:'Teile: SKU|Name|Menge|Preis (eine je Zeile)',
+      appointmentsTitle:'Termine',newApptBtn:'+ Neuer Termin',convertJob:'In Auftrag wandeln',
+      converted:'Übernommen',apptMissing:'Termin nicht gefunden',
+      clash:'Konflikt: gleicher Techniker zur gleichen Zeit',
+      createQuote:'Kostenvoranschlag erstellen',partsCol:'Teile',laborCol:'Lohn',discount:'Rabatt',tax:'MwSt.',
+      quoteFee:'KV-Gebühr',
+      stReady:'Abholbereit',stDelivered:'Ausgeliefert',
+      activeWs:'Aktive Werkstatt',wsOnly:'Jede Rechnung und jeder Lagerartikel gehört nur zu dieser Werkstatt.',
+      langHint:'Die Oberfläche wechselt sofort. Gedruckte Rechnungen bleiben bei DE-Firmen auf Deutsch.',
+      invAddr:'Adresse auf der Rechnung',invTpl:'Rechnungsvorlage',
+      tplShop:'Werkstatt — aktuelles Layout',tplModern:'Modern — Schwarz/Gold',
+      tplClassic:'Klassisch — blauer Rahmen',tplAtelier:'Atelier — breite Kopfzeile',
+      brandName:'Handelsname',legalName:'Rechtsname auf der Rechnung',payDays:'Zahlungsziel (Tage)',
+      paper:'Papier',margins:'Druckränder',printColors:'Druckfarben',
+      marginTight:'Eng 6 mm',marginDef:'Standard 8 mm',marginNorm:'Normal 12 mm',
+      colorYes:'Farbe (Schwarz/Gold)',colorNo:'Schwarzweiß',
+      bank:'Bank',invEmail:'Rechnungs-E-Mail',ownerGf:'Geschäftsführer',
+      newPass:'Neues Passwort für Ihr Konto',passUnchanged:'Leer lassen = unverändert',
+      integrationsTitle:'Integrationen',auditTitle:'Aktivitätsprotokoll',when:'Zeit',userCol:'Benutzer',
+      actionCol:'Aktion',detailCol:'Details',
+      journalTitle:'Journal',reportsTitle:'Berichte',
+      expensesTitle:'Ausgaben',employeesTitle:'Mitarbeiter & Lohn',
+      inventoryTitle:'Lager & Teile',
+      readAdd:'Lesen und hinzufügen',readingInv:'Beleg wird gelesen...',
+      pickBillFirst:'Zuerst Beleg wählen oder fotografieren',
+      expenseAdded:'Ausgabe hinzugefügt',errGeneric:'Ein Fehler ist aufgetreten',
+      camDenied:'Kamerazugriff verweigert',shotOk:'Foto aufgenommen',
+      pdfOk:'PDF erstellt',pdfFail:'PDF konnte nicht erstellt werden',pdfWait:'PDF wird vorbereitet...',
+      printFail:'Drucker konnte nicht geöffnet werden',
+      workshopAdded:'Werkstatt angelegt — Rechtsdaten unter Einstellungen ergänzen',
+      needWsName:'Werkstattname eingeben',
+      resetAsk:'Alle lokalen Daten löschen?',synced:'Synchronisiert',syncing:'Synchronisiere...',
+      exported:'Exportiert',
+      hoursShort:'Std.'
+    },
+    ar:{
+      noData:'لا توجد بيانات بعد.',noResults:'لا نتائج',records:'سجل',showing:'عرض',of:'من',
+      searchResults:'نتائج البحث',photo:'صورة',noPhoto:'لا صورة',savePhoto:'حفظ الصورة',
+      photoSaved:'تم حفظ الصورة',carMissing:'السيارة غير موجودة',photoFail:'تعذر حفظ الصورة',
+      takeOrUploadPhoto:'التقط أو ارفع صورة السيارة بعد تسجيل البيانات',
+      openCam:'فتح الكاميرا',loginBlocked:'تم إيقاف المحاولة مؤقتاً. حدّث الصفحة بعد قليل.',
+      loginBad:'بيانات الدخول غير صحيحة',newWorkshop:'ورشة جديدة',
+      email:'إيميل',date:'التاريخ',time:'الوقت',status:'حالة',note:'ملاحظة',tech:'الفني',
+      hours:'ساعات',qty:'الكمية',skuCol:'رقم القطعة',buy:'شراء',sell:'بيع',minQty:'الحد الأدنى',
+      inStock:'متوفر',shortStock:'نقص',underMin:'تحت الحد الأدنى',
+      newPart:'قطعة جديدة',newEmployee:'موظف جديد',roleJob:'الوظيفة',salary:'الراتب',
+      newExpense:'مصروف جديد',scanBill:'تصوير فاتورة',amount:'المبلغ',category:'الفئة',
+      statement:'البيان',newEntry:'قيد جديد',account:'الحساب',debit:'مدين',credit:'دائن',
+      sales:'المبيعات',costsPurch:'المصاريف + المشتريات',approxDiff:'الفرق التقريبي',
+      unpaidInvoices:'فواتير غير مسددة',hoursLogged:'ساعات العمل المسجّلة',topParts:'أكثر القطع استخداماً',
+      customerDebts:'ديون الزبائن',noDebts:'لا ديون ظاهرة.',
+      listCustomers:'قائمة العملاء',listVehicles:'قائمة السيارات',listPurchases:'قائمة المشتريات',
+      listInventory:'قائمة المخزون',report:'تقرير',purchaseInv:'فاتورة شراء',
+      supplier:'المورد',invNum:'رقم الفاتورة',
+      repairOrders:'أوامر الإصلاح',manualOrder:'أمر يدوي',scanSchein:'تصوير ورقة السيارة',
+      scanScheinOpen:'تصوير ورقة السيارة وفتح أمر',noOrders:'لا أوامر بعد.',
+      jobCard:'بطاقة الأمر',back:'رجوع',saveKm:'حفظ الكم',complaint:'الشكوى',work:'العمل',
+      fuel:'وقود',jobsList:'الأعمال',issuePart:'صرف قطعة من المخزون',issue:'صرف',
+      labor:'أجور',parts:'قطع',photosBA:'صور قبل / بعد',before:'قبل',after:'بعد',
+      toInvoice:'تحويل لفاتورة',waReady:'واتساب جاهز',editOrder:'تعديل أمر الإصلاح',
+      newOrder:'أمر إصلاح جديد',saveEdit:'حفظ التعديل',createOrder:'إنشاء الأمر',
+      orderMissing:'الأمر غير موجود',kmNow:'الكيلومتر الحالي',
+      fuelEmpty:'فارغ',fuelQ:'ربع',fuelH:'نصف',fuelF:'ممتلئ',
+      jobsOnePerLine:'قائمة الأعمال (سطر لكل عمل)',partsLineFmt:'القطع: SKU|الاسم|الكمية|السعر (سطر لكل قطعة)',
+      appointmentsTitle:'المواعيد',newApptBtn:'+ موعد جديد',convertJob:'تحويل لأمر',
+      converted:'تم التحويل',apptMissing:'الموعد غير موجود',
+      clash:'تعارض: نفس الفني ونفس الوقت محجوز',
+      createQuote:'إنشاء تقدير',partsCol:'القطع',laborCol:'الأجور',discount:'الخصم',tax:'الضريبة',
+      quoteFee:'رسوم التقدير',
+      stReady:'جاهز للتسليم',stDelivered:'مسلَّم',
+      activeWs:'الورشة النشطة',wsOnly:'كل فاتورة ومخزون مربوط بهذه الورشة فقط.',
+      langHint:'واجهة البرنامج تتغير فوراً. الفاتورة المطبوعة تبقى بلغة الشركة (ألماني لـ DE).',
+      invAddr:'عنوان الورشة على الفاتورة',invTpl:'قالب الفاتورة',
+      tplShop:'ورشة — مثل فاتورتكم الحالية',tplModern:'حديث — شريط أسود وذهبي',
+      tplClassic:'كلاسيكي — إطار أزرق رسمي',tplAtelier:'أتيليه — عنوان عريض',
+      brandName:'اسم الورشة التجاري',legalName:'الاسم القانوني على الفاتورة',payDays:'مهلة الدفع (أيام)',
+      paper:'ورق الطباعة',margins:'هوامش الطباعة',printColors:'ألوان الطباعة',
+      marginTight:'ضيقة 6مم',marginDef:'افتراضي 8مم',marginNorm:'عادية 12مم',
+      colorYes:'ملون (أسود/ذهبي)',colorNo:'أبيض وأسود',
+      bank:'البنك',invEmail:'إيميل الفاتورة',ownerGf:'صاحب الورشة',
+      newPass:'كلمة سر جديدة لحسابك',passUnchanged:'فارغة = بدون تغيير',
+      integrationsTitle:'التكاملات',auditTitle:'سجل النشاط',when:'الوقت',userCol:'المستخدم',
+      actionCol:'الإجراء',detailCol:'التفاصيل',
+      journalTitle:'دفتر اليومية',reportsTitle:'التقارير',
+      expensesTitle:'المصاريف',employeesTitle:'الموظفون والرواتب',
+      inventoryTitle:'المخزون وقطع الغيار',
+      readAdd:'قراءة وإضافة',readingInv:'جاري قراءة الفاتورة...',
+      pickBillFirst:'اختر أو صوّر الفاتورة أولاً',
+      expenseAdded:'تمت إضافة المصروف بنجاح',errGeneric:'حدث خطأ',
+      camDenied:'لم يتم السماح باستخدام الكاميرا',shotOk:'تم التقاط الصورة بنجاح',
+      pdfOk:'تم إنشاء PDF',pdfFail:'تعذر إنشاء PDF',pdfWait:'جاري تجهيز PDF...',
+      printFail:'تعذر فتح الطابعة',
+      workshopAdded:'تمت إضافة الورشة — املأ البيانات القانونية من الإعدادات',
+      needWsName:'أدخل اسم الورشة',
+      resetAsk:'سيتم حذف كل البيانات المحلية. متابعة؟',synced:'تمت المزامنة',syncing:'جاري المزامنة...',
+      exported:'تم التصدير',
+      hoursShort:'س'
+    }
+  };
+  ['en','de','ar'].forEach(function(code){
+    if(window.WP_I18N[code]) Object.assign(window.WP_I18N[code], extra[code]);
+  });
+})();
 window.t = function(key){
-  const store = (typeof db!=='undefined' && db) || window.db || window.WP && WP.db;
-  const lang = (store && store.settings && store.settings.uiLang) || 'ar';
+  const store = (typeof db!=='undefined' && db) || window.db || (window.WP && WP.db);
+  let lang = (store && store.settings && store.settings.uiLang) || 'ar';
+  if(!(window.WP_ALLOWED_LANGS||['ar','de','en']).includes(lang)) lang='ar';
   const pack = (window.WP_I18N && (WP_I18N[lang] || WP_I18N.en)) || {};
   return pack[key] || (window.WP_I18N && WP_I18N.en && WP_I18N.en[key]) || key;
 };
@@ -170,9 +355,45 @@ window.stLabel = function(s){
   const map={
     'قيد التنفيذ':'stInProgress','جاري العمل':'stWorking','استلام':'stIntake',
     'تشخيص':'stDiag','انتظار قطع':'stWaitParts','مؤكد':'stConfirmed',
-    'منجز':'stDone','مغلق':'stClosed','In Arbeit':'stInProgress','Bestätigt':'stConfirmed'
+    'منجز':'stDone','مغلق':'stClosed','جاهز للتسليم':'stReady','مسلَّم':'stDelivered','مسلم':'stDelivered',
+    'تم التحويل':'converted','In Arbeit':'stInProgress','Bestätigt':'stConfirmed'
   };
   return map[s] ? t(map[s]) : (s||'');
+};
+window.dLabel = function(s){
+  if(!s) return '';
+  const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'ar');
+  if(lang==='ar') return s;
+  const map={
+    'تغيير زيت + فلتر':{de:'Ölwechsel + Filter',en:'Oil change + filter'},
+    'صوت من المحرك عند التشغيل':{de:'Geräusch beim Start',en:'Noise at start'},
+    'تغيير زيت':{de:'Ölwechsel',en:'Oil change'},
+    'تغيير فلتر زيت':{de:'Ölfilterwechsel',en:'Oil filter change'},
+    'فحص فرامل أمامية':{de:'Vorderbremsen prüfen',en:'Front brake check'},
+    'صرير عند الفرملة':{de:'Quietschen beim Bremsen',en:'Squeal when braking'},
+    'فحص فرامل':{de:'Bremsen prüfen',en:'Brake check'},
+    'تغيير فحمات إن لزم':{de:'Beläge wechseln falls nötig',en:'Replace pads if needed'},
+    'تسليم بعد تغيير الزيت':{de:'Abholung nach Ölwechsel',en:'Pickup after oil change'},
+    'الميكانيكي':{de:'Mechaniker',en:'Mechanic'},
+    'المدير':{de:'Manager',en:'Manager'},
+    'أمين المستودع':{de:'Lagerist',en:'Warehouse'},
+    'صاحب الورشة / تطوير':{de:'Inhaber / Entwicklung',en:'Owner / development'},
+    'المحاسب':{de:'Buchhaltung',en:'Accountant'},
+    'إيجار الورشة':{de:'Werkstattmiete',en:'Shop rent'},
+    'تشغيل':{de:'Betrieb',en:'Operations'},
+    'فني':{de:'Techniker',en:'Technician'},
+    'مستودع':{de:'Lager',en:'Warehouse'},
+    'زيت محرك 5W30 5L':{de:'Motoröl 5W30 5L',en:'Engine oil 5W30 5L'},
+    'فلتر زيت VW':{de:'Ölfilter VW',en:'VW oil filter'},
+    'فحمات فرامل أمامية':{de:'Vorderbremsbeläge',en:'Front brake pads'},
+    'بطارية 12V 70Ah':{de:'Batterie 12V 70Ah',en:'Battery 12V 70Ah'},
+    'طلب تجريبي':{de:'Testdatensatz',en:'Demo record'}
+  };
+  return (map[s] && map[s][lang]) || s;
+};
+window.fuelLabel = function(s){
+  const map={'فارغ':'fuelEmpty','ربع':'fuelQ','نصف':'fuelH','ممتلئ':'fuelF'};
+  return map[s]?t(map[s]):(s||'');
 };
 window.docLang = function(){
   const co = window.session && session.company;

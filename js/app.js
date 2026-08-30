@@ -25,9 +25,9 @@ function login(){
  if(lg){ lg.onchange=()=>{db.settings.uiLang=lg.value;save();login();}; }
  $('#loginBtn').onclick=()=>{
   if(lg) {db.settings.uiLang=lg.value;save();}
-  if(window._loginFails>=5) return $('#loginErr').textContent='تم إيقاف المحاولة مؤقتاً. حدّث الصفحة بعد قليل.';
+  if(window._loginFails>=5) return $('#loginErr').textContent=t('loginBlocked');
   const u=db.users.find(x=>x.u===$('#lu').value.trim()&&x.p===$('#lp').value);
-  if(!u){ window._loginFails++; $('#loginErr').textContent='بيانات الدخول غير صحيحة'; return toast('بيانات الدخول غير صحيحة'); }
+  if(!u){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
   window._loginFails=0;
   session={user:u,company:db.companies[0],page:'dashboard'};
   audit('login');
@@ -48,7 +48,7 @@ function render(){
    <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
    <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="ورشة جديدة">＋</button>`:''}
    <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
-   <div class="top-actions"><select id="uiLangTop" title="لغة البرنامج">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${session.user.name}</span><button class="btn ghost small" id="logout">${t('logout')}</button></div>
+   <div class="top-actions"><select id="uiLangTop" title="لغة البرنامج">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span><button class="btn ghost small" id="logout">${t('logout')}</button></div>
   </div>
   <div class="content" id="content"></div>
  </main>
@@ -86,7 +86,7 @@ function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>
 
 const PAGE_SIZE = 50;
 function table(headers, rows, pageKey){
-  if(!rows.length) return `<div class="card muted">لا توجد بيانات بعد.</div>`;
+  if(!rows.length) return `<div class="card muted">${t('noData')}</div>`;
   const key = pageKey || 'default';
   if(!window._tblPage) window._tblPage = {};
   if(window._tblPage[key] == null) window._tblPage[key] = 0;
@@ -96,23 +96,23 @@ function table(headers, rows, pageKey){
   const page = window._tblPage[key];
   const slice = rows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
   const pager = pages > 1 ? `<div class="toolbar" style="margin-top:10px;justify-content:space-between">
-    <span class="muted">عرض ${page*PAGE_SIZE+1}–${Math.min((page+1)*PAGE_SIZE,total)} من ${total}</span>
+    <span class="muted">${t('showing')} ${page*PAGE_SIZE+1}–${Math.min((page+1)*PAGE_SIZE,total)} ${t('of')} ${total}</span>
     <div class="toolbar">
       <button class="btn small ghost" ${page<=0?'disabled':''} onclick="window._tblPage['${key}']=${page-1};render()">${t('prev')}</button>
       <span class="muted">${page+1} / ${pages}</span>
       <button class="btn small ghost" ${page>=pages-1?'disabled':''} onclick="window._tblPage['${key}']=${page+1};render()">${t('next')}</button>
     </div>
-  </div>` : `<div class="muted" style="margin-top:8px">${total} سجل</div>`;
+  </div>` : `<div class="muted" style="margin-top:8px">${total} ${t('records')}</div>`;
   return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
   <tbody>${slice.map(r=>`<tr>${r.map(c=>`<td>${c??''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${pager}`;
 }
 
 function shareBar(type, id){
   return `<div class="share-bar">
-    <button class="btn small" onclick="exportPrint('${type}','${id||''}')">🖨️ طباعة</button>
-    <button class="btn small" onclick="exportPDF('${type}','${id||''}')">📄 PDF</button>
-    <button class="btn small" onclick="exportEmail('${type}','${id||''}')">✉️ إيميل</button>
-    <button class="btn small" onclick="exportWhatsApp('${type}','${id||''}')">💬 واتساب</button>
+    <button class="btn small" onclick="exportPrint('${type}','${id||''}')">🖨️ ${t('print')}</button>
+    <button class="btn small" onclick="exportPDF('${type}','${id||''}')">📄 ${t('pdf')}</button>
+    <button class="btn small" onclick="exportEmail('${type}','${id||''}')">✉️ ${t('email')}</button>
+    <button class="btn small" onclick="exportWhatsApp('${type}','${id||''}')">💬 ${t('whatsapp')}</button>
   </div>`;
 }
 
@@ -127,26 +127,26 @@ function listShareBar(type){
 
 function buildDocHTML(type, id){
   const co = session?.company?.name || 'WerkPilot';
-  const now = new Date().toLocaleString('ar');
+  const now = new Date().toLocaleString((db.settings.uiLang==='de'?'de-DE':db.settings.uiLang==='en'?'en-GB':'ar'));
   let title = '', body = '';
 
   if(type === 'customers'){
-    title = 'قائمة العملاء';
+    title = t('listCustomers');
     const rows = companyRows('customers');
-    body = `<table><thead><tr><th>الاسم</th><th>الهاتف</th><th>الإيميل</th><th>العنوان</th></tr></thead><tbody>` +
+    body = `<table><thead><tr><th>${t('name')}</th><th>${t('phone')}</th><th>${t('email')}</th><th>${t('address')}</th></tr></thead><tbody>` +
       rows.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.phone||'')}</td><td>${esc(c.email||'')}</td><td>${esc(c.address||'')}</td></tr>`).join('') +
       `</tbody></table>`;
   } else if(type === 'vehicles'){
-    title = 'قائمة السيارات';
+    title = t('listVehicles');
     const rows = companyRows('vehicles');
-    body = `<table><thead><tr><th>العميل</th><th>اللوحة</th><th>VIN</th><th>الماركة</th><th>الموديل</th><th>السنة</th></tr></thead><tbody>` +
+    body = `<table><thead><tr><th>${t('customer')}</th><th>${t('plate')}</th><th>VIN</th><th>${t('make')}</th><th>${t('model')}</th><th>${t('year')}</th></tr></thead><tbody>` +
       rows.map(v=>`<tr><td>${esc(customerName(v.customerId))}</td><td>${esc(v.plate||'')}</td><td>${esc(v.vin||'')}</td><td>${esc(v.make||'')}</td><td>${esc(v.model||'')}</td><td>${esc(v.year||'')}</td></tr>`).join('') +
       `</tbody></table>`;
   } else if(type === 'purchases'){
-    title = id ? 'فاتورة شراء' : 'قائمة المشتريات';
+    title = id ? t('purchaseInv') : t('listPurchases');
     let rows = companyRows('purchases');
     if(id) rows = rows.filter(x => x.id === id);
-    body = `<table><thead><tr><th>المورد</th><th>رقم الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th></tr></thead><tbody>` +
+    body = `<table><thead><tr><th>${t('supplier')}</th><th>${t('invNum')}</th><th>${t('date')}</th><th>${t('total')}</th><th>${t('status')}</th></tr></thead><tbody>` +
       rows.map(x=>{
         const total = Number(x.total_amount || (x.qty||0)*(x.price||0) || 0);
         return `<tr><td>${esc(x.supplier||'')}</td><td>${esc(x.invoice_number||x.item||'')}</td><td>${esc(x.date||'')}</td><td>${money(total)}</td><td>${esc(x.payment_status||'')}</td></tr>`;
@@ -165,14 +165,14 @@ function buildDocHTML(type, id){
         `</tbody></table>`;
     }
   } else if(type === 'inventory'){
-    title = 'قائمة المخزون';
+    title = t('listInventory');
     const rows = companyRows('inventory');
-    body = `<table><thead><tr><th>رقم القطعة</th><th>الاسم</th><th>الكمية</th><th>شراء</th><th>بيع</th></tr></thead><tbody>` +
+    body = `<table><thead><tr><th>${t('skuCol')}</th><th>${t('name')}</th><th>${t('qty')}</th><th>${t('buy')}</th><th>${t('sell')}</th></tr></thead><tbody>` +
       rows.map(x=>`<tr><td>${esc(x.sku||'')}</td><td>${esc(x.name||'')}</td><td>${x.qty}</td><td>${money(x.buy)}</td><td>${money(x.sell)}</td></tr>`).join('') +
       `</tbody></table>`;
   } else {
-    title = 'تقرير';
-    body = '<p>لا توجد بيانات</p>';
+    title = t('report');
+    body = '<p>'+t('noData')+'</p>';
   }
 
   if(type==='invoices' && id) return `<div class="print-doc inv-a4">${body}</div>`;
@@ -249,7 +249,7 @@ function exportPrint(type, id){
   const iframe=getPrintFrame();
   const doc=iframe.contentDocument;
   doc.open(); doc.write(page); doc.close();
-  const run=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){ toast('تعذر فتح الطابعة'); } };
+  const run=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){ toast(t('printFail')); } };
   requestAnimationFrame(()=>requestAnimationFrame(run));
 }
 
@@ -270,16 +270,16 @@ async function exportPDF(type, id){
     });
     const name = `${type || 'report'}-${(id||'list').slice(0,12)}-${Date.now().toString(36)}.pdf`;
     doc.save(name);
-    toast('تم إنشاء PDF');
+    toast(t('pdfOk'));
   }catch(e){
     console.error(e);
-    toast('تعذر إنشاء PDF');
+    toast(t('pdfFail'));
   }
 }
 async function exportInvoicePDF(iid){
   const inv=(db.invoices||[]).find(x=>x.id===iid);
   if(!inv) return toast(t('invMissing'));
-  toast('جاري تجهيز PDF...');
+  toast(t('pdfWait'));
   try{ await WP.loadPdf(); }catch(e){ return toast('تعذر تحميل مكتبة PDF'); }
   if(!window.html2canvas || !window.jspdf) return toast('مكتبة PDF غير محمّلة — حدّث الصفحة');
   const page=printDocMarkup('invoices', iid);
@@ -312,7 +312,7 @@ async function exportInvoicePDF(iid){
     toast('تم حفظ PDF');
   }catch(e){
     console.error(e);
-    toast('تعذر إنشاء PDF');
+    toast(t('pdfFail'));
   }
   host.remove();
 }
@@ -370,7 +370,7 @@ function dashboard(){
  </div></div>`+(stale?`<div class="alert">${t('backupWarn')}</div>`:'');
  })()}
  <div class="card" style="margin-top:12px"><b>${t('todayCars')}</b>
- ${inside.length?inside.map(r=>`<div class="today-item"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(r.description||'')} · ${esc(r.tech||'')}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(stLabel(r.status))}</span>
+ ${inside.length?inside.map(r=>`<div class="today-item"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(dLabel(r.description||''))} · ${esc(dLabel(r.tech||''))}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(stLabel(r.status))}</span>
  <button class="btn small" onclick="openRepair('${r.id}')">${t('openBtn')}</button></div></div>`).join(''):`<p class="muted">${t('noCarsInShop')}</p>`}
  </div>
  <div class="card" style="margin-top:12px"><b>${t('todayApptsTitle')}</b>
@@ -379,11 +379,11 @@ function dashboard(){
 }
 function showSearchResults(q){
   const s=globalSearch(q);
-  $('#content').innerHTML=head('نتائج البحث: '+esc(q))+`
-  <div class="card"><b>عملاء</b>${s.customers.length?table(['الاسم','هاتف','إيميل'],s.customers.map(c=>[esc(c.name),esc(c.phone),esc(c.email)]),'s_c'):'<p class="muted">لا نتائج</p>'}</div>
-  <div class="card" style="margin-top:10px"><b>سيارات</b>${s.vehicles.length?table(['لوحة','VIN','ماركة','موديل','كم'],s.vehicles.map(v=>[esc(v.plate),esc(v.vin),esc(v.make),esc(v.model),v.km||'-']),'s_v'):'<p class="muted">لا نتائج</p>'}</div>
-  <div class="card" style="margin-top:10px"><b>أوامر</b>${s.repairs.length?table(['سيارة','وصف','حالة'],s.repairs.map(r=>[vehicleName(r.vehicleId),esc(r.description),esc(r.status)]),'s_r'):'<p class="muted">لا نتائج</p>'}</div>
-  <div class="card" style="margin-top:10px"><b>مخزون</b>${s.inventory.length?table(['SKU','اسم','كمية'],s.inventory.map(i=>[esc(i.sku),esc(i.name),i.qty]),'s_i'):'<p class="muted">لا نتائج</p>'}</div>`;
+  $('#content').innerHTML=head(t('searchResults')+': '+esc(q))+`
+  <div class="card"><b>عملاء</b>${s.customers.length?table([t('name'),t('phone'),t('email')],s.customers.map(c=>[esc(c.name),esc(c.phone),esc(c.email)]),'s_c'):'<p class="muted">'+t('noResults')+'</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>سيارات</b>${s.vehicles.length?table([t('plate'),'VIN',t('make'),t('model'),'km'],s.vehicles.map(v=>[esc(v.plate),esc(v.vin),esc(v.make),esc(v.model),v.km||'-']),'s_v'):'<p class="muted">'+t('noResults')+'</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>أوامر</b>${s.repairs.length?table([t('vehicle'),t('statement'),t('status')],s.repairs.map(r=>[vehicleName(r.vehicleId),esc(r.description),esc(r.status)]),'s_r'):'<p class="muted">'+t('noResults')+'</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>مخزون</b>${s.inventory.length?table(['SKU',t('name'),t('qty')],s.inventory.map(i=>[esc(i.sku),esc(i.name),i.qty]),'s_i'):'<p class="muted">'+t('noResults')+'</p>'}</div>`;
 }
 
 
@@ -451,7 +451,7 @@ window.editCustomer=editCustomer;
 
 function carThumb(v){
   if(v && v.photo) return `<img class="car-thumb" src="${v.photo}" alt="">`;
-  return `<div class="car-thumb empty">لا صورة</div>`;
+  return `<div class="car-thumb empty">${t('noPhoto')}</div>`;
 }
 function compressVehiclePhoto(file){
   return new Promise((resolve,reject)=>{
@@ -472,8 +472,8 @@ function compressVehiclePhoto(file){
 }
 function addVehiclePhoto(vid){
   const v=db.vehicles.find(x=>x.id===vid);
-  if(!v) return toast('السيارة غير موجودة');
-  modal('صورة السيارة',`
+  if(!v) return toast(t('carMissing'));
+  modal(t('photo'),`
     <div class="field">
       <label>التقط أو ارفع صورة السيارة بعد تسجيل البيانات</label>
       <input id="vphoto" type="file" accept="image/*">
@@ -486,9 +486,9 @@ function addVehiclePhoto(vid){
     try{
       v.photo=await compressVehiclePhoto(f);
       save(); audit('vehicle.photo', v.plate||v.vin);
-      closeModal(); render(); toast('تم حفظ صورة السيارة');
-    }catch(e){ toast('تعذر حفظ الصورة'); }
-  }, 'حفظ الصورة');
+      closeModal(); render(); toast(t('photoSaved'));
+    }catch(e){ toast(t('photoFail')); }
+  }, t('savePhoto'));
 }
 window.addVehiclePhoto=addVehiclePhoto;
 
@@ -497,10 +497,10 @@ function vehicles(){
  const addBtn=canEdit()?`<button class="btn primary" id="add">${t('newVehicle')}</button><button class="btn ok" id="scan">📷 Fahrzeugschein</button>`:`<span class="muted">—</span>`;
  $('#content').innerHTML=head(t('vehicles'),`<div class="toolbar">${addBtn}</div>`)+
  listShareBar('vehicles')+
- table(['صورة','العميل','اللوحة','VIN','الماركة','الموديل','السنة','إجراء'],rows.map(v=>[
+ table([t('photo'),t('customer'),t('plate'),'VIN',t('make'),t('model'),t('year'),t('action')],rows.map(v=>[
    carThumb(v),
    customerName(v.customerId),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
-   canEdit()?`<button class="btn small" onclick="editVehicle('${v.id}')">تعديل</button> <button class="btn small" onclick="addVehiclePhoto('${v.id}')">صورة</button>`:'—'
+   canEdit()?`<button class="btn small" onclick="editVehicle('${v.id}')">${t('edit')}</button> <button class="btn small" onclick="addVehiclePhoto('${v.id}')">${t('photo')}</button>`:'—'
  ]), 'vehicles');
  if(canEdit()){
    $('#add').onclick=()=>vehicleModal();
@@ -864,12 +864,12 @@ function repairs(){
  const rows=companyRows('repairs').slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
  const cards=rows.map(r=>`
   <div class="repair-card" onclick="openRepairDesk('${r.id}')">
-    <div class="row"><b>${esc(vehicleName(r.vehicleId))}</b><span class="status ${repairStatusClass(r.status)}">${esc(r.status)}</span></div>
-    <div class="muted">${esc(r.complaint||r.description||'-')}</div>
-    <div class="muted">${esc(r.tech||'-')} · ${esc(r.hours||0)} س · ${money(repairPartsTotal(r))}</div>
-  </div>`).join('') || '<div class="card muted">لا أوامر بعد.</div>';
- $('#content').innerHTML=head('أوامر الإصلاح',`<div class="toolbar"><button class="btn ok" id="scanSchein">📷 تصوير ورقة السيارة</button>${canEdit()?`<button class="btn primary" id="add">أمر يدوي</button>`:''}</div>`)+cards+
- `<div class="bottom-action"><button class="btn ok" id="scanSchein2">📷 تصوير ورقة السيارة وفتح أمر</button></div>`;
+    <div class="row"><b>${esc(vehicleName(r.vehicleId))}</b><span class="status ${repairStatusClass(r.status)}">${esc(stLabel(r.status))}</span></div>
+    <div class="muted">${esc(dLabel(r.complaint||r.description||'-'))}</div>
+    <div class="muted">${esc(r.tech||'-')} · ${esc(r.hours||0)} ${t('hoursShort')} · ${money(repairPartsTotal(r))}</div>
+  </div>`).join('') || `<div class="card muted">${t('noOrders')}</div>`;
+ $('#content').innerHTML=head(t('repairOrders'),`<div class="toolbar"><button class="btn ok" id="scanSchein">📷 ${t('scanSchein')}</button>${canEdit()?`<button class="btn primary" id="add">${t('manualOrder')}</button>`:''}</div>`)+cards+
+ `<div class="bottom-action"><button class="btn ok" id="scanSchein2">📷 ${t('scanScheinOpen')}</button></div>`;
  if(canEdit() && $('#add')) $('#add').onclick=repairModal;
  $('#scanSchein').onclick=scanScheinStartRepair;
  if($('#scanSchein2')) $('#scanSchein2').onclick=scanScheinStartRepair;
@@ -886,37 +886,37 @@ function repairDesk(rid){
  const before=photos.filter(x=>x.kind==='before');
  const after=photos.filter(x=>x.kind==='after');
  const img=(arr)=>arr.map(x=>`<img class="ocr-preview" src="${x.url}">`).join('')||'<div class="muted">لا صور</div>';
- $('#content').innerHTML=head('بطاقة الأمر',`<button class="btn ghost" id="backRep">رجوع</button>`)+`
+ $('#content').innerHTML=head(t('jobCard'),`<button class="btn ghost" id="backRep">${t('back')}</button>`)+`
  <div class="card">
   <div class="row" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
     <div><b>${esc(vehicleName(r.vehicleId))}</b><div class="muted">${esc(c?.name||'')} · ${esc(c?.phone||'')}</div></div>
     ${v&&v.photo?`<img class="car-thumb" src="${v.photo}">`:''}
   </div>
-  <div class="steps">${sts.map(s=>`<button class="btn small ${r.status===s?'primary':''}" onclick="setRepairStatus('${r.id}','${s}')">${s}</button>`).join('')}</div>
-  <div class="field"><label>الكيلومتر الحالي — هذا اللي بتضيفه أنت</label>
+  <div class="steps">${sts.map(s=>`<button class="btn small ${r.status===s?'primary':''}" onclick="setRepairStatus('${r.id}','${s}')">${stLabel(s)}</button>`).join('')}</div>
+  <div class="field"><label>${t('kmNow')}</label>
     <div class="toolbar"><input id="deskKm" type="number" value="${esc(r.km||'')}">
-    <button class="btn primary" id="saveKm">حفظ الكم</button></div>
+    <button class="btn primary" id="saveKm">${t('saveKm')}</button></div>
   </div>
-  <p><b>الشكوى:</b> ${esc(r.complaint||'-')}<br><b>العمل:</b> ${esc(r.description||'-')}<br>
-  <b>وقود:</b> ${esc(r.fuel||'-')} · <b>فني:</b> ${esc(r.tech||'-')}</p>
-  <p><b>الأعمال</b><br>${(r.jobs||[]).map(j=>'• '+esc(j)).join('<br>')||'-'}</p>
-  <h3>صرف قطعة من المخزون</h3>
+  <p><b>${t('complaint')}:</b> ${esc(dLabel(r.complaint||'-'))}<br><b>${t('work')}:</b> ${esc(dLabel(r.description||'-'))}<br>
+  <b>${t('fuel')}:</b> ${esc(fuelLabel(r.fuel||'-'))} · <b>${t('tech')}:</b> ${esc(dLabel(r.tech||'-'))}</p>
+  <p><b>${t('jobsList')}</b><br>${(r.jobs||[]).map(j=>'• '+esc(dLabel(j))).join('<br>')||'-'}</p>
+  <h3>${t('issuePart')}</h3>
   <div class="toolbar">
-    <select id="stockPick">${stock.map(i=>`<option value="${i.id}">${esc(i.sku||'')} ${esc(i.name)} (${i.qty})</option>`).join('')}</select>
+    <select id="stockPick">${stock.map(i=>`<option value="${i.id}">${esc(i.sku||'')} ${esc(dLabel(i.name))} (${i.qty})</option>`).join('')}</select>
     <input id="stockQty" type="number" value="1" min="1" style="width:80px">
-    <button class="btn primary" id="addStock">صرف</button>
+    <button class="btn primary" id="addStock">${t('issue')}</button>
   </div>
-  <p>${(r.parts||[]).map(p=>esc(p.name)+' × '+(p.qty||1)+' — '+money(p.price)+(p.consumed?' ✓':'')).join('<br>')||'-'}</p>
-  <p>أجور: ${money(repairLaborTotal(r))} · قطع: ${money(repairPartsTotal(r))}</p>
-  <h3>صور قبل / بعد</h3>
+  <p>${(r.parts||[]).map(p=>esc(dLabel(p.name))+' × '+(p.qty||1)+' — '+money(p.price)+(p.consumed?' ✓':'')).join('<br>')||'-'}</p>
+  <p>${t('labor')}: ${money(repairLaborTotal(r))} · ${t('parts')}: ${money(repairPartsTotal(r))}</p>
+  <h3>${t('photosBA')}</h3>
   <div class="form-grid">
-    <div class="field"><label>قبل</label>${img(before)}<input type="file" accept="image/*" onchange="addRepairPhoto('${r.id}','before',this)"></div>
-    <div class="field"><label>بعد</label>${img(after)}<input type="file" accept="image/*" onchange="addRepairPhoto('${r.id}','after',this)"></div>
+    <div class="field"><label>${t('before')}</label>${img(before)}<input type="file" accept="image/*" onchange="addRepairPhoto('${r.id}','before',this)"></div>
+    <div class="field"><label>${t('after')}</label>${img(after)}<input type="file" accept="image/*" onchange="addRepairPhoto('${r.id}','after',this)"></div>
   </div>
   <div class="toolbar">
-    <button class="btn" onclick="openRepair('${r.id}')">تعديل</button>
-    <button class="btn ok" onclick="convertRepairToInvoice('${r.id}')">تحويل لفاتورة</button>
-    <button class="btn" onclick="whatsappReady('${r.id}')">واتساب جاهز</button>
+    <button class="btn" onclick="openRepair('${r.id}')">${t('edit')}</button>
+    <button class="btn ok" onclick="convertRepairToInvoice('${r.id}')">${t('toInvoice')}</button>
+    <button class="btn" onclick="whatsappReady('${r.id}')">${t('waReady')}</button>
   </div>
  </div>`;
  $('#backRep').onclick=()=>{session.repairId=null;render()};
@@ -942,7 +942,7 @@ window.addRepairPhoto=async function(rid,kind,input){
   const r=db.repairs.find(x=>x.id===rid); if(!r||!input.files||!input.files[0]) return;
   const file=input.files[0];
   let url=await uploadWorkshopFile(file,'repairs');
-  if(!url){ try{ url=await compressVehiclePhoto(file);}catch(e){ return toast('تعذر حفظ الصورة'); } }
+  if(!url){ try{ url=await compressVehiclePhoto(file);}catch(e){ return toast(t('photoFail')); } }
   r.photos=r.photos||[]; r.photos.push({kind,url});
   save(); upsertRepairCloud(r); render(); toast('تم حفظ الصورة');
 };
@@ -955,18 +955,23 @@ function repairModal(existing){
  const r=existing||{};
  const jobs=(r.jobs||[]).join('\n');
  const parts=(r.parts||[]).map(p=>[p.sku||'',p.name||'',p.qty||1,p.price||0].join('|')).join('\n');
- modal(existing?'تعديل أمر الإصلاح':'أمر إصلاح جديد',`<div class="form-grid">
- <div class="field"><label>السيارة</label><select id="rv">${companyRows('vehicles').map(v=>`<option value="${v.id}" ${v.id===r.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
- <div class="field"><label>الفني</label><input id="rt" value="${esc(r.tech||'')}"></div>
- <div class="field"><label>الكيلومتر</label><input id="rkm" type="number" value="${r.km||''}"></div>
- <div class="field"><label>الوقود</label><select id="rfuel"><option ${r.fuel==='فارغ'?'selected':''}>فارغ</option><option ${r.fuel==='ربع'?'selected':''}>ربع</option><option ${!r.fuel||r.fuel==='نصف'?'selected':''}>نصف</option><option ${r.fuel==='ممتلئ'?'selected':''}>ممتلئ</option></select></div>
- <div class="field span2"><label>شكوى الزبون</label><textarea id="rc">${esc(r.complaint||'')}</textarea></div>
- <div class="field span2"><label>وصف العمل</label><textarea id="rd">${esc(r.description||'')}</textarea></div>
- <div class="field span2"><label>قائمة الأعمال (سطر لكل عمل)</label><textarea id="rjobs">${esc(jobs)}</textarea></div>
- <div class="field span2"><label>القطع: SKU|الاسم|الكمية|السعر (سطر لكل قطعة)</label><textarea id="rparts">${esc(parts)}</textarea></div>
- <div class="field"><label>ساعات العمل</label><input id="rh" type="number" step=".25" value="${r.hours||1}"></div>
- <div class="field"><label>الحالة</label><select id="rs">
-  ${['استلام','تشخيص','انتظار قطع','قيد التنفيذ','جاهز للتسليم','مسلَّم'].map(s=>`<option ${r.status===s?'selected':''}>${s}</option>`).join('')}
+ modal(existing?t('editOrder'):t('newOrder'),`<div class="form-grid">
+ <div class="field"><label>${t('vehicle')}</label><select id="rv">${companyRows('vehicles').map(v=>`<option value="${v.id}" ${v.id===r.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+ <div class="field"><label>${t('tech')}</label><input id="rt" value="${esc(r.tech||'')}"></div>
+ <div class="field"><label>${t('km')}</label><input id="rkm" type="number" value="${r.km||''}"></div>
+ <div class="field"><label>${t('fuel')}</label><select id="rfuel">
+  <option value="فارغ" ${r.fuel==='فارغ'?'selected':''}>${t('fuelEmpty')}</option>
+  <option value="ربع" ${r.fuel==='ربع'?'selected':''}>${t('fuelQ')}</option>
+  <option value="نصف" ${!r.fuel||r.fuel==='نصف'?'selected':''}>${t('fuelH')}</option>
+  <option value="ممتلئ" ${r.fuel==='ممتلئ'?'selected':''}>${t('fuelF')}</option>
+ </select></div>
+ <div class="field span2"><label>${t('complaint')}</label><textarea id="rc">${esc(r.complaint||'')}</textarea></div>
+ <div class="field span2"><label>${t('work')}</label><textarea id="rd">${esc(r.description||'')}</textarea></div>
+ <div class="field span2"><label>${t('jobsOnePerLine')}</label><textarea id="rjobs">${esc(jobs)}</textarea></div>
+ <div class="field span2"><label>${t('partsLineFmt')}</label><textarea id="rparts">${esc(parts)}</textarea></div>
+ <div class="field"><label>${t('hours')}</label><input id="rh" type="number" step=".25" value="${r.hours||1}"></div>
+ <div class="field"><label>${t('status')}</label><select id="rs">
+  ${['استلام','تشخيص','انتظار قطع','قيد التنفيذ','جاهز للتسليم','مسلَّم'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${stLabel(s)}</option>`).join('')}
  </select></div>
  </div>`,()=>{
   const parsedParts=$('#rparts').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
@@ -994,7 +999,7 @@ function repairModal(existing){
     audit('repair.create', obj.description);
   }
   save(); closeModal(); render();
- }, existing?'حفظ التعديل':'إنشاء الأمر');
+ }, existing?t('saveEdit'):t('createOrder'));
 }
 function repairEditModal(rid){
   const r=db.repairs.find(x=>x.id===rid);
@@ -1004,23 +1009,23 @@ function repairEditModal(rid){
 window.openRepair=repairEditModal;
 function appointments(){
   const rows=companyRows('appointments').slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
-  $('#content').innerHTML=head('المواعيد')+
-  table(['التاريخ','الوقت','السيارة','الزبون','الفني','حالة','إجراء'],rows.map(a=>[
-    esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(a.tech||'-'),esc(a.status||''),
-    a.status==='تم التحويل'?'—':`<button class="btn small primary" onclick="appointmentToRepair('${a.id}')">تحويل لأمر</button>`
+  $('#content').innerHTML=head(t('appointmentsTitle'))+
+  table([t('date'),t('time'),t('vehicle'),t('customer'),t('tech'),t('status'),t('action')],rows.map(a=>[
+    esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(dLabel(a.tech||'-')),esc(stLabel(a.status||'')),
+    a.status==='تم التحويل'?'—':`<button class="btn small primary" onclick="appointmentToRepair('${a.id}')">${t('convertJob')}</button>`
   ]),'appointments')+
-  `<div class="bottom-action"><button class="btn primary" id="add">+ موعد جديد</button></div>`;
+  `<div class="bottom-action"><button class="btn primary" id="add">${t('newApptBtn')}</button></div>`;
   $('#add').onclick=()=>{
-    modal('موعد جديد',`<div class="form-grid">
-      <div class="field"><label>السيارة</label><select id="av">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)}</option>`).join('')}</select></div>
-      <div class="field"><label>التاريخ</label><input id="ad" type="date" value="${todayISO()}"></div>
-      <div class="field"><label>الوقت</label><input id="at" type="time" value="09:00"></div>
-      <div class="field"><label>الفني</label><input id="atech" value="الميكانيكي"></div>
-      <div class="field span2"><label>ملاحظة</label><input id="an"></div>
+    modal(t('newAppt'),`<div class="form-grid">
+      <div class="field"><label>${t('vehicle')}</label><select id="av">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)}</option>`).join('')}</select></div>
+      <div class="field"><label>${t('date')}</label><input id="ad" type="date" value="${todayISO()}"></div>
+      <div class="field"><label>${t('time')}</label><input id="at" type="time" value="09:00"></div>
+      <div class="field"><label>${t('tech')}</label><input id="atech" value="${esc(dLabel('الميكانيكي'))}"></div>
+      <div class="field span2"><label>${t('note')}</label><input id="an"></div>
     </div>`,()=>{
       const vid=$('#av').value; const v=vehicleOf(vid);
       const clash=companyRows('appointments').some(x=>x.date===$('#ad').value && x.time===$('#at').value && x.tech===$('#atech').value);
-      if(clash) return toast('تعارض: نفس الفني ونفس الوقت محجوز');
+      if(clash) return toast(t('clash'));
       db.appointments=db.appointments||[];
       db.appointments.push({id:id('ap'),companyId:session.company.id,vehicleId:vid,customerId:v?.customerId||'',date:$('#ad').value,time:$('#at').value,tech:$('#atech').value,note:$('#an').value,status:'مؤكد'});
       upsertAppointmentCloud(db.appointments[db.appointments.length-1]); save(); audit('appointment.create',$('#ad').value+' '+$('#at').value); closeModal(); render();
@@ -1040,9 +1045,9 @@ function appointmentToRepair(aid){
 window.appointmentToRepair=appointmentToRepair;
 function estimates(){
  const rows=companyRows('estimates');
- $('#content').innerHTML=head('Kostenvoranschlag',`<button class="btn primary" id="add">إنشاء تقدير</button>`)+
+ $('#content').innerHTML=head(t('estimates'),`<button class="btn primary" id="add">${t('createQuote')}</button>`)+
  listShareBar('invoices')+
- table(['العميل/السيارة','القطع','الأجور','الخصم','الضريبة','الإجمالي','رسوم التقدير'],rows.map(x=>[vehicleName(x.vehicleId),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]), 'estimates');
+ table([t('vehicle'),t('partsCol'),t('laborCol'),t('discount'),t('tax'),t('total'),t('quoteFee')],rows.map(x=>[vehicleName(x.vehicleId),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]), 'estimates');
  $('#add').onclick=()=>financeModal('estimate');
 }
 function invoices(){
@@ -2010,25 +2015,25 @@ async function openCameraForPurchase(onCapture){
 function inventory(){
  const rows=companyRows('inventory');
  const low=lowStock();
- $('#content').innerHTML=head('المخزون وقطع الغيار',`<button class="btn primary" id="add">قطعة جديدة</button>`)+
+ $('#content').innerHTML=head(t('inventoryTitle'),`<button class="btn primary" id="add">${t('newPart')}</button>`)+
  listShareBar('inventory')+
  (low.length?`<div class="alert"><b>تحت الحد الأدنى:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+' / حد '+ (x.minQty||3)+')').join(' · ')}</div>`:'')+
- table(['رقم القطعة','الاسم','الكمية','الحد الأدنى','شراء','بيع','حالة'],rows.map(x=>{
+ table([t('skuCol'),t('name'),t('qty'),t('minQty'),t('buy'),t('sell'),t('status')],rows.map(x=>{
    const lowFlag=Number(x.qty||0)<=Number(x.minQty||3);
-   return [esc(x.sku),esc(x.name),x.qty,x.minQty||3,money(x.buy),money(x.sell), lowFlag?`<span class="status warn">نقص</span>`:`<span class="status ok">متوفر</span>`];
+   return [esc(x.sku),esc(x.name),x.qty,x.minQty||3,money(x.buy),money(x.sell), lowFlag?`<span class="status warn">${t('shortStock')}</span>`:`<span class="status ok">${t('inStock')}</span>`];
  }), 'inventory');
- $('#add').onclick=()=>simpleModal('قطعة جديدة',[['sku','رقم القطعة'],['name','الاسم'],['qty','الكمية','number'],['minQty','الحد الأدنى','number'],['buy','سعر الشراء','number'],['sell','سعر البيع','number']],o=>{o.companyId=session.company.id;o.id=id('i');o.qty=Number(o.qty||0);o.minQty=Number(o.minQty||3);db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
+ $('#add').onclick=()=>simpleModal(t('newPart'),[['sku',t('skuCol')],['name',t('name')],['qty',t('qty'),'number'],['minQty',t('minQty'),'number'],['buy',t('buy'),'number'],['sell',t('sell'),'number']],o=>{o.companyId=session.company.id;o.id=id('i');o.qty=Number(o.qty||0);o.minQty=Number(o.minQty||3);db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
 }
 function employees(){
  const rows=companyRows('employees');
- $('#content').innerHTML=head('الموظفون والرواتب',`<button class="btn primary" id="add">موظف جديد</button>`)+
- table(['الاسم','الوظيفة','الهاتف','الراتب'],rows.map(x=>[esc(x.name),esc(x.role),esc(x.phone||'-'),money(x.salary)]));
- $('#add').onclick=()=>simpleModal('موظف جديد',[['name','الاسم'],['role','الوظيفة'],['phone','الهاتف'],['salary','الراتب','number']],o=>{o.companyId=session.company.id;o.id=id('e');db.employees.push(o);save();audit('employee.create',o.name);render()});
+ $('#content').innerHTML=head(t('employeesTitle'),`<button class="btn primary" id="add">${t('newEmployee')}</button>`)+
+ table([t('name'),t('roleJob'),t('phone'),t('salary')],rows.map(x=>[esc(x.name),esc(x.role),esc(x.phone||'-'),money(x.salary)]));
+ $('#add').onclick=()=>simpleModal(t('newEmployee'),[['name',t('name')],['role',t('roleJob')],['phone',t('phone')],['salary',t('salary'),'number']],o=>{o.companyId=session.company.id;o.id=id('e');db.employees.push(o);save();audit('employee.create',o.name);render()});
 }
 function expenses(){
  const rows=companyRows('expenses');
-$('#content').innerHTML=head('المصاريف','<button class="btn primary" id="scanExpense">📷 تصوير فاتورة</button> <button class="btn primary" id="add">مصروف جديد</button>')+
- table(['التاريخ','البيان','المبلغ','الفئة'],rows.map(x=>[esc(x.date),esc(x.note),money(x.amount),esc(x.category)]));
+$('#content').innerHTML=head(t('expensesTitle'),`<button class="btn primary" id="scanExpense">📷 ${t('scanBill')}</button> <button class="btn primary" id="add">${t('newExpense')}</button>`)+
+ table([t('date'),t('statement'),t('amount'),t('category')],rows.map(x=>[esc(x.date),esc(x.note),money(x.amount),esc(x.category)]));
  $('#add').onclick=()=>simpleModal('مصروف جديد',[['date','التاريخ','date'],['note','البيان'],['amount','المبلغ','number'],['category','الفئة']],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);db.journal.push({id:id('j'),companyId:session.company.id,date:o.date||todayISO(),account:'مصروف',debit:Number(o.amount||0),credit:0,note:o.note});save();audit('expense.create',o.note);render()});
 $('#scanExpense').onclick=scanExpenseDocument;
 }
@@ -2120,8 +2125,8 @@ $('#msave').disabled=false;
 
 function journal(){
  const rows=companyRows('journal');
- $('#content').innerHTML=head('دفتر اليومية',`<button class="btn primary" id="add">قيد جديد</button>`)+
- table(['التاريخ','الحساب','مدين','دائن','البيان'],rows.map(x=>[esc(x.date),esc(x.account),money(x.debit),money(x.credit),esc(x.note)]));
+ $('#content').innerHTML=head(t('journalTitle'),`<button class="btn primary" id="add">${t('newEntry')}</button>`)+
+ table([t('date'),t('account'),t('debit'),t('credit'),t('statement')],rows.map(x=>[esc(x.date),esc(x.account),money(x.debit),money(x.credit),esc(x.note)]));
  $('#add').onclick=()=>simpleModal('قيد جديد',[['date','التاريخ','date'],['account','الحساب'],['debit','مدين','number'],['credit','دائن','number'],['note','البيان']],o=>{o.companyId=session.company.id;o.id=id('j');db.journal.push(o);save();audit('journal.create',o.account);render()});
 }
 function reports(){
@@ -2134,24 +2139,24 @@ function reports(){
  const topParts={};
  companyRows('repairs').forEach(r=>(r.parts||[]).forEach(p=>{topParts[p.name]=(topParts[p.name]||0)+Number(p.qty||0)}));
  const top=Object.entries(topParts).sort((a,b)=>b[1]-a[1]).slice(0,5);
- $('#content').innerHTML=head('التقارير')+`<div class="grid">
- <div class="card"><div class="muted">المبيعات</div><div class="metric">${money(sales)}</div></div>
- <div class="card"><div class="muted">المصاريف + المشتريات</div><div class="metric">${money(costs)}</div></div>
- <div class="card"><div class="muted">الفرق التقريبي</div><div class="metric">${money(sales-costs)}</div></div>
- <div class="card"><div class="muted">فواتير غير مسددة</div><div class="metric">${unpaid.length}</div></div>
- <div class="card"><div class="muted">ساعات العمل المسجّلة</div><div class="metric">${hours}</div></div>
- <div class="card"><div class="muted">أوامر مفتوحة</div><div class="metric">${openRepairs().length}</div></div>
+ $('#content').innerHTML=head(t('reportsTitle'))+`<div class="grid">
+ <div class="card"><div class="muted">${t('sales')}</div><div class="metric">${money(sales)}</div></div>
+ <div class="card"><div class="muted">${t('costsPurch')}</div><div class="metric">${money(costs)}</div></div>
+ <div class="card"><div class="muted">${t('approxDiff')}</div><div class="metric">${money(sales-costs)}</div></div>
+ <div class="card"><div class="muted">${t('unpaidInvoices')}</div><div class="metric">${unpaid.length}</div></div>
+ <div class="card"><div class="muted">${t('hoursLogged')}</div><div class="metric">${hours}</div></div>
+ <div class="card"><div class="muted">${t('openJobs')}</div><div class="metric">${openRepairs().length}</div></div>
  </div>
- <div class="card" style="margin-top:12px"><b>أكثر القطع استخداماً</b>
- ${top.length?table(['القطعة','الكمية'],top.map(([n,q])=>[esc(n),q]),'top_parts'):'<p class="muted">لا بيانات بعد.</p>'}
+ <div class="card" style="margin-top:12px"><b>${t('topParts')}</b>
+ ${top.length?table([t('parts'),t('qty')],top.map(([n,q])=>[esc(dLabel(n)),q]),'top_parts'):`<p class="muted">${t('noData')}</p>`}
  </div>
- <div class="card" style="margin-top:12px"><b>ديون الزبائن (فواتير غير مسددة)</b>
- ${unpaid.length?table(['رقم','السيارة','الإجمالي'],unpaid.map(x=>[esc(x.number||x.id),vehicleName(x.vehicleId),money(x.total)]),'unpaid'):'<p class="muted">لا ديون ظاهرة.</p>'}
+ <div class="card" style="margin-top:12px"><b>${t('customerDebts')}</b>
+ ${unpaid.length?table([t('invoiceNo'),t('vehicle'),t('total')],unpaid.map(x=>[esc(x.number||x.id),vehicleName(x.vehicleId),money(x.total)]),'unpaid'):`<p class="muted">${t('noDebts')}</p>`}
  </div>`;
 }
 function integrations(){
  const cars=companyRows('vehicles');
- $('#content').innerHTML=head('التكاملات')+`<div class="grid">
+ $('#content').innerHTML=head(t('integrationsTitle'))+`<div class="grid">
  <div class="card"><b>PartsLink24</b><p class="muted">افتح الموقع مع VIN السيارة المحددة.</p>
   <select id="plCar">${cars.map(v=>`<option value="${v.id}">${esc(v.plate||'')} · ${esc(v.vin||'')}</option>`).join('')}</select>
   <button class="btn primary" style="margin-top:8px" id="plOpen">فتح PartsLink24</button>
@@ -2195,7 +2200,7 @@ function integrations(){
 }
 function auditPage(){
  const rows=db.audit.filter(a=>!session.company||a.company===session.company.id||!a.company).slice(0,200);
- $('#content').innerHTML=head('سجل النشاط')+table(['الوقت','المستخدم','الإجراء','التفاصيل'],rows.map(a=>[new Date(a.ts).toLocaleString(),esc(a.user),esc(a.action),esc(a.detail)]));
+ $('#content').innerHTML=head(t('auditTitle'))+table([t('when'),t('userCol'),t('actionCol'),t('detailCol')],rows.map(a=>[new Date(a.ts).toLocaleString(),esc(a.user),esc(a.action),esc(a.detail)]));
 }
 function newWorkshopModal(){
   modal('ورشة جديدة / Neue Werkstatt', `<div class="form-grid">
@@ -2222,46 +2227,46 @@ window.newWorkshopModal=newWorkshopModal;
 function settings(){
  const w=workshop();
  $('#content').innerHTML=head(t('settings'))+`<div class="card"><div class="form-grid">
- <div class="field span2"><div class="alert">الورشة النشطة: <b>${esc(session.company.name)}</b> · ${esc(session.company.country)}. كل فاتورة ومخزون مربوط بهذه الورشة فقط.</div></div>
- <div class="field span2"><label>لغة البرنامج / Programmsprache</label><select id="lang">${langOptions(db.settings.uiLang||'ar')}</select>
- <div class="hint">واجهة البرنامج تتغير فوراً. الفاتورة المطبوعة تبقى بلغة الشركة (ألماني لـ DE).</div></div>
+ <div class="field span2"><div class="alert">${t('activeWs')}: <b>${esc(session.company.name)}</b> · ${esc(session.company.country)}. ${t('wsOnly')}</div></div>
+ <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'ar')}</select>
+ <div class="hint">${t('langHint')}</div></div>
  <div class="field"><label>${t('font')}</label><input id="font" type="number" min="13" max="22" value="${db.settings.font}"></div>
  <div class="field"><label>${t('hourly')}</label><input id="hrate" type="number" step="0.01" value="${w.hourlyRate||85}"></div>
  <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(w.workshopPhone||'')}"></div>
- <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(w.workshopAddress||'')}"></div>
- <div class="field span2"><label>قالب الفاتورة</label><select id="itpl">
-  <option value="werkstatt" ${(w.invoiceTpl||'modern')==='werkstatt'?'selected':''}>ورشة — مثل فاتورتكم الحالية</option>
-  <option value="modern" ${w.invoiceTpl==='modern'?'selected':''}>حديث — شريط أسود وذهبي</option>
-  <option value="classic" ${w.invoiceTpl==='classic'?'selected':''}>كلاسيكي — إطار أزرق رسمي</option>
-  <option value="atelier" ${w.invoiceTpl==='atelier'?'selected':''}>أتيليه — عنوان عريض وBeleg بارز</option>
+ <div class="field span2"><label>${t('invAddr')}</label><input id="waddr" value="${esc(w.workshopAddress||'')}"></div>
+ <div class="field span2"><label>${t('invTpl')}</label><select id="itpl">
+  <option value="werkstatt" ${(w.invoiceTpl||'modern')==='werkstatt'?'selected':''}>${t('tplShop')}</option>
+  <option value="modern" ${w.invoiceTpl==='modern'?'selected':''}>${t('tplModern')}</option>
+  <option value="classic" ${w.invoiceTpl==='classic'?'selected':''}>${t('tplClassic')}</option>
+  <option value="atelier" ${w.invoiceTpl==='atelier'?'selected':''}>${t('tplAtelier')}</option>
  </select></div>
- <div class="field span2"><label>اسم الورشة التجاري</label><input id="wbrand" value="${esc(w.workshopBrand||'TST')}"></div>
- <div class="field span2"><label>الاسم القانوني على الفاتورة</label><input id="wname" value="${esc(w.workshopName||'')}"></div>
+ <div class="field span2"><label>${t('brandName')}</label><input id="wbrand" value="${esc(w.workshopBrand||'TST')}"></div>
+ <div class="field span2"><label>${t('legalName')}</label><input id="wname" value="${esc(w.workshopName||'')}"></div>
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(w.workshopTaxId||'')}"></div>
  <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(w.workshopSteuerNr||'')}"></div>
  <div class="field"><label>IBAN</label><input id="wiban" value="${esc(w.workshopIban||'')}"></div>
  <div class="field"><label>BIC</label><input id="wbic" value="${esc(w.workshopBic||'')}" placeholder="GENODEF1RLB"></div>
  <div class="field"><label>HRB</label><input id="whrb" value="${esc(w.workshopHrb||'')}" placeholder="25248 HL"></div>
  <div class="field"><label>Sitz</label><input id="wsitz" value="${esc(w.workshopSitz||'')}"></div>
- <div class="field"><label>مهلة الدفع (أيام)</label><input id="pdays" type="number" value="${w.paymentDays||0}"></div>
- <div class="field"><label>ورق الطباعة</label><select id="ppaper">
+ <div class="field"><label>${t('payDays')}</label><input id="pdays" type="number" value="${w.paymentDays||0}"></div>
+ <div class="field"><label>${t('paper')}</label><select id="ppaper">
   <option value="A4" ${(w.printPaper||'A4')==='A4'?'selected':''}>A4</option>
   <option value="A5" ${w.printPaper==='A5'?'selected':''}>A5</option>
  </select></div>
- <div class="field"><label>هوامش الطباعة</label><select id="pmargin">
-  <option value="6mm" ${w.printMargin==='6mm'?'selected':''}>ضيقة 6مم</option>
-  <option value="8mm" ${(w.printMargin||'8mm')==='8mm'?'selected':''}>افتراضي 8مم</option>
-  <option value="12mm" ${w.printMargin==='12mm'?'selected':''}>عادية 12مم</option>
+ <div class="field"><label>${t('margins')}</label><select id="pmargin">
+  <option value="6mm" ${w.printMargin==='6mm'?'selected':''}>${t('marginTight')}</option>
+  <option value="8mm" ${(w.printMargin||'8mm')==='8mm'?'selected':''}>${t('marginDef')}</option>
+  <option value="12mm" ${w.printMargin==='12mm'?'selected':''}>${t('marginNorm')}</option>
  </select></div>
- <div class="field"><label>ألوان الطباعة</label><select id="pcolor">
-  <option value="1" ${w.printColor!==false?'selected':''}>ملون (أسود/ذهبي)</option>
-  <option value="0" ${w.printColor===false?'selected':''}>أبيض وأسود</option>
+ <div class="field"><label>${t('printColors')}</label><select id="pcolor">
+  <option value="1" ${w.printColor!==false?'selected':''}>${t('colorYes')}</option>
+  <option value="0" ${w.printColor===false?'selected':''}>${t('colorNo')}</option>
  </select></div>
- <div class="field"><label>البنك</label><input id="wbank" value="${esc(w.workshopBank||'')}"></div>
- <div class="field"><label>إيميل الفاتورة</label><input id="wmail" value="${esc(w.workshopEmail||'')}"></div>
+ <div class="field"><label>${t('bank')}</label><input id="wbank" value="${esc(w.workshopBank||'')}"></div>
+ <div class="field"><label>${t('invEmail')}</label><input id="wmail" value="${esc(w.workshopEmail||'')}"></div>
  <div class="field"><label>Amtsgericht</label><input id="wcourt" value="${esc(w.workshopCourt||'')}"></div>
- <div class="field"><label>GF / صاحب الورشة</label><input id="wowner" value="${esc(w.workshopOwner||'')}"></div>
- <div class="field"><label>كلمة سر جديدة لحسابك</label><input id="newpass" type="password" placeholder="فارغة = بدون تغيير"></div>
+ <div class="field"><label>${t('ownerGf')}</label><input id="wowner" value="${esc(w.workshopOwner||'')}"></div>
+ <div class="field"><label>${t('newPass')}</label><input id="newpass" type="password" placeholder="${t('passUnchanged')}"></div>
  </div>
  <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
