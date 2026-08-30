@@ -206,31 +206,39 @@ function load(){
   if(!Array.isArray(merged.katyCache)) merged.katyCache=[];
   if(!merged.settings) merged.settings=clone(seed.settings);
   merged.settings={...clone(seed.settings),...merged.settings};
-  const placeholders=['Musterstraße 12, 10115 Berlin','DE123456789','DE89 3704 0044 0532 0130 00','+49 170 1112233'];
-  merged.settings.workshopBrand=seed.settings.workshopBrand;
-  merged.settings.workshopName=seed.settings.workshopName;
-  merged.settings.workshopHrb=seed.settings.workshopHrb;
-  merged.settings.workshopBic=seed.settings.workshopBic;
-  merged.settings.workshopSitz=seed.settings.workshopSitz;
-  merged.settings.workshopCourt=seed.settings.workshopCourt;
-  merged.settings.workshopAccountHolder=seed.settings.workshopAccountHolder;
-  if(placeholders.includes(merged.settings.workshopAddress)) merged.settings.workshopAddress=seed.settings.workshopAddress;
-  if(placeholders.includes(merged.settings.workshopTaxId)) merged.settings.workshopTaxId=seed.settings.workshopTaxId;
-  if(placeholders.includes(merged.settings.workshopIban)) merged.settings.workshopIban=seed.settings.workshopIban;
-  if(placeholders.includes(merged.settings.workshopPhone)) merged.settings.workshopPhone=seed.settings.workshopPhone;
-  ['workshopEmail','workshopSteuerNr','workshopCourt','workshopOwner','workshopBank','workshopAccountHolder','workshopBrand','workshopHrb','workshopBic','workshopSitz'].forEach(k=>{
-    if(!merged.settings[k]) merged.settings[k]=seed.settings[k];
-  });
-  if(/HANS-KOCH-RING/.test(merged.settings.workshopAddress||'')) merged.settings.workshopAddress=seed.settings.workshopAddress;
-  if(/RASHID TABAH/.test(merged.settings.workshopOwner||'')) merged.settings.workshopOwner=seed.settings.workshopOwner;
-  const deCo=(merged.companies||[]).find(c=>c.id==='de');
-  if(deCo) deCo.name=seed.companies[0].name;
 
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
   if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'owner',p:'bm-dev-2026',name:'صاحب الورشة / تطوير',role:'developer'});
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
+  ensureCompanyProfiles(merged);
   return merged;
  }catch{return clone(seed)}
+}
+const WORKSHOP_KEYS=['workshopBrand','workshopName','workshopAddress','workshopPhone','workshopEmail','workshopTaxId','workshopSteuerNr','workshopCourt','workshopOwner','workshopBank','workshopIban','workshopAccountHolder','workshopHrb','workshopBic','workshopSitz','hourlyRate','invoiceSeq','auftragSeq','paymentDays','invoiceTpl','printPaper','printMargin','printColor'];
+function defaultWorkshopProfile(co, settings){
+  const s=settings||(typeof db!=='undefined'&&db&&db.settings)||seed.settings;
+  const isDe=co.id==='de' || co.country==='DE';
+  const p={};
+  WORKSHOP_KEYS.forEach(k=>{ p[k]= isDe ? (s[k]??seed.settings[k]) : (s[k]??''); });
+  if(!isDe){
+    p.workshopBrand=co.name||'Werkstatt';
+    p.workshopName=co.name||'';
+    p.workshopAccountHolder=co.name||'';
+    p.invoiceSeq=0; p.auftragSeq=0; p.hourlyRate=100; p.paymentDays=0;
+    p.invoiceTpl='modern'; p.printPaper='A4'; p.printMargin='8mm'; p.printColor=true;
+    p.workshopTaxId=''; p.workshopIban=''; p.workshopHrb=''; p.workshopBic='';
+  }
+  p.docLang=co.docLang|| (co.country==='DE'?'de':'de');
+  p.currency=co.currency||'EUR';
+  return p;
+}
+function ensureCompanyProfiles(store){
+  const st=store||db;
+  if(!Array.isArray(st.companies)) st.companies=clone(seed.companies);
+  st.companies.forEach(co=>{
+    if(!co.profile) co.profile=defaultWorkshopProfile(co, st.settings);
+    WORKSHOP_KEYS.forEach(k=>{ if(co.profile[k]===undefined) co.profile[k]=defaultWorkshopProfile(co, st.settings)[k]; });
+  });
 }
 function save(){localStorage.setItem(storeKey,JSON.stringify(db))}
 
@@ -243,10 +251,12 @@ async function loadPurchasesFromCloud(){
   try{
     const sb = window.supabaseClient;
     if(!sb) return false;
-    const { data, error } = await sb.from('purchases').select('*').order('purchase_date', { ascending: false });
+    let q=sb.from('purchases').select('*').order('purchase_date', { ascending: false });
+    q=cloudCompanyFilter(q);
+    const { data, error } = await q;
     if(error){ console.warn('loadPurchases', error.message); return false; }
     if(!Array.isArray(data)) return false;
-    db.purchases = data.map(r => ({
+    mergeByCompany('purchases', data.map(r => ({
       id: 'p_cloud_' + r.id,
       cloudId: r.id,
       companyId: r.company_id || 'de',
@@ -262,7 +272,7 @@ async function loadPurchasesFromCloud(){
       payment_status: r.payment_status || r.status || 'pending',
       notes: r.notes || '',
       receipt_url: r.receipt_url || ''
-    }));
+    })));
     save();
     return true;
   }catch(e){ console.warn(e); return false; }
@@ -321,20 +331,20 @@ async function deletePurchaseCloud(pid){
 async function loadCustomersFromCloud(){
   try{
     const sb=window.supabaseClient; if(!sb) return false;
-    const {data,error}=await sb.from('customers').select('*');
+    const {data,error}=await cloudCompanyFilter(sb.from('customers').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
     const mapped=data.map(r=>({
-      id:'c_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+      id:'c_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||session?.company?.id||'de',
       name:r.name||'', phone:r.phone||'', email:r.email||'', address:r.address||''
     })).filter(x=>x.name);
-    if(mapped.length){ db.customers=mapped; save(); return true; }
+    if(mapped.length){ mergeByCompany('customers', mapped); save(); return true; }
   }catch(e){console.warn(e)}
   return false;
 }
 async function upsertCustomerCloud(c){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={name:c.name||'',phone:c.phone||'',email:c.email||'',address:c.address||''};
+    const row={name:c.name||'',phone:c.phone||'',email:c.email||'',address:c.address||'',company_id:c.companyId||session?.company?.id||'de'};
     if(c.cloudId){ await sb.from('customers').update(row).eq('id',c.cloudId); }
     else {
       const {data,error}=await sb.from('customers').insert(row).select('id').single();
@@ -345,20 +355,20 @@ async function upsertCustomerCloud(c){
 async function loadInventoryFromCloud(){
   try{
     const sb=window.supabaseClient; if(!sb) return false;
-    const {data,error}=await sb.from('inventory').select('*');
+    const {data,error}=await cloudCompanyFilter(sb.from('inventory').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
     const mapped=data.map(r=>({
-      id:'inv_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+      id:'inv_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||session?.company?.id||'de',
       sku:r.sku||'', name:r.name||'', qty:Number(r.qty||0), buy:Number(r.buy||0), sell:Number(r.sell||0)
     })).filter(x=>x.name||x.sku);
-    if(mapped.length){ db.inventory=mapped; save(); return true; }
+    if(mapped.length){ mergeByCompany('inventory', mapped); save(); return true; }
   }catch(e){console.warn(e)}
   return false;
 }
 async function upsertInventoryCloud(item){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={sku:item.sku||'',name:item.name||'',qty:Number(item.qty||0),buy:Number(item.buy||0),sell:Number(item.sell||0)};
+    const row={sku:item.sku||'',name:item.name||'',qty:Number(item.qty||0),buy:Number(item.buy||0),sell:Number(item.sell||0),company_id:item.companyId||session?.company?.id||'de'};
     if(item.cloudId){ await sb.from('inventory').update(row).eq('id',item.cloudId); }
     else {
       const {data,error}=await sb.from('inventory').insert(row).select('id').single();
@@ -370,14 +380,14 @@ async function upsertInventoryCloud(item){
 async function loadVehiclesFromCloud(){
   try{
     const sb=window.supabaseClient; if(!sb) return false;
-    const {data,error}=await sb.from('vehicles').select('*');
+    const {data,error}=await cloudCompanyFilter(sb.from('vehicles').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    db.vehicles=data.map(r=>({
+    mergeByCompany('vehicles', data.map(r=>({
       id:'v_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
       customerId:r.customer_id||'', plate:r.plate||'', vin:r.vin||'',
       make:r.make||'', model:r.model||'', year:r.year||'', engine:r.engine||'',
       paint:r.paint||'', km:r.km||0, nextServiceKm:r.next_service_km||0, photo:r.photo||''
-    }));
+    })));
     save(); return true;
   }catch(e){console.warn(e);return false}
 }
@@ -392,16 +402,16 @@ async function upsertVehicleCloud(v){
 async function loadRepairsFromCloud(){
   try{
     const sb=window.supabaseClient; if(!sb) return false;
-    const {data,error}=await sb.from('repairs').select('*');
+    const {data,error}=await cloudCompanyFilter(sb.from('repairs').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    db.repairs=data.map(r=>({
+    mergeByCompany('repairs', data.map(r=>({
       id:'r_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de', vehicleId:r.vehicle_id||'',
       description:r.description||'', complaint:r.complaint||'', tech:r.tech||'', hours:r.hours||0,
       status:r.status||'استلام', km:r.km||'', fuel:r.fuel||'', date:r.repair_date||'',
       jobs: r.jobs? (typeof r.jobs==='string'? JSON.parse(r.jobs||'[]'):r.jobs):[],
       parts: r.parts? (typeof r.parts==='string'? JSON.parse(r.parts||'[]'):r.parts):[],
       photos: r.photos? (typeof r.photos==='string'? JSON.parse(r.photos||'[]'):r.photos):[]
-    }));
+    })));
     save(); return true;
   }catch(e){console.warn(e);return false}
 }
@@ -437,15 +447,15 @@ async function upsertAppointmentCloud(a){
 async function loadInvoicesFromCloud(){
   try{
     const sb=window.supabaseClient; if(!sb) return false;
-    const {data,error}=await sb.from('invoices').select('*');
+    const {data,error}=await cloudCompanyFilter(sb.from('invoices').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    db.invoices=data.map(r=>({
+    mergeByCompany('invoices', data.map(r=>({
       id:'i_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de', vehicleId:r.vehicle_id||'',
       repairId:r.repair_id||'', number:r.number||'', type:r.type||'فاتورة',
       parts:r.parts||0, labor:r.labor||0, discount:r.discount||0, tax:r.tax||19,
       net:r.net||0, total:r.total||0, payment:r.payment||'', paid:!!r.paid,
       date:r.issued_at||'', lines: r.lines? (typeof r.lines==='string'?JSON.parse(r.lines||'[]'):r.lines):[]
-    }));
+    })));
     save(); return true;
   }catch(e){console.warn(e);return false}
 }
@@ -472,7 +482,35 @@ function id(p='x'){return p+'_'+Date.now().toString(36)+Math.random().toString(3
 function money(v){return Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'})}
 function toast(t){const x=document.createElement('div');x.className='toast';x.textContent=t;document.body.append(x);setTimeout(()=>x.remove(),2200)}
 function audit(action,detail=''){db.audit.unshift({id:id('a'),ts:new Date().toISOString(),user:session?.user?.name||'system',company:session?.company?.id||'',action,detail});save()}
-function companyRows(name){return db[name].filter(x=>x.companyId===session.company.id)}
+function companyRows(name){return (db[name]||[]).filter(x=>x.companyId===session.company.id)}
+function visibleCompanies(){
+  const u=session?.user;
+  if(!u) return db.companies||[];
+  if(['developer','manager'].includes(u.role) || !u.companies) return db.companies||[];
+  return (db.companies||[]).filter(c=>(u.companies||[]).includes(c.id));
+}
+function workshop(){
+  ensureCompanyProfiles();
+  const co=session?.company || db.companies[0];
+  if(!co.profile) co.profile=defaultWorkshopProfile(co, db.settings);
+  return co.profile;
+}
+function patchWorkshop(fields){
+  const co=session.company; if(!co) return;
+  co.profile=Object.assign({}, workshop(), fields||{});
+  if(fields && fields.workshopBrand) co.name=fields.workshopBrand+(fields.workshopName?(' — '+fields.workshopName):'');
+  else if(fields && fields.workshopName && !co.name) co.name=fields.workshopName;
+  save();
+}
+function mergeByCompany(key, rows){
+  const cid=session?.company?.id;
+  if(!cid){ db[key]=rows; return; }
+  db[key]=(db[key]||[]).filter(x=>x.companyId!==cid).concat(rows||[]);
+}
+function cloudCompanyFilter(query){
+  const cid=session?.company?.id;
+  return cid ? query.eq('company_id', cid) : query;
+}
 
 function vehicleOf(vid){return db.vehicles.find(x=>x.id===vid)}
 function cleanVin(v){return String(v||'').replace(/[^A-HJ-NPR-Z0-9]/gi,'').toUpperCase()}
@@ -761,15 +799,19 @@ function bindKbaEnter(hsnId,tsnId,fillIds){
 }
 function nextInvoiceNumber(){
   const y=new Date().getFullYear();
-  db.settings.invoiceSeq=Number(db.settings.invoiceSeq||0)+1;
+  const w=workshop();
+  w.invoiceSeq=Number(w.invoiceSeq||0)+1;
   save();
-  return 'RE-'+y+'-'+String(db.settings.invoiceSeq).padStart(4,'0');
+  const prefix=(session?.company?.id||'RE').toString().slice(0,4).toUpperCase();
+  return 'RE-'+prefix+'-'+y+'-'+String(w.invoiceSeq).padStart(4,'0');
 }
 function nextAuftragNumber(){
   const y=new Date().getFullYear();
-  db.settings.auftragSeq=Number(db.settings.auftragSeq||0)+1;
+  const w=workshop();
+  w.auftragSeq=Number(w.auftragSeq||0)+1;
   save();
-  return 'AU-'+y+'-'+String(db.settings.auftragSeq).padStart(4,'0');
+  const prefix=(session?.company?.id||'AU').toString().slice(0,4).toUpperCase();
+  return 'AU-'+prefix+'-'+y+'-'+String(w.auftragSeq).padStart(4,'0');
 }
 function lowStock(){
   return companyRows('inventory').filter(x=>Number(x.qty||0)<=Number(x.minQty||3));
@@ -788,7 +830,7 @@ function repairPartsTotal(r){
   return (r.parts||[]).reduce((s,p)=>s+Number(p.qty||0)*Number(p.price||0),0);
 }
 function repairLaborTotal(r){
-  return Number(r.hours||0)*Number(db.settings.hourlyRate||85);
+  return Number(r.hours||0)*Number(workshop().hourlyRate||db.settings.hourlyRate||85);
 }
 function globalSearch(q){
   q=(q||'').trim().toLowerCase();
@@ -843,7 +885,7 @@ function convertRepairToInvoice(rid){
     date:new Date().toISOString(),
     lines:[
       ...(r.parts||[]).map(p=>({name:p.name, sku:p.sku, qty:p.qty, price:p.price, kind:'parts'})),
-      {name:'Arbeitswert', qty:Number(r.hours||1), price:Number(db.settings.hourlyRate||100), kind:'labor'}
+      {name:'Arbeitswert', qty:Number(r.hours||1), price:Number(workshop().hourlyRate||db.settings.hourlyRate||100), kind:'labor'}
     ], auftrag:r.number||nextAuftragNumber()
   };
   db.invoices.push(inv);
@@ -949,7 +991,7 @@ function render(){
  <main class="main">
   <div class="topbar">
    <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
-   <select id="company">${db.companies.map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${c.name} · ${c.country}</option>`).join('')}</select>
+   <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="ورشة جديدة">＋</button>`:''}
    <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
    <div class="top-actions"><select id="uiLangTop" title="لغة البرنامج">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${session.user.name}</span><button class="btn ghost small" id="logout">${t('logout')}</button></div>
   </div>
@@ -961,7 +1003,8 @@ function render(){
 </div>`;
  $$('[data-page]').forEach(b=>b.onclick=()=>{session.page=b.dataset.page;render()});
  $('#logout').onclick=()=>{audit('logout');session=null;login()};
- $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';render()};
+ $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render())};
+ if($('#addWorkshop')) $('#addWorkshop').onclick=newWorkshopModal;
  if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{db.settings.uiLang=e.target.value;save();applyUiLang();render();};
  $('#menu').onclick=()=>$('#side').classList.toggle('open');
  const qs=$('#qsearch');
@@ -1088,7 +1131,7 @@ function printDocMarkup(type, id){
   const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":(WP_RTL.includes(db.settings.uiLang||"ar")?"rtl":"ltr");
   return `<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>TST</title>
     <style>
-      @page{size:${(db.settings.printPaper||'A4')} portrait;margin:${(db.settings.printMargin||'8mm')}}
+      @page{size:${(workshop().printPaper||db.settings.printPaper||'A4')} portrait;margin:${(workshop().printMargin||db.settings.printMargin||'8mm')}}
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
       html,body{height:auto;margin:0}
       body{font-family:Arial,Helvetica,sans-serif;padding:0;direction:${ddr};color:#111;font-size:11px${(db.settings.printColor===false)?';filter:grayscale(1)':''}}
@@ -1980,23 +2023,23 @@ window.invoicesForCustomer=invoicesForCustomer;
 window.editInvoice=editInvoice;
 window.deleteInvoice=deleteInvoice;
 function workshopInfo(){
-  const s=db.settings||{};
+  const s=workshop();
   return {
-    brand: s.workshopBrand || 'TST',
-    name: s.workshopName || 'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',
-    address: s.workshopAddress || 'Hans-Koch-Ring 12, 21493 Schwarzenbek',
-    phone: s.workshopPhone || '016096585124',
-    email: s.workshopEmail || 'rashed.car50@gmail.com',
-    taxId: s.workshopTaxId || 'DE369361489',
-    steuerNr: s.workshopSteuerNr || '22 290/41079',
-    court: s.workshopCourt || 'Amtsgericht Lübeck',
-    owner: s.workshopOwner || 'Rashid Tabah',
-    bank: s.workshopBank || 'Raiffeisenbank eG',
-    iban: s.workshopIban || 'DE36230631290000273384',
-    accountHolder: s.workshopAccountHolder || 'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',
-    hrb: s.workshopHrb || '25248 HL',
-    bic: s.workshopBic || 'GENODEF1RLB',
-    sitz: s.workshopSitz || 'Schwarzenbek',
+    brand: s.workshopBrand || session?.company?.name || 'Werkstatt',
+    name: s.workshopName || session?.company?.name || '',
+    address: s.workshopAddress || '',
+    phone: s.workshopPhone || '',
+    email: s.workshopEmail || '',
+    taxId: s.workshopTaxId || '',
+    steuerNr: s.workshopSteuerNr || '',
+    court: s.workshopCourt || '',
+    owner: s.workshopOwner || '',
+    bank: s.workshopBank || '',
+    iban: s.workshopIban || '',
+    accountHolder: s.workshopAccountHolder || s.workshopName || '',
+    hrb: s.workshopHrb || '',
+    bic: s.workshopBic || '',
+    sitz: s.workshopSitz || '',
     paymentDays: Number(s.paymentDays||0)
   };
 }
@@ -2125,7 +2168,7 @@ function metaTbl(m){
 }
 function buildWorkshopRechnung(x){
   const m=invoiceModel(x);
-  const tpl=db.settings.invoiceTpl||'modern';
+  const tpl=workshop().invoiceTpl||db.settings.invoiceTpl||'modern';
   const {w,cust}=m;
   if(tpl==='modern'){
     return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
@@ -2273,7 +2316,7 @@ function numberInvoiceRows(){
 }
 function invoiceDesigner(kind='invoice', customerId='', existing=null){
   const title = existing ? (t('editInvoice')+' '+(existing.number||'')) : (kind==='bar' ? 'Barverkauf' : t('createInv'));
-  const rate=db.settings.hourlyRate||100;
+  const rate=workshop().hourlyRate||db.settings.hourlyRate||100;
   if(existing){ customerId=customerId||existing.customerId||''; }
   modal(title, `<div class="form-grid">
     <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)).map(v=>`<option value="${v.id}" ${existing&&v.id===existing.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
@@ -3091,58 +3134,124 @@ function auditPage(){
  const rows=db.audit.filter(a=>!session.company||a.company===session.company.id||!a.company).slice(0,200);
  $('#content').innerHTML=head('سجل النشاط')+table(['الوقت','المستخدم','الإجراء','التفاصيل'],rows.map(a=>[new Date(a.ts).toLocaleString(),esc(a.user),esc(a.action),esc(a.detail)]));
 }
+function newWorkshopModal(){
+  modal('ورشة جديدة / Neue Werkstatt', `<div class="form-grid">
+    <div class="field"><label>الاسم التجاري</label><input id="nwBrand" placeholder="TST Nord"></div>
+    <div class="field"><label>الاسم القانوني</label><input id="nwName" placeholder="Firma UG"></div>
+    <div class="field"><label>الدولة</label><select id="nwCountry"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="ES">España</option><option value="NL">Nederland</option></select></div>
+    <div class="field"><label>العملة</label><input id="nwCur" value="EUR"></div>
+    <div class="field span2"><label>العنوان</label><input id="nwAddr"></div>
+  </div>`, ()=>{
+    const brand=$('#nwBrand').value.trim(), name=$('#nwName').value.trim();
+    if(!brand && !name) return toast('أدخل اسم الورشة');
+    const co={id:id('ws'), name:brand||name, country:$('#nwCountry').value, currency:$('#nwCur').value.trim()||'EUR', docLang:$('#nwCountry').value==='DE'?'de':'de'};
+    co.profile=defaultWorkshopProfile(co, db.settings);
+    co.profile.workshopBrand=brand||name;
+    co.profile.workshopName=name||brand;
+    co.profile.workshopAccountHolder=name||brand;
+    co.profile.workshopAddress=$('#nwAddr').value.trim();
+    co.profile.invoiceSeq=0; co.profile.auftragSeq=0;
+    db.companies.push(co); save();
+    session.company=co; closeModal(); render(); toast('تمت إضافة الورشة — املأ البيانات القانونية من الإعدادات');
+  });
+}
+window.newWorkshopModal=newWorkshopModal;
 function settings(){
+ const w=workshop();
  $('#content').innerHTML=head(t('settings'))+`<div class="card"><div class="form-grid">
+ <div class="field span2"><div class="alert">الورشة النشطة: <b>${esc(session.company.name)}</b> · ${esc(session.company.country)}. كل فاتورة ومخزون مربوط بهذه الورشة فقط.</div></div>
  <div class="field span2"><label>لغة البرنامج / Programmsprache</label><select id="lang">${langOptions(db.settings.uiLang||'ar')}</select>
- <div class="hint">واجهة البرنامج تتغير فوراً. الفاتورة المطبوعة تبقى بالألمانية.</div></div>
+ <div class="hint">واجهة البرنامج تتغير فوراً. الفاتورة المطبوعة تبقى بلغة الشركة (ألماني لـ DE).</div></div>
  <div class="field"><label>${t('font')}</label><input id="font" type="number" min="13" max="22" value="${db.settings.font}"></div>
- <div class="field"><label>${t('hourly')}</label><input id="hrate" type="number" step="0.01" value="${db.settings.hourlyRate||85}"></div>
- <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(db.settings.workshopPhone||'')}"></div>
- <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(db.settings.workshopAddress||'')}"></div>
+ <div class="field"><label>${t('hourly')}</label><input id="hrate" type="number" step="0.01" value="${w.hourlyRate||85}"></div>
+ <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(w.workshopPhone||'')}"></div>
+ <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(w.workshopAddress||'')}"></div>
  <div class="field span2"><label>قالب الفاتورة</label><select id="itpl">
-  <option value="werkstatt" ${(db.settings.invoiceTpl||'modern')==='werkstatt'?'selected':''}>ورشة — مثل فاتورتكم الحالية</option>
-  <option value="modern" ${db.settings.invoiceTpl==='modern'?'selected':''}>حديث — شريط أسود وذهبي</option>
-  <option value="classic" ${db.settings.invoiceTpl==='classic'?'selected':''}>كلاسيكي — إطار أزرق رسمي</option>
-  <option value="atelier" ${db.settings.invoiceTpl==='atelier'?'selected':''}>أتيليه — عنوان عريض وBeleg بارز</option>
+  <option value="werkstatt" ${(w.invoiceTpl||'modern')==='werkstatt'?'selected':''}>ورشة — مثل فاتورتكم الحالية</option>
+  <option value="modern" ${w.invoiceTpl==='modern'?'selected':''}>حديث — شريط أسود وذهبي</option>
+  <option value="classic" ${w.invoiceTpl==='classic'?'selected':''}>كلاسيكي — إطار أزرق رسمي</option>
+  <option value="atelier" ${w.invoiceTpl==='atelier'?'selected':''}>أتيليه — عنوان عريض وBeleg بارز</option>
  </select></div>
- <div class="field span2"><label>اسم الورشة التجاري</label><input id="wbrand" value="${esc(db.settings.workshopBrand||'TST')}"></div>
- <div class="field span2"><label>الاسم القانوني على الفاتورة</label><input id="wname" value="${esc(db.settings.workshopName||'')}"></div>
- <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(db.settings.workshopTaxId||'')}"></div>
- <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(db.settings.workshopSteuerNr||'')}"></div>
- <div class="field"><label>IBAN</label><input id="wiban" value="${esc(db.settings.workshopIban||'')}"></div>
- <div class="field"><label>BIC</label><input id="wbic" value="${esc(db.settings.workshopBic||'GENODEF1RLB')}" placeholder="GENODEF1RLB"></div>
- <div class="field"><label>HRB</label><input id="whrb" value="${esc(db.settings.workshopHrb||'25248 HL')}" placeholder="25248 HL"></div>
- <div class="field"><label>Sitz</label><input id="wsitz" value="${esc(db.settings.workshopSitz||'Schwarzenbek')}"></div>
- <div class="field"><label>مهلة الدفع (أيام)</label><input id="pdays" type="number" value="${db.settings.paymentDays||0}"></div>
+ <div class="field span2"><label>اسم الورشة التجاري</label><input id="wbrand" value="${esc(w.workshopBrand||'TST')}"></div>
+ <div class="field span2"><label>الاسم القانوني على الفاتورة</label><input id="wname" value="${esc(w.workshopName||'')}"></div>
+ <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(w.workshopTaxId||'')}"></div>
+ <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(w.workshopSteuerNr||'')}"></div>
+ <div class="field"><label>IBAN</label><input id="wiban" value="${esc(w.workshopIban||'')}"></div>
+ <div class="field"><label>BIC</label><input id="wbic" value="${esc(w.workshopBic||'')}" placeholder="GENODEF1RLB"></div>
+ <div class="field"><label>HRB</label><input id="whrb" value="${esc(w.workshopHrb||'')}" placeholder="25248 HL"></div>
+ <div class="field"><label>Sitz</label><input id="wsitz" value="${esc(w.workshopSitz||'')}"></div>
+ <div class="field"><label>مهلة الدفع (أيام)</label><input id="pdays" type="number" value="${w.paymentDays||0}"></div>
  <div class="field"><label>ورق الطباعة</label><select id="ppaper">
-  <option value="A4" ${(db.settings.printPaper||'A4')==='A4'?'selected':''}>A4</option>
-  <option value="A5" ${db.settings.printPaper==='A5'?'selected':''}>A5</option>
+  <option value="A4" ${(w.printPaper||'A4')==='A4'?'selected':''}>A4</option>
+  <option value="A5" ${w.printPaper==='A5'?'selected':''}>A5</option>
  </select></div>
  <div class="field"><label>هوامش الطباعة</label><select id="pmargin">
-  <option value="6mm" ${db.settings.printMargin==='6mm'?'selected':''}>ضيقة 6مم</option>
-  <option value="8mm" ${(db.settings.printMargin||'8mm')==='8mm'?'selected':''}>افتراضي 8مم</option>
-  <option value="12mm" ${db.settings.printMargin==='12mm'?'selected':''}>عادية 12مم</option>
+  <option value="6mm" ${w.printMargin==='6mm'?'selected':''}>ضيقة 6مم</option>
+  <option value="8mm" ${(w.printMargin||'8mm')==='8mm'?'selected':''}>افتراضي 8مم</option>
+  <option value="12mm" ${w.printMargin==='12mm'?'selected':''}>عادية 12مم</option>
  </select></div>
  <div class="field"><label>ألوان الطباعة</label><select id="pcolor">
-  <option value="1" ${db.settings.printColor!==false?'selected':''}>ملون (أسود/ذهبي)</option>
-  <option value="0" ${db.settings.printColor===false?'selected':''}>أبيض وأسود</option>
+  <option value="1" ${w.printColor!==false?'selected':''}>ملون (أسود/ذهبي)</option>
+  <option value="0" ${w.printColor===false?'selected':''}>أبيض وأسود</option>
  </select></div>
- <div class="field"><label>البنك</label><input id="wbank" value="${esc(db.settings.workshopBank||'')}"></div>
- <div class="field"><label>إيميل الفاتورة</label><input id="wmail" value="${esc(db.settings.workshopEmail||'')}"></div>
- <div class="field"><label>Amtsgericht</label><input id="wcourt" value="${esc(db.settings.workshopCourt||'')}"></div>
- <div class="field"><label>GF / صاحب الورشة</label><input id="wowner" value="${esc(db.settings.workshopOwner||'')}"></div>
+ <div class="field"><label>البنك</label><input id="wbank" value="${esc(w.workshopBank||'')}"></div>
+ <div class="field"><label>إيميل الفاتورة</label><input id="wmail" value="${esc(w.workshopEmail||'')}"></div>
+ <div class="field"><label>Amtsgericht</label><input id="wcourt" value="${esc(w.workshopCourt||'')}"></div>
+ <div class="field"><label>GF / صاحب الورشة</label><input id="wowner" value="${esc(w.workshopOwner||'')}"></div>
  <div class="field"><label>كلمة سر جديدة لحسابك</label><input id="newpass" type="password" placeholder="فارغة = بدون تغيير"></div>
  </div>
  <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
   <button class="btn primary" id="saveset">${t('save')}</button>
+  <button class="btn" id="addWsSet">＋ ورشة جديدة</button>
   <button class="btn" id="exportData">${t('backup')}</button>
+  <button class="btn" id="exportCo">نسخة هذه الورشة</button>
   <button class="btn" id="syncCloud">${t('sync')}</button>
   <button class="btn bad" id="reset">${t('reset')}</button>
  </div>
  </div>`;
  if($('#lang')) $('#lang').onchange=()=>{db.settings.uiLang=$('#lang').value;save();applyUiLang();render();};
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;if($('#itpl')) db.settings.invoiceTpl=$('#itpl').value;if($('#wbrand')) db.settings.workshopBrand=$('#wbrand').value;if($('#wname')) db.settings.workshopName=$('#wname').value;if($('#wstnr')) db.settings.workshopSteuerNr=$('#wstnr').value;if($('#wbank')) db.settings.workshopBank=$('#wbank').value;if($('#wmail')) db.settings.workshopEmail=$('#wmail').value;if($('#wcourt')) db.settings.workshopCourt=$('#wcourt').value;if($('#wowner')) db.settings.workshopOwner=$('#wowner').value;if($('#wbic')) db.settings.workshopBic=$('#wbic').value;if($('#whrb')) db.settings.workshopHrb=$('#whrb').value;if($('#wsitz')) db.settings.workshopSitz=$('#wsitz').value;if($('#pdays')) db.settings.paymentDays=+$('#pdays').value||0;if($('#ppaper')) db.settings.printPaper=$('#ppaper').value;if($('#pmargin')) db.settings.printMargin=$('#pmargin').value;if($('#pcolor')) db.settings.printColor=$('#pcolor').value!=='0';const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
+ $('#saveset').onclick=()=>{
+   db.settings.font=+$('#font').value||16;
+   db.settings.uiLang=$('#lang').value;
+   patchWorkshop({
+     hourlyRate:+$('#hrate').value||85,
+     workshopPhone:$('#wphone').value,
+     workshopAddress:$('#waddr').value,
+     workshopTaxId:$('#wtax').value,
+     workshopIban:$('#wiban').value,
+     invoiceTpl:$('#itpl')?$('#itpl').value:'modern',
+     workshopBrand:$('#wbrand')?$('#wbrand').value:'',
+     workshopName:$('#wname')?$('#wname').value:'',
+     workshopSteuerNr:$('#wstnr')?$('#wstnr').value:'',
+     workshopBank:$('#wbank')?$('#wbank').value:'',
+     workshopEmail:$('#wmail')?$('#wmail').value:'',
+     workshopCourt:$('#wcourt')?$('#wcourt').value:'',
+     workshopOwner:$('#wowner')?$('#wowner').value:'',
+     workshopBic:$('#wbic')?$('#wbic').value:'',
+     workshopHrb:$('#whrb')?$('#whrb').value:'',
+     workshopSitz:$('#wsitz')?$('#wsitz').value:'',
+     workshopAccountHolder:($('#wname')?$('#wname').value:'')||workshop().workshopAccountHolder,
+     paymentDays:$('#pdays')?+$('#pdays').value||0:0,
+     printPaper:$('#ppaper')?$('#ppaper').value:'A4',
+     printMargin:$('#pmargin')?$('#pmargin').value:'8mm',
+     printColor:$('#pcolor')?$('#pcolor').value!=='0':true
+   });
+   const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} }
+   applyUiLang();toast(t('saved'));render();
+ };
+ if($('#addWsSet')) $('#addWsSet').onclick=newWorkshopModal;
+ if($('#exportCo')) $('#exportCo').onclick=()=>{
+   const cid=session.company.id;
+   const pack={company:session.company, exportedAt:new Date().toISOString(),
+     customers:companyRows('customers'), vehicles:companyRows('vehicles'), repairs:companyRows('repairs'),
+     invoices:companyRows('invoices'), purchases:companyRows('purchases'), inventory:companyRows('inventory'),
+     employees:companyRows('employees'), expenses:companyRows('expenses'), appointments:companyRows('appointments')};
+   const a=document.createElement('a');
+   a.href=URL.createObjectURL(new Blob([JSON.stringify(pack,null,2)],{type:'application/json'}));
+   a.download='tst-workshop-'+cid+'-'+new Date().toISOString().slice(0,10)+'.json';
+   a.click(); toast('تم تصدير ورشة '+cid);
+ };
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
