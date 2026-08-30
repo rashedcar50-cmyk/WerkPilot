@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
    <script src="supabase-config.js"></script>
 <script src="i18n.js"></script>
 <style>
@@ -866,6 +867,7 @@ function exportPrint(type, id){
 }
 
 function exportPDF(type, id){
+  if(type==='invoices' && id) return exportInvoicePDF(id);
   try{
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -886,6 +888,46 @@ function exportPDF(type, id){
     toast('تعذر إنشاء PDF');
   }
 }
+async function exportInvoicePDF(iid){
+  const inv=(db.invoices||[]).find(x=>x.id===iid);
+  if(!inv) return toast('الفاتورة غير موجودة');
+  if(!window.html2canvas || !window.jspdf) return toast('مكتبة PDF غير محمّلة — حدّث الصفحة');
+  toast('جاري تجهيز PDF...');
+  const page=printDocMarkup('invoices', iid);
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1';
+  const fr=document.createElement('iframe');
+  fr.style.cssText='width:794px;height:1123px;border:0;background:#fff';
+  host.appendChild(fr);
+  document.body.appendChild(host);
+  const doc=fr.contentDocument;
+  doc.open(); doc.write(page); doc.close();
+  await new Promise(r=>setTimeout(r,180));
+  try{
+    const canvas=await window.html2canvas(doc.body,{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:794,windowHeight:Math.max(doc.body.scrollHeight,1123)});
+    const { jsPDF }=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+    const img=canvas.toDataURL('image/jpeg',0.92);
+    const pageW=210, pageH=297;
+    const imgH=pageW*canvas.height/canvas.width;
+    let left=imgH;
+    pdf.addImage(img,'JPEG',0,0,pageW,imgH,'inv','FAST');
+    let offset=pageH;
+    while(left>pageH+1){
+      pdf.addPage();
+      pdf.addImage(img,'JPEG',0, -(offset), pageW, imgH,'inv','FAST');
+      left-=pageH; offset+=pageH;
+    }
+    const name=(inv.number||'Rechnung').replace(/[^\w.-]+/g,'_')+'.pdf';
+    pdf.save(name);
+    toast('تم حفظ PDF');
+  }catch(e){
+    console.error(e);
+    toast('تعذر إنشاء PDF');
+  }
+  host.remove();
+}
+window.exportInvoicePDF=exportInvoicePDF;
 
 function exportEmail(type, id){
   const subject = encodeURIComponent('WerkPilot - ' + (type || 'تقرير'));
@@ -1599,7 +1641,8 @@ function invoices(){
   `<button class="btn small primary" onclick="previewInvoice('${x.id}')">معاينة</button>
    <button class="btn small" onclick="editInvoice('${x.id}')">تعديل</button>
    <button class="btn small bad" onclick="deleteInvoice('${x.id}')">حذف</button>
-   <button class="btn small" onclick="exportPrint('invoices','${x.id}')">طباعة</button>`
+   <button class="btn small" onclick="exportPrint('invoices','${x.id}')">طباعة</button>
+   <button class="btn small" onclick="exportPDF('invoices','${x.id}')">PDF</button>`
  ]), 'invoices')+
  `<div class="bottom-action"><button class="btn primary" id="inv2">+ إنشاء فاتورة</button></div>`;
  $('#inv').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
@@ -2010,7 +2053,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
 function previewInvoice(iid){
   const page=printDocMarkup('invoices', iid);
   modal('عرض التصميم', `<div id="prevHost" style="height:70vh;background:#fff;border-radius:8px;overflow:hidden"></div>
-    <div class="toolbar" style="margin-top:10px"><button class="btn primary" id="printNow">طباعة</button></div>`, null);
+    <div class="toolbar" style="margin-top:10px"><button class="btn primary" id="printNow">طباعة</button><button class="btn" id="pdfNow">PDF</button></div>`, null);
   setTimeout(()=>{
     const host=$('#prevHost');
     if(host){
@@ -2020,6 +2063,7 @@ function previewInvoice(iid){
       fr.contentDocument.open(); fr.contentDocument.write(page); fr.contentDocument.close();
     }
     const b=$('#printNow'); if(b) b.onclick=()=>exportPrint('invoices', iid);
+    const p=$('#pdfNow'); if(p) p.onclick=()=>exportPDF('invoices', iid);
   }, 30);
 }
 window.previewInvoice=previewInvoice;
