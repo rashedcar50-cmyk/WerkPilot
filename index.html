@@ -186,7 +186,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',workshopBrand:'Autoservice und Autoteile, Tabah UG',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',invoiceTpl:'werkstatt',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',workshopBrand:'Autoservice und Autoteile, Tabah UG',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',invoiceTpl:'modern',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
 };
 let db=load(), session=null;
 
@@ -793,9 +793,10 @@ function exportPrint(type, id){
   const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":(WP_RTL.includes(db.settings.uiLang||"ar")?"rtl":"ltr");
   w.document.write(`<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>${type==="invoices"&&dl==="de"?"Rechnung":"Print"}</title>
     <style>
-      @page{size:A4;margin:10mm}
+      @page{size:A4;margin:8mm}
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
       html,body{height:auto;margin:0}
-      body{font-family:Arial,Helvetica,sans-serif;padding:0;direction:${ddr};color:#111;font-size:11.5px}
+      body{font-family:Arial,Helvetica,sans-serif;padding:0;direction:${ddr};color:#111;font-size:11px}
       .print-doc,.inv-a4{margin:0;padding:0}
       .rechnung{width:100%;max-width:190mm;margin:0 auto;min-height:0;height:auto;display:flex;flex-direction:column;page-break-inside:avoid;page-break-after:avoid}
       .rh-main{flex:0 1 auto}
@@ -818,10 +819,11 @@ function exportPrint(type, id){
       .grand{font-weight:800;border-top:1px solid #111;margin-top:3px;padding-top:3px}
       .rh-thanks{margin:12px 0 4px;font-size:12px;font-style:italic}
       .rh-pay{font-size:10px;margin-top:6px}
-      .rh-foot{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #111;margin-top:14px;padding-top:8px;font-size:9.5px;page-break-inside:avoid}
+      .rh-foot{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #111;margin-top:10px;padding-top:6px;font-size:9px;page-break-inside:avoid}
       .rh-foot>div{flex:1}
-      .rh-band{display:flex;justify-content:space-between;align-items:flex-end;background:#142033;color:#fff;padding:10px 14px;margin:0 0 10px}
-      .rh-band .rh-title{color:#f4c95d;text-align:left;font-size:20px}
+      .rh-band{display:flex;justify-content:space-between;align-items:flex-end;background:#111;color:#d4af37;padding:10px 14px;margin:0 0 8px;border-bottom:3px solid #d4af37}
+      .rh-band .rh-title{color:#d4af37;text-align:left;font-size:18px}
+      .rh-band .rh-doc{color:#fff}
       .rh-doc{font-size:26px;font-weight:800;letter-spacing:1px}
       .tpl-classic{border-left:6px solid #1f3a5f;padding-left:12px}
       .tpl-classic .rh-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
@@ -1644,7 +1646,12 @@ function buildWorkshopRechnung(x){
   const {w,cust}=m;
   if(tpl==='modern'){
     return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
-      <div class="rh-band"><div class="rh-title">${esc(w.brand)}</div><div class="rh-doc">RECHNUNG</div></div>
+      <table class="rh-band" width="100%" cellpadding="0" cellspacing="0" bgcolor="#111111" style="background:#111;color:#d4af37;width:100%;border-collapse:collapse;border-bottom:3px solid #d4af37">
+        <tr>
+          <td style="padding:10px 12px;color:#d4af37;font-size:18px;font-weight:700">${esc(w.brand)}</td>
+          <td style="padding:10px 12px;color:#fff;font-size:22px;font-weight:800;text-align:right;letter-spacing:1px">RECHNUNG</td>
+        </tr>
+      </table>
       <div class="rh-sub">${esc(w.address)} · Tel. ${esc(w.phone)}</div>
       <div class="rh-grid"><div class="rh-cust"><div class="muted">Rechnungsempfänger</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
