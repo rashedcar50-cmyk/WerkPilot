@@ -23,6 +23,19 @@ WP.run = function(name, ctx){
 };
 WP.has = function(flag){ return !!WP.features[flag]; };
 WP.emit = WP.run;
+window.t = window.t || function(k){ return k; };
+window.applyUiLang = window.applyUiLang || function(){
+  try{
+    const lang=(window.db&&db.settings&&db.settings.uiLang)||'ar';
+    document.documentElement.lang=lang;
+    document.documentElement.dir=(window.WP_RTL&&WP_RTL.includes(lang))?'rtl':'ltr';
+  }catch(e){}
+};
+window.langOptions = window.langOptions || function(sel){
+  return ['ar','de','en'].map(c=>`<option value="${c}" ${c===(sel||'ar')?'selected':''}>${c}</option>`).join('');
+};
+window.docLang = window.docLang || function(){ return 'de'; };
+window.WP_RTL = window.WP_RTL || ['ar','fa','ur','he'];
 window.addEventListener('error', function(ev){
   console.error(ev.error || ev.message);
   WP.run('onError', ev.error || ev.message);
