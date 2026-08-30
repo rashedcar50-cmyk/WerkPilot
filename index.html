@@ -672,25 +672,47 @@ function parseFahrzeugdaten(html, fallbackMake){
   const fuel=/Diesel/i.test(html)?'Diesel':(/Elektro/i.test(html)?'Elektro':(/Hybrid/i.test(html)?'Hybrid':(/Benzin|Otto/i.test(html)?'Benzin':'')));
   return {make, model:String(model).replace(/,/g,' ').replace(/\s+/g,' ').trim(), engine_power_kw:kw, engine_displacement_cm3:cc, year, fuel_type:fuel};
 }
+function mapKbaFuel(code){
+  const m={'1':'Benzin','2':'Diesel','3':'LPG','4':'Elektro','5':'Hybrid','6':'Wasserstoff','7':'Erdgas/CNG','8':'Ethanol','9':'Andere'};
+  const c=String(code||'').trim();
+  return m[c]||c;
+}
+async function lookupEasyWerkstatt(hsn,tsn){
+  const urls=[
+    'https://api.easywerkstatt.com/app/hsnTsn/'+hsn+'/'+tsn,
+    'https://api.staging.easywerkstatt.com/app/hsnTsn/'+hsn+'/'+tsn
+  ];
+  for(const url of urls){
+    try{
+      const res=await fetch(url);
+      if(!res.ok) continue;
+      const j=await res.json();
+      if(!j || (!j.brand && !j.modelName && !j.kbaBrand)) continue;
+      const model=String(j.modelName||'').replace(/,/g,' ').replace(/\s+/g,' ').trim();
+      const year=(j.tsnDate||'').slice(0,4);
+      return {
+        hsn:j.hsn||hsn, tsn:j.tsn||tsn, kba:(hsn+' '+tsn),
+        make:j.brand||j.kbaBrand||'',
+        model,
+        year,
+        engine_power_kw:j.powerKw||'',
+        engine_displacement_cm3:j.ccm||'',
+        fuel_type:mapKbaFuel(j.fuelCode),
+        vehicleClass:j.vehicleClass||'',
+        maxWeight:j.maxWeight||'',
+        seats:j.seats||'',
+        source:'easyWerkstatt'
+      };
+    }catch(e){}
+  }
+  return null;
+}
 async function lookupKbaFree(hsn,tsn){
   hsn=String(hsn||'').replace(/\D/g,'').padStart(4,'0');
   tsn=String(tsn||'').trim().toUpperCase();
   const local=lookupKbaLocal(hsn,tsn);
-  const brand=local.make||'Opel';
-  const urls=[
-    'https://r.jina.ai/https://fahrzeugdaten.com/'+brand+'/'+hsn+'/'+tsn,
-    'https://fahrzeugdaten.com/'+brand+'/'+hsn+'/'+tsn,
-    'https://r.jina.ai/http://www.hsn-tsn.de/'+tsn.toLowerCase()+'.html',
-    'http://www.hsn-tsn.de/'+tsn.toLowerCase()+'.html'
-  ];
-  for(const url of urls){
-    const html=await fetchText(url);
-    if(!html || html.length<80 || /page could not be found/i.test(html.slice(0,500))) continue;
-    const parsed=url.includes('fahrzeugdaten')?parseFahrzeugdaten(html,local.make):parseHsnTsnHtml(html,hsn,tsn);
-    if(parsed.model || parsed.engine_power_kw || parsed.engine_displacement_cm3){
-      return Object.assign({},local,parsed);
-    }
-  }
+  const ew=await lookupEasyWerkstatt(hsn,tsn);
+  if(ew && (ew.model||ew.engine_power_kw||ew.make)) return Object.assign({},local,ew);
   return local;
 }
 function bindKbaEnter(hsnId,tsnId,fillIds){
@@ -707,6 +729,9 @@ function bindKbaEnter(hsnId,tsnId,fillIds){
     set(fillIds.kw, info.engine_power_kw);
     set(fillIds.cc, info.engine_displacement_cm3);
     set(fillIds.fuel, info.fuel_type);
+    set(fillIds.seats, info.seats);
+    set(fillIds.weight, info.maxWeight);
+    set(fillIds.klass, info.vehicleClass);
     if(info.model || info.engine_power_kw) toast((info.make||'')+' '+(info.model||'')+(info.engine_displacement_cm3?(' · '+info.engine_displacement_cm3+' cm³'):'')+(info.engine_power_kw?(' · '+info.engine_power_kw+' kW'):''));
     else toast((info.make||'KBA')+' — الموديل مو موجود بهالمصدر المجاني، كمّل يدوياً');
   };
@@ -1391,13 +1416,16 @@ function vehicleModal(prefill={}){
  <div class="field"><label>سعة المحرك (cm³)</label><input id="cc" type="number" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
  <div class="field"><label>نوع الوقود</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
  <div class="field"><label>قوة المحرك (kW)</label><input id="kw" type="number" value="${esc(prefill.engine_power_kw||'')}"></div>
+ <div class="field"><label>الوزن الأقصى (kg)</label><input id="vmaxw" type="number" value="${esc(prefill.maxWeight||'')}"></div>
+ <div class="field"><label>عدد المقاعد</label><input id="vseats" type="number" value="${esc(prefill.seats||'')}"></div>
+ <div class="field"><label>فئة المركبة</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
  <div class="field"><label>كود المحرك</label><input id="en" value="${esc(prefill.engine||'')}"></div>
  <div class="field"><label>كود اللون (مو من VIN — من الورقة)</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="من Fahrzeugschein"></div>
  <div class="field"><label>الكيلومتر الحالي</label><input id="vkm" type="number" value="${esc(prefill.km||'')}"></div>
  <div class="field"><label>الصيانة القادمة عند كم</label><input id="vnext" type="number" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
   if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
-  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
+  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
   else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
  });
@@ -1405,7 +1433,7 @@ function vehicleModal(prefill={}){
 window.open('https://www.partslink24.com/','_blank');
 };
   bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en',pa:'#pa'});
-  bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',year:'#yr',kw:'#kw',cc:'#cc',fuel:'#fuel'});
+  bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',year:'#yr',kw:'#kw',cc:'#cc',fuel:'#fuel',seats:'#vseats',weight:'#vmaxw',klass:'#vklass'});
 }
 function scanVehicleDocument(){
  modal('تصوير/رفع ورقة السيارة',`<div class="field">
