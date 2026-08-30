@@ -473,6 +473,56 @@ function audit(action,detail=''){db.audit.unshift({id:id('a'),ts:new Date().toIS
 function companyRows(name){return db[name].filter(x=>x.companyId===session.company.id)}
 
 function vehicleOf(vid){return db.vehicles.find(x=>x.id===vid)}
+function cleanVin(v){return String(v||'').replace(/[^A-HJ-NPR-Z0-9]/gi,'').toUpperCase()}
+async function lookupVin(vin){
+  vin=cleanVin(vin);
+  if(vin.length!==17) throw new Error('VIN لازم 17 خانة');
+  const res=await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/'+encodeURIComponent(vin)+'?format=json');
+  if(!res.ok) throw new Error('تعذر الاتصال بخدمة VIN');
+  const data=await res.json();
+  const r=(data.Results&&data.Results[0])||{};
+  const make=r.Make||r.Manufacturer||'';
+  const model=r.Model||r.Series||'';
+  const year=r.ModelYear||'';
+  if(!make && !model && !year) throw new Error('ما انلقطت بيانات لهالـ VIN');
+  const cc=r.DisplacementCC || (r.DisplacementL?Math.round(Number(r.DisplacementL)*1000):'');
+  return {
+    vin, make, model, year,
+    engine: r.EngineModel||r.EngineConfiguration||'',
+    fuel_type: r.FuelTypePrimary||'',
+    engine_power_kw: r.EngineKW||'',
+    engine_displacement_cm3: cc||'',
+    paint: r.BodyClass||''
+  };
+}
+function fillVinFields(info, ids){
+  const set=(id,val)=>{ const el=$(id); if(el && val) el.value=val; };
+  if(ids.vin){ const el=$(ids.vin); if(el) el.value=info.vin; }
+  set(ids.make, info.make);
+  set(ids.model, info.model);
+  set(ids.year, info.year);
+  if(ids.cc) set(ids.cc, info.engine_displacement_cm3);
+  if(ids.fuel) set(ids.fuel, info.fuel_type);
+  if(ids.kw) set(ids.kw, info.engine_power_kw);
+  if(ids.en) set(ids.en, info.engine);
+}
+function bindVinEnter(inputId, ids){
+  const el=$(inputId); if(!el) return;
+  el.placeholder=el.placeholder||'17 خانة ثم Enter';
+  el.addEventListener('keydown', async ev=>{
+    if(ev.key!=='Enter') return;
+    ev.preventDefault();
+    const vin=cleanVin(el.value);
+    el.value=vin;
+    if(vin.length!==17) return toast('VIN لازم 17 خانة');
+    toast('جاري جلب بيانات السيارة...');
+    try{
+      const info=await lookupVin(vin);
+      fillVinFields(info, ids);
+      toast((info.make||'')+' '+(info.model||'')+' '+(info.year||''));
+    }catch(e){ toast(e.message||'تعذر قراءة VIN'); }
+  });
+}
 function customerOfVehicle(vid){const v=vehicleOf(vid);return v?db.customers.find(c=>c.id===v.customerId):null}
 function nextInvoiceNumber(){
   const y=new Date().getFullYear();
@@ -1024,7 +1074,7 @@ function customerModal(existing){
  <div class="field span2"><label>العنوان</label><input id="ad" value="${esc(c0.address||'')}"></div>
  <div class="field span2"><b>سيارة العميل</b></div>
  <div class="field"><label>اللوحة</label><input id="vplate" placeholder="HH-AB 1234"></div>
- <div class="field"><label>VIN</label><input id="vvin"></div>
+ <div class="field"><label>VIN (Enter لجلب البيانات)</label><input id="vvin" maxlength="17" placeholder="17 خانة ثم Enter"></div>
  <div class="field"><label>الماركة</label><input id="vmake"></div>
  <div class="field"><label>الموديل</label><input id="vmodel"></div>
  <div class="field"><label>السنة</label><input id="vyear"></div>
@@ -1046,6 +1096,7 @@ function customerModal(existing){
   }
   save();upsertCustomerCloud(c);closeModal();render();
  });
+ bindVinEnter('#vvin',{vin:'#vvin',make:'#vmake',model:'#vmodel',year:'#vyear'});
 }
 function editCustomer(cid){ const c=db.customers.find(x=>x.id===cid); if(c) customerModal(c); }
 window.editCustomer=editCustomer;
@@ -1116,7 +1167,7 @@ function vehicleModal(prefill={}){
  modal('إضافة سيارة',`<div class="form-grid">
  <div class="field"><label>العميل</label><select id="cu"><option value="">اختر العميل</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
  <div class="field"><label>رقم اللوحة</label><input id="pl" value="${esc(prefill.plate||'')}"></div>
- <div class="field"><label>VIN</label><input id="vin" value="${esc(prefill.vin||'')}"></div>
+ <div class="field"><label>VIN (Enter لجلب البيانات)</label><input id="vin" value="${esc(prefill.vin||'')}" maxlength="17" placeholder="17 خانة ثم Enter"></div>
  <div class="field"><label>Partslink24</label><button type="button" class="btn" id="partslinkBtn">فتح partslink24</button></div>
  <div class="field"><label>الماركة</label><input id="mk" value="${esc(prefill.make||'')}"></div>
  <div class="field"><label>الموديل</label><input id="mo" value="${esc(prefill.model||'')}"></div>
@@ -1136,7 +1187,8 @@ function vehicleModal(prefill={}){
  });
   $('#partslinkBtn').onclick=()=>{
 window.open('https://www.partslink24.com/','_blank');
-}; 
+};
+  bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en'});
 }
 function scanVehicleDocument(){
  modal('تصوير/رفع ورقة السيارة',`<div class="field">
