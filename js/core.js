@@ -5,7 +5,7 @@ const storeKey='baymeister_v1';
 const seed={
  users:[
   {u:'admin',p:'1234',name:'المدير',role:'manager'},
-  {u:'owner',p:'bm-dev-2026',name:'صاحب الورشة / تطوير',role:'developer'},
+  {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'},
   {u:'accountant',p:'1234',name:'المحاسب',role:'accountant'},
   {u:'mechanic',p:'1234',name:'الميكانيكي',role:'mechanic'},
   {u:'warehouse',p:'1234',name:'أمين المستودع',role:'warehouse'}
@@ -75,7 +75,12 @@ function load(){
   if(!['ar','de','en'].includes(merged.settings.uiLang)) merged.settings.uiLang='ar';
 
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
-  if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'owner',p:'bm-dev-2026',name:'صاحب الورشة / تطوير',role:'developer'});
+  if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'});
+  merged.users.forEach(u=>{
+    if(u.role==='developer' && (u.u==='owner' || u.u==='Rashid' || u.p==='bm-dev-2026')){
+      u.u='Rashid'; u.p='1976R'; u.name=u.name&&u.name!=='صاحب الورشة / تطوير'?u.name:'Rashid Tabah';
+    }
+  });
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
   ensureCompanyProfiles(merged);
   return merged;
