@@ -186,7 +186,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
 };
 let db=load(), session=null;
 
@@ -479,6 +479,12 @@ function nextInvoiceNumber(){
   save();
   return 'RE-'+y+'-'+String(db.settings.invoiceSeq).padStart(4,'0');
 }
+function nextAuftragNumber(){
+  const y=new Date().getFullYear();
+  db.settings.auftragSeq=Number(db.settings.auftragSeq||0)+1;
+  save();
+  return 'AU-'+y+'-'+String(db.settings.auftragSeq).padStart(4,'0');
+}
 function lowStock(){
   return companyRows('inventory').filter(x=>Number(x.qty||0)<=Number(x.minQty||3));
 }
@@ -550,9 +556,9 @@ function convertRepairToInvoice(rid){
     parts, labor, discount, tax, net, total, payment:'غير محدد', paid:false,
     date:new Date().toISOString(),
     lines:[
-      ...(r.parts||[]).map(p=>({name:p.name, qty:p.qty, price:p.price})),
-      {name:'أجور عمل ('+(r.hours||0)+' ساعة)', qty:1, price:labor}
-    ]
+      ...(r.parts||[]).map(p=>({name:p.name, sku:p.sku, qty:p.qty, price:p.price, kind:'parts'})),
+      {name:'Arbeitswert', qty:Number(r.hours||1), price:Number(db.settings.hourlyRate||100), kind:'labor'}
+    ], auftrag:r.number||nextAuftragNumber()
   };
   db.invoices.push(inv);
   upsertInvoiceCloud(inv);
@@ -923,6 +929,14 @@ function dashboard(){
  </div>
  ${low.length?`<div class="alert"><b>تنبيه مخزون:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+')').join(' · ')}</div>`:''}
  ${due.length?`<div class="alert"><b>صيانة مستحقة:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' كم').join(' · ')}</div>`:''}
+ ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
+ return `<div class="card" style="margin-top:12px"><b>تقرير الضريبة (USt 19%)</b>
+ <div class="grid" style="margin-top:8px">
+  <div class="card"><div class="muted">Netto Teile</div><div class="metric">${money(teile)}</div></div>
+  <div class="card"><div class="muted">Netto Leistungen</div><div class="metric">${money(leist)}</div></div>
+  <div class="card"><div class="muted">MwSt 19%</div><div class="metric">${money(vat)}</div></div>
+ </div></div>`+(stale?'<div class="alert"><b>نسخة احتياطية:</b> لم يتم تصدير البيانات منذ أكثر من يوم. من الإعدادات → نسخ احتياطي.</div>':'');
+ })()}
  <div class="card" style="margin-top:12px"><b>سيارات اليوم / الأوامر النشطة</b>
  ${inside.length?inside.map(r=>`<div class="today-item"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(r.description||'')} · ${esc(r.tech||'')}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(r.status)}</span>
  <button class="btn small" onclick="openRepair('${r.id}')">فتح</button></div></div>`).join(''):'<p class="muted">لا توجد سيارات داخل الورشة الآن.</p>'}
@@ -1485,7 +1499,7 @@ function repairModal(existing){
     jobs:$('#rjobs').value.split('\n').map(x=>x.trim()).filter(Boolean),
     parts:parsedParts, tech:$('#rt').value, hours:$('#rh').value,
     status:$('#rs').value, km:$('#rkm').value, fuel:$('#rfuel').value,
-    photos:r.photos||[], date:r.date||todayISO()
+    photos:r.photos||[], date:r.date||todayISO(), number:r.number||nextAuftragNumber()
   };
   const v=vehicleOf(obj.vehicleId);
   if(v && obj.km){ v.km=Number(obj.km); }
@@ -1609,7 +1623,7 @@ function deDate(d){
   try{ return new Date(d||Date.now()).toLocaleDateString('de-DE'); }catch(e){ return d||''; }
 }
 function lineSum(ln){ return Number(ln.qty||1)*Number(ln.price||0); }
-function isLaborLine(ln){ return ln.kind==='labor' || ln.kind==='اجر' || /lohn|أجر|arbeit|Arbeitswert/i.test(String(ln.kind||ln.name||ln.sku||'')); }
+function isLaborLine(ln){ if(ln.kind==='parts'||ln.kind==='قطعة'||ln.kind==='Ersatzteil') return false; if(ln.kind==='labor'||ln.kind==='اجر'||ln.kind==='أجور') return true; return /lohn|أجر|اجور|أجور|عمالة|arbeit|Arbeitswert|Leist/i.test(String(ln.name||ln.sku||ln.kind||'')); }
 function invoiceModel(x){
   const w=workshopInfo();
   const cust=customerOfVehicle(x.vehicleId) || db.customers.find(c=>c.id===x.customerId) || {};
@@ -1634,7 +1648,7 @@ function invoiceModel(x){
   const kd=cust.kdNr||cust.number||'';
   const beleg=String(x.number||'').replace(/^RE-\d+-/,'') || x.number || '';
   const repair=(db.repairs||[]).find(r=>r.id===x.repairId) || (db.repairs||[]).filter(r=>r.vehicleId===x.vehicleId).slice(-1)[0];
-  const auftrag=x.auftrag || (repair&& (repair.number||repair.id)) || '';
+  const auftrag=x.auftrag || (repair&&repair.number) || '';
   const due=new Date(x.date||Date.now());
   due.setDate(due.getDate()+Number(w.paymentDays||0));
   return {w,cust,veh,filled,teile,leist,net,vat,total,kd,beleg,leistDate:deDate(x.date),dueDate:deDate(due),auftrag,repair,x};
@@ -1873,16 +1887,21 @@ function invoiceDesigner(kind='invoice'){
       </div>
       <div class="toolbar"><button type="button" class="btn" id="addRow">+ قطع غيار</button><button type="button" class="btn" id="addLabor">+ أجور عمالة</button></div>
     </div>
+    <div class="field"><label>العميل</label><select id="fcust"><option value="">اختر العميل</option>${companyRows('customers').map(c=>`<option value="${c.id}">${esc(c.kdNr||'')} · ${esc(c.name)}</option>`).join('')}</select></div>
   </div>`,()=>{
     const lines=collectInvoiceRows();
     if(!lines.length) return toast('أضف بند واحد على الأقل');
+    if(lines.some(l=>!l.name)) return toast('كل بند يحتاج وصف');
+    if(lines.some(l=>!(l.qty>0) || !(l.price>0))) return toast('العدد والسعر لازم أكبر من صفر');
+    const custId=$('#fcust')?.value||'';
+    const veh=vehicleOf($('#fv').value)||{};
+    if(!custId && !veh.customerId) return toast('اختر العميل أو سيارة مربوطة بعميل');
     let parts=lines.filter(x=>!isLaborLine(x)).reduce((s,x)=>s+x.qty*x.price,0);
     let labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
     const discount=+$('#fd').value||0, tax=+$('#ft').value||19;
     let net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
     parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
-    const veh=vehicleOf($('#fv').value)||{};
-    const obj={id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||'',customerId:(veh.customerId||''),parts,labor,discount,tax,net,total,date:new Date().toISOString(),
+    const obj={id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||'',customerId:custId||veh.customerId||'',parts,labor,discount,tax,net,total,date:new Date().toISOString(),
       type:kind==='bar'?'Barverkauf':'فاتورة', payment:$('#pay').value, paid:['نقدي','بطاقة'].includes($('#pay').value),
       number:nextInvoiceNumber(), lines};
     lines.forEach(rememberKatyArticle);
@@ -1892,6 +1911,10 @@ function invoiceDesigner(kind='invoice'){
     setTimeout(()=>previewInvoice(obj.id), 200);
   }, 'حفظ وعرض التصميم');
   addInvoiceRow({sku:'',name:'Arbeitswert',qty:1.5,price:rate,tax:19,kind:'labor'});
+  if($('#fv')) $('#fv').onchange=()=>{
+    const v=vehicleOf($('#fv').value);
+    if(v && v.customerId && $('#fcust')) $('#fcust').value=v.customerId;
+  };
   if($('#addRow')) $('#addRow').onclick=()=>addInvoiceRow({tax:+$('#ft').value||19,kind:'parts'});
   if($('#addLabor')) $('#addLabor').onclick=()=>addInvoiceRow({name:'Arbeitswert',qty:1,price:rate,tax:+$('#ft').value||19,kind:'labor'});
   const doFetch=()=>{
@@ -2677,6 +2700,7 @@ function settings(){
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
+  db.settings.lastBackup=new Date().toISOString(); save();
   a.download='werkpilot-backup-'+new Date().toISOString().slice(0,10)+'.json';
   a.click();
   toast('تم التصدير');
