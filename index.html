@@ -801,8 +801,8 @@ function printDocMarkup(type, id){
       html,body{height:auto;margin:0}
       body{font-family:Arial,Helvetica,sans-serif;padding:0;direction:${ddr};color:#111;font-size:11px}
       .print-doc,.inv-a4{margin:0;padding:0}
-      .rechnung{width:100%;max-width:190mm;margin:0 auto;min-height:0;height:auto;display:flex;flex-direction:column;page-break-inside:avoid;page-break-after:avoid}
-      .rh-main{flex:0 1 auto}
+      .rechnung{width:100%;max-width:190mm;margin:0 auto}
+      .rh-main{display:block}
       .rh-title{text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;margin:0}
       .rh-legal{text-align:center;font-size:10px;margin:2px 0}
       .rh-sub{text-align:center;font-size:10px;margin-bottom:10px}
@@ -839,20 +839,24 @@ function printDocMarkup(type, id){
     </style>
     </head><body>${html}</body></html>`;
 }
+function getPrintFrame(){
+  let f=document.getElementById('printFrame');
+  if(!f){
+    f=document.createElement('iframe');
+    f.id='printFrame';
+    f.setAttribute('aria-hidden','true');
+    f.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;border:0;pointer-events:none';
+    document.body.appendChild(f);
+  }
+  return f;
+}
 function exportPrint(type, id){
   const page=printDocMarkup(type,id);
-  document.getElementById('printFrame')?.remove();
-  const iframe=document.createElement('iframe');
-  iframe.id='printFrame';
-  iframe.setAttribute('aria-hidden','true');
-  iframe.style.cssText='position:fixed;left:-9999px;top:0;width:0;height:0;border:0';
-  document.body.appendChild(iframe);
+  const iframe=getPrintFrame();
   const doc=iframe.contentDocument;
   doc.open(); doc.write(page); doc.close();
-  setTimeout(()=>{
-    try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){ toast('تعذر فتح الطابعة'); }
-    setTimeout(()=>iframe.remove(), 1500);
-  }, 250);
+  const run=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){ toast('تعذر فتح الطابعة'); } };
+  requestAnimationFrame(()=>requestAnimationFrame(run));
 }
 
 function exportPDF(type, id){
