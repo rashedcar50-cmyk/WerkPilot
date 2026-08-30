@@ -144,7 +144,7 @@ const seed={
   {u:'warehouse',p:'1234',name:'أمين المستودع',role:'warehouse'}
  ],
  companies:[
-  {id:'de',name:'STS — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
+  {id:'de',name:'TST — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
  customers:[
@@ -186,7 +186,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'STS',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
 };
 let db=load(), session=null;
 
@@ -796,7 +796,7 @@ function exportPrint(type, id){
   const w = window.open('', '_blank', 'width=900,height=700');
   if(!w) return toast('اسمح بالنوافذ المنبثقة');
   const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":(WP_RTL.includes(db.settings.uiLang||"ar")?"rtl":"ltr");
-  w.document.write(`<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>${type==="invoices"?"STS":"Print"}</title>
+  w.document.write(`<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>${type==="invoices"?"TST":"Print"}</title>
     <style>
       @page{size:A4;margin:8mm}
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -1554,7 +1554,7 @@ function invoices(){
 function workshopInfo(){
   const s=db.settings||{};
   return {
-    brand: s.workshopBrand || 'STS',
+    brand: s.workshopBrand || 'TST',
     name: s.workshopName || 'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',
     address: s.workshopAddress || 'Hans-Koch-Ring 12, 21493 Schwarzenbek',
     phone: s.workshopPhone || '016096585124',
@@ -2609,7 +2609,7 @@ function settings(){
   <option value="classic" ${db.settings.invoiceTpl==='classic'?'selected':''}>كلاسيكي — إطار أزرق رسمي</option>
   <option value="atelier" ${db.settings.invoiceTpl==='atelier'?'selected':''}>أتيليه — عنوان عريض وBeleg بارز</option>
  </select></div>
- <div class="field span2"><label>اسم الورشة التجاري</label><input id="wbrand" value="${esc(db.settings.workshopBrand||'STS')}"></div>
+ <div class="field span2"><label>اسم الورشة التجاري</label><input id="wbrand" value="${esc(db.settings.workshopBrand||'TST')}"></div>
  <div class="field span2"><label>الاسم القانوني على الفاتورة</label><input id="wname" value="${esc(db.settings.workshopName||'')}"></div>
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(db.settings.workshopTaxId||'')}"></div>
  <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(db.settings.workshopSteuerNr||'')}"></div>
