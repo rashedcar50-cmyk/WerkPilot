@@ -1596,10 +1596,10 @@ function invoices(){
  listShareBar('invoices')+
  table(['رقم','النوع','السيارة','الإجمالي','الدفع','تصميم'],rows.map(x=>[
   esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'بيع مباشر', money(x.total), esc(x.payment||'-'),
-  `<button class="btn small primary" onclick="previewInvoice('${x.id}')">عرض التصميم</button>
-   <button class="btn small" onclick="exportPrint('invoices','${x.id}')">طباعة</button>
-   <button class="btn small" onclick="exportPDF('invoices','${x.id}')">PDF</button>
-   <button class="btn small" onclick="exportWhatsApp('invoices','${x.id}')">واتساب</button>`
+  `<button class="btn small primary" onclick="previewInvoice('${x.id}')">عرض</button>
+   <button class="btn small" onclick="editInvoice('${x.id}')">تعديل</button>
+   <button class="btn small bad" onclick="deleteInvoice('${x.id}')">حذف</button>
+   <button class="btn small" onclick="exportPrint('invoices','${x.id}')">طباعة</button>`
  ]), 'invoices')+
  `<div class="bottom-action"><button class="btn primary" id="inv2">+ إنشاء فاتورة</button></div>`;
  $('#inv').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
@@ -1609,8 +1609,23 @@ function invoices(){
 }
 function invoiceForCustomer(cid){ invoiceDesigner('invoice', cid); }
 function invoicesForCustomer(cid){ session.customerFilter=cid; session.page='invoices'; render(); }
+function editInvoice(iid){
+  const inv=db.invoices.find(x=>x.id===iid);
+  if(!inv) return toast('الفاتورة غير موجودة');
+  invoiceDesigner(inv.type==='Barverkauf'?'bar':'invoice', inv.customerId||'', inv);
+}
+function deleteInvoice(iid){
+  const inv=db.invoices.find(x=>x.id===iid);
+  if(!inv) return;
+  if(!confirm('حذف الفاتورة '+ (inv.number||'') +' ؟')) return;
+  db.invoices=db.invoices.filter(x=>x.id!==iid);
+  if(typeof deleteInvoiceCloud==='function') try{ deleteInvoiceCloud(inv); }catch(e){}
+  audit('invoice.delete', inv.number||iid); save(); render(); toast('تم حذف الفاتورة');
+}
 window.invoiceForCustomer=invoiceForCustomer;
 window.invoicesForCustomer=invoicesForCustomer;
+window.editInvoice=editInvoice;
+window.deleteInvoice=deleteInvoice;
 function workshopInfo(){
   const s=db.settings||{};
   return {
@@ -1903,14 +1918,15 @@ function numberInvoiceRows(){
     const p=tr.querySelector('.c-pos'); if(p) p.textContent=i+1;
   });
 }
-function invoiceDesigner(kind='invoice', customerId=''){
-  const title = kind==='bar' ? 'Barverkauf' : 'إنشاء فاتورة';
+function invoiceDesigner(kind='invoice', customerId='', existing=null){
+  const title = existing ? ('تعديل فاتورة '+(existing.number||'')) : (kind==='bar' ? 'Barverkauf' : 'إنشاء فاتورة');
   const rate=db.settings.hourlyRate||100;
+  if(existing){ customerId=customerId||existing.customerId||''; }
   modal(title, `<div class="form-grid">
-    <div class="field"><label>السيارة</label><select id="fv"><option value="">بدون سيارة / بيع مباشر</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId).map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
-    <div class="field"><label>طريقة الدفع</label><select id="pay"><option>غير محدد</option><option>نقدي</option><option>بطاقة</option><option>تحويل بنكي</option></select></div>
-    <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="19"></div>
-    <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="0"></div>
+    <div class="field"><label>السيارة</label><select id="fv"><option value="">بدون سيارة / بيع مباشر</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)).map(v=>`<option value="${v.id}" ${existing&&v.id===existing.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+    <div class="field"><label>طريقة الدفع</label><select id="pay">${['غير محدد','نقدي','بطاقة','تحويل بنكي'].map(p=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
+    <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="${existing?existing.tax:19}"></div>
+    <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="${existing?existing.discount||0:0}"></div>
     <div class="field span2"><label>رقم قطعة Katy / Henry</label>
       <div class="toolbar">
         <input id="katySku" placeholder="رقم القطعة">
@@ -1944,16 +1960,27 @@ function invoiceDesigner(kind='invoice', customerId=''){
     const discount=+$('#fd').value||0, tax=+$('#ft').value||19;
     let net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
     parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
-    const obj={id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||'',customerId:custId||veh.customerId||'',parts,labor,discount,tax,net,total,date:new Date().toISOString(),
+    const obj={id:existing?existing.id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custId||veh.customerId||'',parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
       type:kind==='bar'?'Barverkauf':'فاتورة', payment:$('#pay').value, paid:['نقدي','بطاقة'].includes($('#pay').value),
-      number:nextInvoiceNumber(), lines};
+      number:existing?existing.number:nextInvoiceNumber(), lines, repairId:existing&&existing.repairId, auftrag:existing&&existing.auftrag};
     lines.forEach(rememberKatyArticle);
-    db.invoices.push(obj); upsertInvoiceCloud(obj);
-    db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
-    audit('invoice.create',obj.number); save(); closeModal(); render();
+    if(existing){
+      const i=db.invoices.findIndex(x=>x.id===existing.id);
+      if(i>=0) db.invoices[i]=obj; else db.invoices.push(obj);
+      upsertInvoiceCloud(obj); audit('invoice.update',obj.number);
+    } else {
+      db.invoices.push(obj); upsertInvoiceCloud(obj);
+      db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
+      audit('invoice.create',obj.number);
+    }
+    save(); closeModal(); render();
     setTimeout(()=>previewInvoice(obj.id), 200);
-  }, 'حفظ وعرض التصميم');
-  addInvoiceRow({sku:'',name:'Arbeitswert',qty:1.5,price:rate,tax:19,kind:'labor'});
+  }, existing?'حفظ التعديل':'حفظ وعرض التصميم');
+  if(existing && existing.lines && existing.lines.length){
+    existing.lines.forEach(l=>addInvoiceRow(l));
+  } else if(!existing){
+    addInvoiceRow({sku:'',name:'Arbeitswert',qty:1.5,price:rate,tax:19,kind:'labor'});
+  }
   if($('#fv')) $('#fv').onchange=()=>{
     const v=vehicleOf($('#fv').value);
     if(v && v.customerId && $('#fcust')) $('#fcust').value=v.customerId;
