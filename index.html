@@ -1230,9 +1230,12 @@ function findOrCreateFromSchein(ai){
 }
 function scanScheinStartRepair(){
   modal('تصوير ورقة السيارة — فتح أمر',`<div class="field">
-    <label>صوّر الـ Fahrzeugschein. بعد القراءة بتدخل الكم فقط.</label>
-    <input id="doc" type="file" accept="image/*" capture="environment">
-    <button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
+    <label>اختر صورة الورقة من الاستوديو أو الملفات، أو صوّرها بالكاميرا.</label>
+    <input id="doc" type="file" accept="image/*">
+    <div class="toolbar">
+      <button type="button" class="btn primary" id="pickGallery">🖼️ الاستوديو / الملفات</button>
+      <button type="button" class="btn" onclick="openCamera()">📷 الكاميرا</button>
+    </div>
     <img id="ocrImg" class="ocr-preview hidden">
     <div id="ocrStatus" class="hint"></div>
     <div id="scheinPreview" class="hidden"></div>
@@ -1295,6 +1298,7 @@ function scanScheinStartRepair(){
     }
   }, 'قراءة الورقة');
   $('#doc').onchange=()=>{const f=$('#doc').files[0]; if(f){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); window._scheinReady=false; }};
+  if($('#pickGallery')) $('#pickGallery').onclick=()=>$('#doc').click();
 }
 window.scanScheinStartRepair=scanScheinStartRepair;
 function repairStatusClass(st){
@@ -1764,7 +1768,7 @@ async function scanPurchaseDocument(){
     <div class="field">
       <label>1) صوّر أو ارفع الفاتورة</label>
       <div class="filebox" style="margin-top:8px">
-        <input id="purchaseFile" type="file" accept="image/*,.pdf" capture="environment">
+        <input id="purchaseFile" type="file" accept="image/*,.pdf">
         <div class="muted" style="margin-top:6px">صور أو PDF</div>
       </div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
