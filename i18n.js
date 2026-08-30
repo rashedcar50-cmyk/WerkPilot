@@ -28,7 +28,14 @@ estimates:'Quotes',invoices:'Invoices & cash sale',purchases:'Purchases',invento
 employees:'Staff & payroll',expenses:'Expenses',journal:'Journal',reports:'Reports',integrations:'Integrations',
 audit:'Activity log',settings:'Settings',search:'Search: plate / customer / part / job',
 save:'Save',cancel:'Cancel',print:'Print',pdf:'PDF',email:'Email',whatsapp:'WhatsApp',
+printList:'Print list',pdfList:'PDF list',
+name:'Name / company',phone:'Phone',taxId:'Tax ID',address:'Address',cars:'Vehicles',action:'Action',
+edit:'Edit',newInvoice:'New invoice',invoicesOf:'Invoices',preview:'Preview',del:'Delete',
+invoiceNo:'Number',type:'Type',vehicle:'Vehicle',total:'Total',payment:'Payment',design:'Actions',
 newCustomer:'New customer',newVehicle:'Add vehicle',newRepair:'New repair order',newAppt:'New appointment',
+studio:'Developer studio',todayShort:'Today',ordersShort:'Jobs',carsShort:'Cars',apptShort:'Dates',invShort:'Invoices',
+confirmDelInv:'Delete invoice',invDeleted:'Invoice deleted',invMissing:'Invoice not found',
+allInvoices:'All invoices',createInvoice:'+ New invoice',
 font:'Font size',language:'Program language',hourly:'Labor hourly rate €',phone:'Workshop / WhatsApp phone',
 invoiceNote:'Invoices stay in German when the active company is in Germany.',
 saved:'Saved',backup:'Export backup',sync:'Sync from cloud',reset:'Reset demo data'},
@@ -38,7 +45,14 @@ estimates:'Kostenvoranschläge',invoices:'Rechnungen & Barverkauf',purchases:'Ei
 employees:'Mitarbeiter & Lohn',expenses:'Ausgaben',journal:'Journal',reports:'Berichte',integrations:'Integrationen',
 audit:'Aktivitätsprotokoll',settings:'Einstellungen',search:'Suche: Kennzeichen / Kunde / Teil / Auftrag',
 save:'Speichern',cancel:'Abbrechen',print:'Drucken',pdf:'PDF',email:'E-Mail',whatsapp:'WhatsApp',
+printList:'Liste drucken',pdfList:'Liste als PDF',
+name:'Name / Firma',phone:'Telefon',taxId:'USt-IdNr.',address:'Adresse',cars:'Fahrzeuge',action:'Aktion',
+edit:'Bearbeiten',newInvoice:'Neue Rechnung',invoicesOf:'Rechnungen',preview:'Vorschau',del:'Löschen',
+invoiceNo:'Nummer',type:'Art',vehicle:'Fahrzeug',total:'Gesamt',payment:'Zahlung',design:'Aktionen',
 newCustomer:'Neuer Kunde',newVehicle:'Fahrzeug hinzufügen',newRepair:'Neuer Auftrag',newAppt:'Neuer Termin',
+studio:'Entwicklerstudio',todayShort:'Heute',ordersShort:'Aufträge',carsShort:'Autos',apptShort:'Termine',invShort:'Rechnungen',
+confirmDelInv:'Rechnung löschen',invDeleted:'Rechnung gelöscht',invMissing:'Rechnung nicht gefunden',
+allInvoices:'Alle Rechnungen',createInvoice:'+ Neue Rechnung',
 font:'Schriftgröße',language:'Programmsprache',hourly:'Stundensatz €',phone:'Werkstatt / WhatsApp',
 invoiceNote:'Rechnungen bleiben auf Deutsch, wenn die aktive Firma in Deutschland ist.',
 saved:'Gespeichert',backup:'Backup exportieren',sync:'Aus Cloud synchronisieren',reset:'Demodaten löschen'},
@@ -48,7 +62,14 @@ estimates:'Kostenvoranschlag',invoices:'الفواتير و Barverkauf',purchase
 employees:'الموظفون والرواتب',expenses:'المصاريف',journal:'دفتر اليومية',reports:'التقارير',integrations:'التكاملات',
 audit:'سجل النشاط',settings:'الإعدادات',search:'بحث: لوحة / زبون / قطعة / أمر',
 save:'حفظ',cancel:'إلغاء',print:'طباعة',pdf:'PDF',email:'إيميل',whatsapp:'واتساب',
+printList:'طباعة القائمة',pdfList:'PDF القائمة',
+name:'الاسم / الشركة',phone:'الهاتف',taxId:'الرقم الضريبي',address:'العنوان',cars:'السيارات',action:'إجراء',
+edit:'تعديل',newInvoice:'فاتورة جديدة',invoicesOf:'فواتير',preview:'معاينة',del:'حذف',
+invoiceNo:'رقم',type:'النوع',vehicle:'السيارة',total:'الإجمالي',payment:'الدفع',design:'إجراء',
 newCustomer:'عميل جديد',newVehicle:'إضافة سيارة',newRepair:'أمر إصلاح جديد',newAppt:'موعد جديد',
+studio:'استوديو التطوير',todayShort:'اليوم',ordersShort:'الأوامر',carsShort:'سيارات',apptShort:'مواعيد',invShort:'فواتير',
+confirmDelInv:'حذف الفاتورة',invDeleted:'تم حذف الفاتورة',invMissing:'الفاتورة غير موجودة',
+allInvoices:'كل الفواتير',createInvoice:'+ إنشاء فاتورة',
 font:'حجم الخط',language:'لغة البرنامج',hourly:'سعر ساعة العمل €',phone:'هاتف الورشة / واتساب',
 invoiceNote:'الفاتورة تبقى بالألمانية إذا كانت الشركة النشطة في ألمانيا.',
 saved:'تم الحفظ',backup:'تصدير نسخة احتياطية',sync:'مزامنة من السحابة',reset:'مسح بيانات التجربة'}
@@ -73,7 +94,7 @@ window.WP_INV_DE = {
 window.t = function(key){
   const lang = (window.db && db.settings && db.settings.uiLang) || (window.db && window.db.settings && window.db.settings.uiLang) || 'ar';
   const pack = window.WP_I18N[lang] || window.WP_I18N.en;
-  return pack[key] || window.WP_I18N.en[key] || window.WP_I18N.ar[key] || key;
+  return pack[key] || window.WP_I18N.en[key] || key;
 };
 window.docLang = function(){
   const co = window.session && session.company;

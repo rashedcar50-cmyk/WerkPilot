@@ -908,7 +908,7 @@ function nav(){
   ['estimates', t('estimates')],['invoices', t('invoices')],['purchases', t('purchases')],
   ['inventory', t('inventory')],['employees', t('employees')],['expenses', t('expenses')],
   ['journal', t('journal')],['reports', t('reports')],['integrations', t('integrations')],
-  ['audit', t('audit')],['settings', t('settings')],['studio','استوديو التطوير']
+  ['audit', t('audit')],['settings', t('settings')],['studio', t('studio')]
  ];
 }
 
@@ -956,7 +956,7 @@ function render(){
   <div class="content" id="content"></div>
  </main>
  <nav class="bottom-nav">
-  ${[['dashboard','اليوم'],['repairs','الأوامر'],['vehicles','سيارات'],['appointments','مواعيد'],['invoices','فواتير']].filter(([k])=>roleCan(k)).map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
+  ${[['dashboard',t('todayShort')],['repairs',t('ordersShort')],['vehicles',t('carsShort')],['appointments',t('apptShort')],['invoices',t('invShort')]].filter(([k])=>roleCan(k)).map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </nav>
 </div>`;
  $$('[data-page]').forEach(b=>b.onclick=()=>{session.page=b.dataset.page;render()});
@@ -1016,10 +1016,10 @@ function shareBar(type, id){
 
 function listShareBar(type){
   return `<div class="share-bar">
-    <button class="btn small" onclick="exportPrint('${type}','')">🖨️ طباعة القائمة</button>
-    <button class="btn small" onclick="exportPDF('${type}','')">📄 PDF القائمة</button>
-    <button class="btn small" onclick="exportEmail('${type}','')">✉️ إيميل</button>
-    <button class="btn small" onclick="exportWhatsApp('${type}','')">💬 واتساب</button>
+    <button class="btn small" onclick="exportPrint('${type}','')">🖨️ ${t('printList')}</button>
+    <button class="btn small" onclick="exportPDF('${type}','')">📄 ${t('pdfList')}</button>
+    <button class="btn small" onclick="exportEmail('${type}','')">✉️ ${t('email')}</button>
+    <button class="btn small" onclick="exportWhatsApp('${type}','')">💬 ${t('whatsapp')}</button>
   </div>`;
 }
 
@@ -1175,7 +1175,7 @@ function exportPDF(type, id){
 }
 async function exportInvoicePDF(iid){
   const inv=(db.invoices||[]).find(x=>x.id===iid);
-  if(!inv) return toast('الفاتورة غير موجودة');
+  if(!inv) return toast(t('invMissing'));
   if(!window.html2canvas || !window.jspdf) return toast('مكتبة PDF غير محمّلة — حدّث الصفحة');
   toast('جاري تجهيز PDF...');
   const page=printDocMarkup('invoices', iid);
@@ -1284,15 +1284,15 @@ function showSearchResults(q){
 
 function customers(){
  const rows=companyRows('customers');
- $('#content').innerHTML=head('العملاء',canEdit()?`<button class="btn primary" id="add">عميل جديد</button>`:'')+
+ $('#content').innerHTML=head(t('customers'),canEdit()?`<button class="btn primary" id="add">${t('newCustomer')}</button>`:'')+
  listShareBar('customers')+
- table(['الاسم / الشركة','الهاتف','الرقم الضريبي','العنوان','السيارات','إجراء'],rows.map(c=>[
+ table([t('name'),t('phone'),t('taxId'),t('address'),t('cars'),t('action')],rows.map(c=>[
   esc(c.companyName? (c.companyName+' · '+(c.contact||c.name||'')) : (c.name||'-')),
   esc(c.phone||'-'),esc(c.taxId||c.ustId||'-'),esc(c.address||'-'),
   db.vehicles.filter(v=>v.customerId===c.id).length,
-  canEdit()?`<button class="btn small" onclick="editCustomer('${c.id}')">تعديل</button>
-  <button class="btn small primary" onclick="invoiceForCustomer('${c.id}')">فاتورة جديدة</button>
-  <button class="btn small" onclick="invoicesForCustomer('${c.id}')">فواتير</button>`:'—'
+  canEdit()?`<button class="btn small" onclick="editCustomer('${c.id}')">${t('edit')}</button>
+  <button class="btn small primary" onclick="invoiceForCustomer('${c.id}')">${t('newInvoice')}</button>
+  <button class="btn small" onclick="invoicesForCustomer('${c.id}')">${t('invoicesOf')}</button>`:'—'
  ]), 'customers');
  if(canEdit() && $('#add')) $('#add').onclick=customerModal;
 }
@@ -1390,7 +1390,7 @@ window.addVehiclePhoto=addVehiclePhoto;
 function vehicles(){
  const rows=companyRows('vehicles');
  const addBtn=canEdit()?`<button class="btn primary" id="add">إضافة سيارة</button><button class="btn ok" id="scan">📷 تصوير ورقة السيارة</button>`:`<span class="muted">عرض فقط</span>`;
- $('#content').innerHTML=head('السيارات',`<div class="toolbar">${addBtn}</div>`)+
+ $('#content').innerHTML=head(t('vehicles'),`<div class="toolbar">${addBtn}</div>`)+
  listShareBar('vehicles')+
  table(['صورة','العميل','اللوحة','VIN','الماركة','الموديل','السنة','إجراء'],rows.map(v=>[
    carThumb(v),
@@ -1943,17 +1943,17 @@ function invoices(){
  let rows=companyRows('invoices');
  if(filter) rows=rows.filter(x=>x.customerId===filter || (vehicleOf(x.vehicleId)||{}).customerId===filter);
  const cust=filter && db.customers.find(c=>c.id===filter);
- $('#content').innerHTML=head(cust?('فواتير · '+(cust.companyName||cust.name)): 'الفواتير',`<div class="toolbar"><button class="btn primary" id="inv">+ إنشاء فاتورة</button><button class="btn" id="bar">Barverkauf</button>${filter?`<button class="btn" id="clrCust">كل الفواتير</button>`:''}</div>`)+
+ $('#content').innerHTML=head(cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'),`<div class="toolbar"><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">Barverkauf</button>${filter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
  listShareBar('invoices')+
- table(['رقم','النوع','السيارة','الإجمالي','الدفع','تصميم'],rows.map(x=>[
-  esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'بيع مباشر', money(x.total), esc(x.payment||'-'),
-  `<button class="btn small primary" onclick="previewInvoice('${x.id}')">معاينة</button>
-   <button class="btn small" onclick="editInvoice('${x.id}')">تعديل</button>
-   <button class="btn small bad" onclick="deleteInvoice('${x.id}')">حذف</button>
-   <button class="btn small" onclick="exportPrint('invoices','${x.id}')">طباعة</button>
-   <button class="btn small" onclick="exportPDF('invoices','${x.id}')">PDF</button>`
+ table([t('invoiceNo'),t('type'),t('vehicle'),t('total'),t('payment'),t('design')],rows.map(x=>[
+  esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(x.payment||'-'),
+  `<button class="btn small primary" onclick="previewInvoice('${x.id}')">${t('preview')}</button>
+   <button class="btn small" onclick="editInvoice('${x.id}')">${t('edit')}</button>
+   <button class="btn small bad" onclick="deleteInvoice('${x.id}')">${t('del')}</button>
+   <button class="btn small" onclick="exportPrint('invoices','${x.id}')">${t('print')}</button>
+   <button class="btn small" onclick="exportPDF('invoices','${x.id}')">${t('pdf')}</button>`
  ]), 'invoices')+
- `<div class="bottom-action"><button class="btn primary" id="inv2">+ إنشاء فاتورة</button></div>`;
+ `<div class="bottom-action"><button class="btn primary" id="inv2">${t('createInvoice')}</button></div>`;
  $('#inv').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
  if($('#inv2')) $('#inv2').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
  $('#bar').onclick=()=>invoiceDesigner('bar', session.customerFilter||'');
@@ -1963,16 +1963,16 @@ function invoiceForCustomer(cid){ invoiceDesigner('invoice', cid); }
 function invoicesForCustomer(cid){ session.customerFilter=cid; session.page='invoices'; render(); }
 function editInvoice(iid){
   const inv=db.invoices.find(x=>x.id===iid);
-  if(!inv) return toast('الفاتورة غير موجودة');
+  if(!inv) return toast(t('invMissing'));
   invoiceDesigner(inv.type==='Barverkauf'?'bar':'invoice', inv.customerId||'', inv);
 }
 function deleteInvoice(iid){
   const inv=db.invoices.find(x=>x.id===iid);
   if(!inv) return;
-  if(!confirm('حذف الفاتورة '+ (inv.number||'') +' ؟')) return;
+  if(!confirm(t('confirmDelInv')+' '+(inv.number||'')+' ?')) return;
   db.invoices=db.invoices.filter(x=>x.id!==iid);
   if(typeof deleteInvoiceCloud==='function') try{ deleteInvoiceCloud(inv); }catch(e){}
-  audit('invoice.delete', inv.number||iid); save(); render(); toast('تم حذف الفاتورة');
+  audit('invoice.delete', inv.number||iid); save(); render(); toast(t('invDeleted'));
 }
 window.invoiceForCustomer=invoiceForCustomer;
 window.invoicesForCustomer=invoicesForCustomer;
