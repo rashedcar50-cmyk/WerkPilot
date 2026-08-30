@@ -76,10 +76,10 @@ window.t = function(key){
   return pack[key] || window.WP_I18N.en[key] || window.WP_I18N.ar[key] || key;
 };
 window.docLang = function(){
-  const country = window.session && session.company && session.company.country;
-  if(country === 'DE') return 'de';
-  if(country === 'ES') return 'es';
-  return (db && db.settings && db.settings.uiLang) || 'de';
+  const co = window.session && session.company;
+  if(co && (co.country === 'DE' || co.id === 'de' || /AUTOSERVICE|Deutschland|Germany/i.test(co.name||''))) return 'de';
+  if(co && co.country === 'ES') return 'es';
+  return 'de';
 };
 window.applyUiLang = function(){
   const lang = (db && db.settings && db.settings.uiLang) || 'ar';

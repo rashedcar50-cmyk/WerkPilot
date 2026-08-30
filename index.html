@@ -750,29 +750,16 @@ function buildDocHTML(type, id){
         return `<tr><td>${esc(x.supplier||'')}</td><td>${esc(x.invoice_number||x.item||'')}</td><td>${esc(x.date||'')}</td><td>${money(total)}</td><td>${esc(x.payment_status||'')}</td></tr>`;
       }).join('') + `</tbody></table>`;
   } else if(type === 'invoices'){
-    const L = (docLang()==='de') ? WP_INV_DE : null;
-    if(L){
-      title = id ? L.invoice : L.invoices;
-      let rows = companyRows('invoices');
-      if(id) rows = rows.filter(x => x.id === id);
-      const x = id && rows[0];
-      if(x){
-        const cust = customerOfVehicle(x.vehicleId);
-        const veh = vehicleOf(x.vehicleId);
-        const lines = (x.lines&&x.lines.length)?x.lines:[{name:L.parts,qty:1,price:x.parts||0},{name:L.labor,qty:1,price:x.labor||0}];
-        body = buildWorkshopRechnung(x);
-        title = "";
-      } else {
-        body = `<table><thead><tr><th>${L.number}</th><th>${L.type}</th><th>${L.vehicle}</th><th>${L.net}</th><th>${L.tax}</th><th>${L.total}</th><th>${L.payment}</th></tr></thead><tbody>`+
-          rows.map(r=>`<tr><td>${esc(r.number||r.id)}</td><td>${esc(r.type||L.invoice)}</td><td>${esc(vehicleName(r.vehicleId)||L.cash)}</td><td>${money(r.net)}</td><td>${r.tax||0}%</td><td>${money(r.total)}</td><td>${esc(r.payment||'')}</td></tr>`).join('')+
-          `</tbody></table>`;
-      }
+    const L = WP_INV_DE;
+    let rows = (db.invoices||[]).filter(x=>!session.company || x.companyId===session.company.id);
+    if(id){
+      const x = rows.find(i=>i.id===id) || db.invoices.find(i=>i.id===id);
+      title = '';
+      body = x ? buildWorkshopRechnung(x) : '<p>Rechnung nicht gefunden</p>';
     } else {
-      title = id ? 'فاتورة' : 'قائمة الفواتير';
-      let rows = companyRows('invoices');
-      if(id) rows = rows.filter(x => x.id === id);
-      body = `<table><thead><tr><th>النوع</th><th>السيارة</th><th>الصافي</th><th>الضريبة</th><th>الإجمالي</th><th>الدفع</th></tr></thead><tbody>` +
-        rows.map(x=>`<tr><td>${esc(x.type||'')}</td><td>${esc(vehicleName(x.vehicleId)||'بيع مباشر')}</td><td>${money(x.net)}</td><td>${x.tax||0}%</td><td>${money(x.total)}</td><td>${esc(x.payment||'')}</td></tr>`).join('') +
+      title = L.invoices;
+      body = `<table><thead><tr><th>${L.number}</th><th>${L.type}</th><th>${L.vehicle}</th><th>${L.net}</th><th>${L.tax}</th><th>${L.total}</th><th>${L.payment}</th></tr></thead><tbody>`+
+        rows.map(r=>`<tr><td>${esc(r.number||r.id)}</td><td>${esc(r.type||L.invoice)}</td><td>${esc(vehicleName(r.vehicleId)||L.cash)}</td><td>${money(r.net)}</td><td>${r.tax||0}%</td><td>${money(r.total)}</td><td>${esc(r.payment||'')}</td></tr>`).join('')+
         `</tbody></table>`;
     }
   } else if(type === 'inventory'){
