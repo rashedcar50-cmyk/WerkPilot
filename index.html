@@ -3,39 +3,43 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>WerkPilot Pro</title>
+<title>BayMeister</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
    <script src="supabase-config.js"></script>
 <script src="i18n.js"></script>                                                                               pt>
 <style>
-:root{--bg:#0b1220;--panel:#151f33;--panel2:#1d2940;--line:#334155;--text:#f8fafc;--muted:#94a3b8;--pri:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#b91c1c;--font:16px}
+:root{--bg:#0B0E14;--panel:#161B24;--panel2:#1C222E;--line:#2A3140;--text:#F4F1EA;--muted:#9AA3B2;--pri:#E8A54B;--ok:#3D8B5F;--warn:#C9842A;--bad:#B5463A;--font:16px}
 *{box-sizing:border-box}
 html{font-size:var(--font)}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text)}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 .hidden{display:none!important}
-.login-screen{min-height:100vh;display:grid;place-items:center;padding:22px}
-.login-card{width:min(460px,100%);background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:26px;box-shadow:0 24px 70px #0007}
+.login-screen{min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(1200px 600px at 70% 40%,#1a1510 0%,#0B0E14 55%)}
+.login-card{width:min(460px,100%);background:rgba(22,27,36,.88);border:1px solid #E8A54B55;border-radius:24px;padding:26px;box-shadow:0 24px 70px #000a;backdrop-filter:blur(10px)}
+.brand-mark{display:flex;align-items:center;gap:10px;font-size:1.8rem;font-weight:800}
+.brand-b{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#E8A54B,#b87333);display:grid;place-items:center;color:#111;font-weight:900}
+.car-thumb{width:72px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#111}
+.car-thumb.empty{display:grid;place-items:center;color:var(--muted);font-size:.7rem}
 .brand{font-size:2rem;font-weight:800}.tag{color:var(--muted);margin:6px 0 24px}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .field label{font-weight:700}
-input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#0f172a;color:var(--text)}
+input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#10141c;color:var(--text)}
 textarea{min-height:100px;resize:vertical}
 .btn{border:0;border-radius:12px;padding:11px 15px;background:#334155;color:white;font-weight:700}
 .btn.primary{background:var(--pri)}.btn.ok{background:var(--ok)}.btn.warn{background:var(--warn)}.btn.bad{background:var(--bad)}.btn.ghost{background:transparent;border:1px solid var(--line)}
 .btn.small{padding:7px 10px;font-size:.9rem}.full{width:100%}
 .hint,.muted{color:var(--muted);font-size:.92rem}
 .shell{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
-.sidebar{background:#0f172a;border-left:1px solid var(--line);padding:18px;position:sticky;top:0;height:100vh;overflow:auto}
+.sidebar{background:#10141c;border-left:1px solid var(--line);padding:18px;position:sticky;top:0;height:100vh;overflow:auto}
 .sidebrand{font-size:1.35rem;font-weight:800;margin-bottom:14px}
 .nav{display:flex;flex-direction:column;gap:7px}
 .nav button{background:transparent;color:var(--text);border:0;border-radius:10px;padding:10px 12px;text-align:right}
-.nav button.active,.nav button:hover{background:var(--panel2)}
+.nav button.active,.nav button:hover{background:var(--panel2);color:var(--pri)}
 .main{min-width:0}
-.topbar{position:sticky;top:0;z-index:8;background:#0f172aee;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.topbar{position:sticky;top:0;z-index:8;background:#0B0E14ee;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;justify-content:space-between;gap:10px;align-items:center}
 .top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .content{padding:18px;max-width:1400px;margin:auto}
 .page-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
@@ -49,7 +53,7 @@ textarea{min-height:100px;resize:vertical}
 .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}
 table{width:100%;border-collapse:collapse;min-width:720px;background:var(--panel)}
 th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
-th{background:#111827;position:sticky;top:0}
+th{background:#10141c;position:sticky;top:0}
 .status{padding:4px 8px;border-radius:999px;background:#334155}.status.ok{background:#14532d}.status.warn{background:#78350f}
 .modal-back{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:18px;z-index:50}
 .modal{width:min(760px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
@@ -99,10 +103,11 @@ th{background:#111827;position:sticky;top:0}
 <script>
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
-const storeKey='werkpilot_pro_v3';
+const storeKey='baymeister_v1';
 const seed={
  users:[
   {u:'admin',p:'1234',name:'المدير',role:'manager'},
+  {u:'owner',p:'bm-dev-2026',name:'صاحب الورشة / تطوير',role:'developer'},
   {u:'accountant',p:'1234',name:'المحاسب',role:'accountant'},
   {u:'mechanic',p:'1234',name:'الميكانيكي',role:'mechanic'},
   {u:'warehouse',p:'1234',name:'أمين المستودع',role:'warehouse'}
@@ -166,6 +171,7 @@ function load(){
   });
   if(!merged.settings) merged.settings=clone(seed.settings);
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
+  if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'owner',p:'bm-dev-2026',name:'صاحب الورشة / تطوير',role:'developer'});
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
   return merged;
  }catch{return clone(seed)}
@@ -422,10 +428,13 @@ window.openRepair=function(rid){ repairEditModal(rid); };
 function customerName(cid){return db.customers.find(c=>c.id===cid)?.name||'-'}
 function vehicleName(vid){const v=db.vehicles.find(x=>x.id===vid);return v?`${v.plate||v.vin||'-'} · ${v.make||''} ${v.model||''}`:'-'}
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function isDev(){return session?.user?.role==='developer'}
+function canEdit(){return ['manager','developer'].includes(session?.user?.role)}
 function roleCan(section){
  const r=session.user.role;
- if(r==='manager') return true;
- if(r==='accountant') return !['settings'].includes(section);
+ if(r==='developer') return true;
+ if(r==='manager') return section!=='studio';
+ if(r==='accountant') return !['settings','studio'].includes(section);
  if(r==='mechanic') return ['dashboard','customers','vehicles','repairs','estimates','appointments','integrations'].includes(section);
  if(r==='warehouse') return ['dashboard','inventory','purchases','integrations'].includes(section);
  return false;
@@ -437,14 +446,14 @@ function nav(){
   ['estimates', t('estimates')],['invoices', t('invoices')],['purchases', t('purchases')],
   ['inventory', t('inventory')],['employees', t('employees')],['expenses', t('expenses')],
   ['journal', t('journal')],['reports', t('reports')],['integrations', t('integrations')],
-  ['audit', t('audit')],['settings', t('settings')]
+  ['audit', t('audit')],['settings', t('settings')],['studio','استوديو التطوير']
  ];
 }
 
 function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
- <div class="brand">${t('app')}</div><div class="tag">${t('tag')}</div>
+ <div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="tag">WERKSTATT. DIGITAL. EFFIZIENT.</div>
  <div class="field"><label>${t('user')}</label><input id="lu" value="admin"></div>
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" value="1234"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'ar')}</select></div>
@@ -472,7 +481,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell">
- <aside class="sidebar" id="side"><div class="sidebrand">${t("app")}</div><div class="nav">
+ <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">WERKSTATT. DIGITAL.</div></div><div class="nav">
  ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </div></aside>
  <main class="main">
@@ -501,7 +510,7 @@ function render(){
  page();
 }
 function page(){
- const m={dashboard,customers,vehicles,repairs,appointments,estimates,invoices,purchases,inventory,employees,expenses,journal,reports,integrations,audit:auditPage,settings};
+ const m={dashboard,customers,vehicles,repairs,appointments,estimates,invoices,purchases,inventory,employees,expenses,journal,reports,integrations,audit:auditPage,settings,studio};
  (m[session.page]||dashboard)();
 }
 function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>${action}</div>`}
@@ -721,7 +730,7 @@ function showSearchResults(q){
 
 function customers(){
  const rows=companyRows('customers');
- $('#content').innerHTML=head('العملاء',`<button class="btn primary" id="add">عميل جديد</button>`)+
+ $('#content').innerHTML=head('العملاء',canEdit()?`<button class="btn primary" id="add">عميل جديد</button>`:'')+
  listShareBar('customers')+
  table(['الاسم','الهاتف','الإيميل','العنوان','السيارات','مشاركة'],rows.map(c=>[
   esc(c.name),esc(c.phone||'-'),esc(c.email||'-'),esc(c.address||'-'),
@@ -729,7 +738,7 @@ function customers(){
   `<button class="btn small" onclick="exportPrint('customers','')">🖨️</button>
    <button class="btn small" onclick="exportWhatsApp('customers','')">💬</button>`
  ]), 'customers');
- $('#add').onclick=customerModal;
+ if(canEdit() && $('#add')) $('#add').onclick=customerModal;
 }
 function customerModal(){
  modal('عميل جديد',`<div class="form-grid">
@@ -744,13 +753,63 @@ function customerModal(){
  });
 }
 
+function carThumb(v){
+  if(v && v.photo) return `<img class="car-thumb" src="${v.photo}" alt="">`;
+  return `<div class="car-thumb empty">لا صورة</div>`;
+}
+function compressVehiclePhoto(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=900;
+      let w=img.width,h=img.height;
+      if(w>max||h>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s)}
+      const c=document.createElement('canvas'); c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg',0.72));
+    };
+    img.onerror=reject;
+    img.src=url;
+  });
+}
+function addVehiclePhoto(vid){
+  const v=db.vehicles.find(x=>x.id===vid);
+  if(!v) return toast('السيارة غير موجودة');
+  modal('صورة السيارة',`
+    <div class="field">
+      <label>التقط أو ارفع صورة السيارة بعد تسجيل البيانات</label>
+      <input id="vphoto" type="file" accept="image/*">
+      <button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
+      ${v.photo?`<img class="ocr-preview" src="${v.photo}">`:''}
+    </div>
+  `, async()=>{
+    const f=$('#vphoto').files[0];
+    if(!f) return toast('اختر صورة أولاً');
+    try{
+      v.photo=await compressVehiclePhoto(f);
+      save(); audit('vehicle.photo', v.plate||v.vin);
+      closeModal(); render(); toast('تم حفظ صورة السيارة');
+    }catch(e){ toast('تعذر حفظ الصورة'); }
+  }, 'حفظ الصورة');
+}
+window.addVehiclePhoto=addVehiclePhoto;
+
 function vehicles(){
  const rows=companyRows('vehicles');
- $('#content').innerHTML=head('السيارات',`<div class="toolbar"><button class="btn primary" id="add">إضافة سيارة</button><button class="btn ok" id="scan">📷 تصوير ورقة السيارة</button></div>`)+
+ const addBtn=canEdit()?`<button class="btn primary" id="add">إضافة سيارة</button><button class="btn ok" id="scan">📷 تصوير ورقة السيارة</button>`:`<span class="muted">عرض فقط</span>`;
+ $('#content').innerHTML=head('السيارات',`<div class="toolbar">${addBtn}</div>`)+
  listShareBar('vehicles')+
- table(['العميل','اللوحة','VIN','الماركة','الموديل','السنة','المحرك','اللون'],rows.map(v=>[customerName(v.customerId),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),esc(v.engine||'-'),esc(v.paint||'-')]), 'vehicles');
- $('#add').onclick=()=>vehicleModal();
- $('#scan').onclick=scanVehicleDocument;
+ table(['صورة','العميل','اللوحة','VIN','الماركة','الموديل','السنة','إجراء'],rows.map(v=>[
+   carThumb(v),
+   customerName(v.customerId),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
+   canEdit()?`<button class="btn small" onclick="addVehiclePhoto('${v.id}')">صورة</button>`:'—'
+ ]), 'vehicles');
+ if(canEdit()){
+   $('#add').onclick=()=>vehicleModal();
+   $('#scan').onclick=scanVehicleDocument;
+ }
 }
 function vehicleModal(prefill={}){
  const customers=companyRows('customers');
@@ -773,6 +832,7 @@ function vehicleModal(prefill={}){
   if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
   const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0)};
   db.vehicles.push(v);save();audit('vehicle.create',v.plate||v.vin);closeModal();render();
+  if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200);
  });
   $('#partslinkBtn').onclick=()=>{
 window.open('https://www.partslink24.com/','_blank');
@@ -913,7 +973,7 @@ function repairStatusClass(st){
 }
 function repairs(){
  const rows=companyRows('repairs').slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
- $('#content').innerHTML=head('أوامر الإصلاح',`<button class="btn primary" id="add">أمر إصلاح جديد</button>`)+
+ $('#content').innerHTML=head('أوامر الإصلاح',canEdit()?`<button class="btn primary" id="add">أمر إصلاح جديد</button>`:'')+
  table(['السيارة','العطل','الفني','ساعات','قطع €','حالة','إجراءات'],rows.map(r=>[
   vehicleName(r.vehicleId),
   esc(r.complaint||r.description||'-'),
@@ -925,7 +985,7 @@ function repairs(){
    <button class="btn small ok" onclick="convertRepairToInvoice('${r.id}')">فاتورة</button>
    <button class="btn small" onclick="whatsappReady('${r.id}')">واتساب جاهز</button>`
  ]), 'repairs');
- $('#add').onclick=repairModal;
+ if(canEdit() && $('#add')) $('#add').onclick=repairModal;
 }
 function repairModal(existing){
  const r=existing||{};
@@ -1713,6 +1773,37 @@ function settings(){
  };
  $('#reset').onclick=()=>{if(confirm('سيتم حذف كل البيانات المحلية. متابعة؟')){db=clone(seed);save();toast('تمت إعادة الضبط');render()}};
 }
+
+function studio(){
+  if(!isDev()){ toast('هذه الصفحة لصاحب الورشة فقط'); session.page='dashboard'; return render(); }
+  $('#content').innerHTML=head('استوديو التطوير')+`
+  <div class="alert">هذه الصفحة تظهر فقط لحساب صاحب الورشة (owner). الموظفون لا يرونها ولا يقدرون يضيفوا/يعدّلوا البيانات الأساسية.</div>
+  <div class="card">
+    <p class="muted">هنا تقدر تعدّل وتضيف مع Grok بدون ما يوصل الموظفون لهالأدوات.</p>
+    <div class="toolbar">
+      <button class="btn" id="expRaw">تصدير JSON كامل</button>
+      <button class="btn" id="impRaw">استيراد JSON</button>
+      <button class="btn primary" id="seedAgain">إعادة بيانات التجربة</button>
+    </div>
+    <div class="field" style="margin-top:12px"><label>ملاحظات تطوير</label><textarea id="devNotes">${esc(db.settings.devNotes||'')}</textarea></div>
+    <button class="btn primary" id="saveNotes">حفظ الملاحظات</button>
+    <input id="jsonFile" type="file" accept="application/json" class="hidden">
+  </div>`;
+  $('#saveNotes').onclick=()=>{db.settings.devNotes=$('#devNotes').value;save();toast('تم حفظ الملاحظات')};
+  $('#expRaw').onclick=()=>{
+    const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='baymeister-full.json'; a.click();
+  };
+  $('#seedAgain').onclick=()=>{if(confirm('إعادة الضبط؟')){db=clone(seed);save();render();}};
+  $('#impRaw').onclick=()=>$('#jsonFile').click();
+  $('#jsonFile').onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{try{db=JSON.parse(r.result);save();toast('تم الاستيراد');render()}catch{toast('ملف غير صالح')}};
+    r.readAsText(f);
+  };
+}
+
 function simpleModal(title,fields,onSave){
  modal(title,`<div class="form-grid">${fields.map(([k,l,t='text'])=>`<div class="field"><label>${l}</label><input id="f_${k}" type="${t}"></div>`).join('')}</div>`,()=>{
   const o={};fields.forEach(([k])=>o[k]=$('#f_'+k).value);closeModal();onSave(o);
