@@ -1,0 +1,14 @@
+{
+  "name": "BayMeister",
+  "short_name": "BayMeister",
+  "description": "Werkstatt. Digital. Effizient.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0B0E14",
+  "theme_color": "#E8A54B",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

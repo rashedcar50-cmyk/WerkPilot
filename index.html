@@ -3,12 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#E8A54B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BayMeister">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
 <title>BayMeister</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
    <script src="supabase-config.js"></script>
-<script src="i18n.js"></script>                                                                               pt>
+<script src="i18n.js"></script>
 <style>
 :root{--bg:#0B0E14;--panel:#161B24;--panel2:#1C222E;--line:#2A3140;--text:#F4F1EA;--muted:#9AA3B2;--pri:#E8A54B;--ok:#3D8B5F;--warn:#C9842A;--bad:#B5463A;--font:16px}
 *{box-sizing:border-box}
@@ -193,6 +198,7 @@ function load(){
    if(!Array.isArray(merged[k]) || merged[k].length===0) merged[k]=clone(seed[k]||[]);
   });
   if(!merged.settings) merged.settings=clone(seed.settings);
+  merged.settings={...clone(seed.settings),...merged.settings};
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
   if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'owner',p:'bm-dev-2026',name:'صاحب الورشة / تطوير',role:'developer'});
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
@@ -573,6 +579,7 @@ function nav(){
  ];
 }
 
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
@@ -865,26 +872,31 @@ function customers(){
  const rows=companyRows('customers');
  $('#content').innerHTML=head('العملاء',canEdit()?`<button class="btn primary" id="add">عميل جديد</button>`:'')+
  listShareBar('customers')+
- table(['الاسم','الهاتف','الإيميل','العنوان','السيارات','مشاركة'],rows.map(c=>[
+ table(['الاسم','الهاتف','الإيميل','العنوان','السيارات','إجراء'],rows.map(c=>[
   esc(c.name),esc(c.phone||'-'),esc(c.email||'-'),esc(c.address||'-'),
   db.vehicles.filter(v=>v.customerId===c.id).length,
-  `<button class="btn small" onclick="exportPrint('customers','')">🖨️</button>
-   <button class="btn small" onclick="exportWhatsApp('customers','')">💬</button>`
+  canEdit()?`<button class="btn small" onclick="editCustomer('${c.id}')">تعديل</button>`:'—'
  ]), 'customers');
  if(canEdit() && $('#add')) $('#add').onclick=customerModal;
 }
-function customerModal(){
- modal('عميل جديد',`<div class="form-grid">
- <div class="field"><label>الاسم</label><input id="n"></div>
- <div class="field"><label>الهاتف</label><input id="ph"></div>
- <div class="field"><label>الإيميل</label><input id="em"></div>
- <div class="field"><label>العنوان</label><input id="ad"></div>
+function customerModal(existing){
+ const c0=existing||{};
+ modal(existing?'تعديل عميل':'عميل جديد',`<div class="form-grid">
+ <div class="field"><label>الاسم</label><input id="n" value="${esc(c0.name||'')}"></div>
+ <div class="field"><label>الهاتف</label><input id="ph" value="${esc(c0.phone||'')}"></div>
+ <div class="field"><label>الإيميل</label><input id="em" value="${esc(c0.email||'')}"></div>
+ <div class="field"><label>العنوان</label><input id="ad" value="${esc(c0.address||'')}"></div>
  </div>`,()=>{
-  const c={id:id('c'),companyId:session.company.id,name:$('#n').value.trim(),phone:$('#ph').value,email:$('#em').value,address:$('#ad').value};
+  const c={id:c0.id||id('c'),companyId:c0.companyId||session.company.id,cloudId:c0.cloudId,name:$('#n').value.trim(),phone:$('#ph').value,email:$('#em').value,address:$('#ad').value};
   if(!c.name)return toast('أدخل اسم العميل');
-  db.customers.push(c);save();upsertCustomerCloud(c);audit('customer.create',c.name);closeModal();render();
+  if(existing){ const i=db.customers.findIndex(x=>x.id===c0.id); if(i>=0) db.customers[i]=c; audit('customer.update',c.name); }
+  else { db.customers.push(c); audit('customer.create',c.name); }
+  save();upsertCustomerCloud(c);closeModal();render();
  });
 }
+function editCustomer(cid){ const c=db.customers.find(x=>x.id===cid); if(c) customerModal(c); }
+window.editCustomer=editCustomer;
+
 
 function carThumb(v){
   if(v && v.photo) return `<img class="car-thumb" src="${v.photo}" alt="">`;
@@ -937,17 +949,19 @@ function vehicles(){
  table(['صورة','العميل','اللوحة','VIN','الماركة','الموديل','السنة','إجراء'],rows.map(v=>[
    carThumb(v),
    customerName(v.customerId),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
-   canEdit()?`<button class="btn small" onclick="addVehiclePhoto('${v.id}')">صورة</button>`:'—'
+   canEdit()?`<button class="btn small" onclick="editVehicle('${v.id}')">تعديل</button> <button class="btn small" onclick="addVehiclePhoto('${v.id}')">صورة</button>`:'—'
  ]), 'vehicles');
  if(canEdit()){
    $('#add').onclick=()=>vehicleModal();
    $('#scan').onclick=scanVehicleDocument;
  }
 }
+function editVehicle(vid){ const v=db.vehicles.find(x=>x.id===vid); if(v) vehicleModal(v); }
+window.editVehicle=editVehicle;
 function vehicleModal(prefill={}){
  const customers=companyRows('customers');
  modal('إضافة سيارة',`<div class="form-grid">
- <div class="field"><label>العميل</label><select id="cu"><option value="">اختر العميل</option>${customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
+ <div class="field"><label>العميل</label><select id="cu"><option value="">اختر العميل</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
  <div class="field"><label>رقم اللوحة</label><input id="pl" value="${esc(prefill.plate||'')}"></div>
  <div class="field"><label>VIN</label><input id="vin" value="${esc(prefill.vin||'')}"></div>
  <div class="field"><label>Partslink24</label><button type="button" class="btn" id="partslinkBtn">فتح partslink24</button></div>
@@ -963,9 +977,9 @@ function vehicleModal(prefill={}){
  <div class="field"><label>الصيانة القادمة عند كم</label><input id="vnext" type="number" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
   if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
-  const v={id:id('v'),companyId:session.company.id,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0)};
-  db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render();
-  if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200);
+  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
+  if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
+  else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
  });
   $('#partslinkBtn').onclick=()=>{
 window.open('https://www.partslink24.com/','_blank');
@@ -1818,7 +1832,7 @@ function expenses(){
  const rows=companyRows('expenses');
 $('#content').innerHTML=head('المصاريف','<button class="btn primary" id="scanExpense">📷 تصوير فاتورة</button> <button class="btn primary" id="add">مصروف جديد</button>')+
  table(['التاريخ','البيان','المبلغ','الفئة'],rows.map(x=>[esc(x.date),esc(x.note),money(x.amount),esc(x.category)]));
- $('#add').onclick=()=>simpleModal('مصروف جديد',[['date','التاريخ','date'],['note','البيان'],['amount','المبلغ','number'],['category','الفئة']],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);save();audit('expense.create',o.note);render()});
+ $('#add').onclick=()=>simpleModal('مصروف جديد',[['date','التاريخ','date'],['note','البيان'],['amount','المبلغ','number'],['category','الفئة']],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);db.journal.push({id:id('j'),companyId:session.company.id,date:o.date||todayISO(),account:'مصروف',debit:Number(o.amount||0),credit:0,note:o.note});save();audit('expense.create',o.note);render()});
 $('#scanExpense').onclick=scanExpenseDocument;
 }
    async function scanExpenseDocument(){
