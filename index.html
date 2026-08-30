@@ -660,19 +660,33 @@ async function fetchText(url){
     return await res.text();
   }catch(e){ clearTimeout(t); return ''; }
 }
+function parseFahrzeugdaten(html, fallbackMake){
+  const title=(String(html).match(/<title>([^<]+)/i)||html.match(/^Title[:\s]+(.+)$/mi)||[])[1]||'';
+  const clean=title.replace(/\s*\|\s*HSN.*$/i,'').replace(/\s+/g,' ').trim();
+  const parts=clean.split(/\s+/);
+  let make=fallbackMake, model=clean;
+  if(parts.length>=2){ make=parts[0]; model=parts.slice(1).join(' '); }
+  const kw=(html.match(/(\d+)\s*k\s*w/i)||html.match(/Leistung[^0-9]{0,40}(\d+)/i)||[])[1]||'';
+  const cc=(html.match(/Hubraum[^0-9]{0,80}(\d{3,5})/i)||html.match(/(\d{3,5})\s*ccm/i)||[])[1]||'';
+  const year=(html.match(/(20\d{2})\s*[–-]\s*(20\d{2}|heute)/i)||html.match(/ab\s+(20\d{2})/i)||[])[1]||'';
+  const fuel=/Diesel/i.test(html)?'Diesel':(/Elektro/i.test(html)?'Elektro':(/Hybrid/i.test(html)?'Hybrid':(/Benzin|Otto/i.test(html)?'Benzin':'')));
+  return {make, model:String(model).replace(/,/g,' ').replace(/\s+/g,' ').trim(), engine_power_kw:kw, engine_displacement_cm3:cc, year, fuel_type:fuel};
+}
 async function lookupKbaFree(hsn,tsn){
   hsn=String(hsn||'').replace(/\D/g,'').padStart(4,'0');
   tsn=String(tsn||'').trim().toUpperCase();
   const local=lookupKbaLocal(hsn,tsn);
+  const brand=local.make||'Opel';
   const urls=[
+    'https://r.jina.ai/https://fahrzeugdaten.com/'+brand+'/'+hsn+'/'+tsn,
+    'https://fahrzeugdaten.com/'+brand+'/'+hsn+'/'+tsn,
     'https://r.jina.ai/http://www.hsn-tsn.de/'+tsn.toLowerCase()+'.html',
-    'https://r.jina.ai/http://www.hsn-tsn.de/hsn-tsn.php?'+hsn+'-'+tsn,
     'http://www.hsn-tsn.de/'+tsn.toLowerCase()+'.html'
   ];
   for(const url of urls){
     const html=await fetchText(url);
-    if(!html || html.length<80) continue;
-    const parsed=parseHsnTsnHtml(html,hsn,tsn);
+    if(!html || html.length<80 || /page could not be found/i.test(html.slice(0,500))) continue;
+    const parsed=url.includes('fahrzeugdaten')?parseFahrzeugdaten(html,local.make):parseHsnTsnHtml(html,hsn,tsn);
     if(parsed.model || parsed.engine_power_kw || parsed.engine_displacement_cm3){
       return Object.assign({},local,parsed);
     }
@@ -689,6 +703,7 @@ function bindKbaEnter(hsnId,tsnId,fillIds){
     const set=(id,val)=>{ const el=$(id); if(el && val) el.value=val; };
     set(fillIds.make, info.make);
     set(fillIds.model, info.model);
+    set(fillIds.year, info.year);
     set(fillIds.kw, info.engine_power_kw);
     set(fillIds.cc, info.engine_displacement_cm3);
     set(fillIds.fuel, info.fuel_type);
@@ -1290,7 +1305,7 @@ function customerModal(existing){
   save();upsertCustomerCloud(c);closeModal();render();
  });
  bindVinEnter('#vvin',{vin:'#vvin',make:'#vmake',model:'#vmodel',year:'#vyear'});
- bindKbaEnter('#vhsn','#vtsn',{make:'#vmake',model:'#vmodel'});
+ bindKbaEnter('#vhsn','#vtsn',{make:'#vmake',model:'#vmodel',year:'#vyear'});
 }
 function editCustomer(cid){ const c=db.customers.find(x=>x.id===cid); if(c) customerModal(c); }
 window.editCustomer=editCustomer;
@@ -1390,7 +1405,7 @@ function vehicleModal(prefill={}){
 window.open('https://www.partslink24.com/','_blank');
 };
   bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en',pa:'#pa'});
-  bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',kw:'#kw',cc:'#cc',fuel:'#fuel'});
+  bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',year:'#yr',kw:'#kw',cc:'#cc',fuel:'#fuel'});
 }
 function scanVehicleDocument(){
  modal('تصوير/رفع ورقة السيارة',`<div class="field">
