@@ -1176,34 +1176,69 @@ function findOrCreateFromSchein(ai){
 }
 function scanScheinStartRepair(){
   modal('تصوير ورقة السيارة — فتح أمر',`<div class="field">
-    <label>صوّر الـ Fahrzeugschein. البرنامج بسجّل السيارة والعميل ويفتح الأمر. أنت بتضيف الكم فقط.</label>
-    <input id="doc" type="file" accept="image/*">
+    <label>صوّر الـ Fahrzeugschein. بعد القراءة بتدخل الكم فقط.</label>
+    <input id="doc" type="file" accept="image/*" capture="environment">
     <button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
     <img id="ocrImg" class="ocr-preview hidden">
     <div id="ocrStatus" class="hint"></div>
+    <div id="scheinPreview" class="hidden"></div>
   </div>`, async()=>{
     const f=$('#doc').files[0];
     if(!f) return toast('صوّر الورقة أولاً');
-    $('#ocrStatus').textContent='جاري القراءة...';
+    if(window._scheinReady){
+      const km=Number($('#scheinKm')?.value||0);
+      if(!km) return toast('أدخل كيلومتر السيارة');
+      const ai=window._scheinAI;
+      const {c,v}=findOrCreateFromSchein(ai);
+      v.km=km; upsertVehicleCloud(v);
+      const r={id:id('r'),companyId:session.company.id,vehicleId:v.id,complaint:'استلام من ورقة السيارة',description:'',jobs:[],parts:[],photos:[],tech:session.user.name||'',hours:1,status:'استلام',km:km,fuel:'نصف',date:todayISO()};
+      db.repairs.push(r); upsertRepairCloud(r); save();
+      audit('repair.from_schein', (v.plate||v.vin)+' '+km);
+      window._scheinReady=false; window._scheinAI=null;
+      closeModal(); session.repairId=r.id; session.page='repairs'; render();
+      toast('تم فتح الأمر — '+esc(v.plate||v.vin)+' / '+km+' km');
+      return;
+    }
+    $('#ocrStatus').textContent='جاري قراءة الورقة...';
     $('#msave').disabled=true;
     try{
-      const ai=await readScheinAI(f);
-      const {v}=findOrCreateFromSchein(ai);
-      const r={id:id('r'),companyId:session.company.id,vehicleId:v.id,complaint:'استلام من ورقة السيارة',description:'',jobs:[],parts:[],photos:[],tech:session.user.name||'',hours:1,status:'استلام',km:'',fuel:'نصف',date:todayISO()};
-      db.repairs.push(r); upsertRepairCloud(r); save();
-      audit('repair.from_schein', v.plate||v.vin);
-      closeModal();
-      session.repairId=r.id; session.page='repairs';
-      render();
-      toast('تم تسجيل السيارة. أدخل الكيلومتر فقط');
-      setTimeout(()=>{ const el=$('#deskKm'); if(el){ el.focus(); el.scrollIntoView({behavior:'smooth',block:'center'}); } }, 200);
+      let ai;
+      try{ ai=await readScheinAI(f); }
+      catch(err){
+        const compressed=await compressVehiclePhoto(f);
+        let text='';
+        if(window.Tesseract){
+          const res=await Tesseract.recognize(compressed,'deu+eng');
+          text=res?.data?.text||'';
+        }
+        const parsed=parseVehicleOCR(text||'');
+        ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:''};
+        if(!ai.license_plate && !ai.vin) throw err;
+      }
+      window._scheinAI=ai; window._scheinReady=true;
+      const plate=ai.license_plate||ai.plate||'-';
+      const vin=ai.vin||'-';
+      const owner=ai.owner_name||ai.holder||ai.customer_name||'-';
+      $('#scheinPreview').classList.remove('hidden');
+      $('#scheinPreview').innerHTML=`<div class="okbox">
+        <b>تمّت القراءة. راجع ثم أدخل الكم:</b><br>
+        الزبون: ${esc(owner)}<br>
+        اللوحة: ${esc(plate)}<br>
+        VIN: ${esc(vin)}<br>
+        ${esc(ai.brand||ai.make||'')} ${esc(ai.model||'')} ${esc(ai.year||'')}
+        <div class="field" style="margin-top:10px"><label>الكيلومتر الحالي</label><input id="scheinKm" type="number" inputmode="numeric" placeholder="مثلاً 86500"></div>
+      </div>`;
+      $('#ocrStatus').textContent='أدخل الكم ثم اضغط حفظ';
+      $('#msave').disabled=false;
+      $('#msave').textContent='حفظ وفتح الأمر';
+      setTimeout(()=>$('#scheinKm')?.focus(), 150);
     }catch(e){
       console.error(e);
-      $('#ocrStatus').textContent='تعذرت القراءة. جرّب صورة أوضح.';
+      $('#ocrStatus').textContent='تعذرت القراءة. صوّر الورقة أوضح أو أدخل الأمر يدوياً.';
       $('#msave').disabled=false;
     }
-  }, 'قراءة وفتح الأمر');
-  $('#doc').onchange=()=>{const f=$('#doc').files[0]; if(f){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); }};
+  }, 'قراءة الورقة');
+  $('#doc').onchange=()=>{const f=$('#doc').files[0]; if(f){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); window._scheinReady=false; }};
 }
 window.scanScheinStartRepair=scanScheinStartRepair;
 function repairStatusClass(st){
