@@ -57,7 +57,7 @@ function render(){
  </nav>
 </div>`;
  $$('[data-page]').forEach(b=>b.onclick=()=>{session.page=b.dataset.page;render()});
- $('#logout').onclick=()=>{audit('logout');session=null;login()};
+ $('#logout').onclick=()=>{audit('logout');session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
  $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render())};
  if($('#addWorkshop')) $('#addWorkshop').onclick=newWorkshopModal;
  if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{db.settings.uiLang=e.target.value;save();applyUiLang();render();};
@@ -73,6 +73,44 @@ function render(){
   };
  }
  page();
+ mountDevDock();
+}
+function mountDevDock(){
+  if(typeof isDev!=='function' || !isDev()) return;
+  if($('#devFab')) return;
+  const fab=document.createElement('button');
+  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok — طلب تعديل'; fab.textContent='G';
+  document.body.appendChild(fab);
+  fab.onclick=()=>toggleDevPanel();
+}
+function toggleDevPanel(){
+  const old=$('#devPanel');
+  if(old){ old.remove(); return; }
+  const box=document.createElement('div');
+  box.id='devPanel'; box.className='dev-panel';
+  const reqs=db.settings.devRequests||[];
+  box.innerHTML=`<h3>Grok داخل الورشة</h3>
+    <p class="muted">هاللوحة إلك وحدك (owner). اكتب التعديل، بنحفظه هون. بعدين افتح محادثة Grok والصق الطلب حتى ينفّذ فوراً.</p>
+    <textarea id="devAsk" placeholder="مثال: أضف خانة رقم الهيكل على بطاقة الأمر"></textarea>
+    <div class="toolbar" style="margin-top:8px">
+      <button class="btn primary" id="devSave">حفظ الطلب</button>
+      <button class="btn" id="devCopy">نسخ الكل</button>
+      <button class="btn ghost" id="devClose">إغلاق</button>
+    </div>
+    <div class="dev-req">${reqs.length?reqs.slice().reverse().map(r=>`<div><b>${esc(r.ts)}</b><div>${esc(r.text)}</div></div>`).join(''):'<div class="muted">ما في طلبات بعد.</div>'}</div>`;
+  document.body.appendChild(box);
+  $('#devClose').onclick=()=>box.remove();
+  $('#devSave').onclick=()=>{
+    const text=$('#devAsk').value.trim();
+    if(!text) return toast('اكتب الطلب أولاً');
+    db.settings.devRequests=db.settings.devRequests||[];
+    db.settings.devRequests.push({ts:new Date().toLocaleString(),text});
+    save(); toast('تم حفظ الطلب'); box.remove(); toggleDevPanel();
+  };
+  $('#devCopy').onclick=()=>{
+    const text=(db.settings.devRequests||[]).map(r=>'- '+r.text).join('\n')||$('#devAsk').value;
+    navigator.clipboard.writeText(text).then(()=>toast('تم النسخ — الصقه في Grok')).catch(()=>toast(text));
+  };
 }
 function page(){
  const m={dashboard,customers,vehicles,repairs,appointments,estimates,invoices,purchases,inventory,employees,expenses,journal,reports,integrations,audit:auditPage,settings,studio};
@@ -2340,10 +2378,12 @@ function settings(){
 
 function studio(){
   if(!isDev()){ toast('هذه الصفحة لصاحب الورشة فقط'); session.page='dashboard'; return render(); }
+  const reqs=db.settings.devRequests||[];
   $('#content').innerHTML=head('استوديو التطوير')+`
-  <div class="alert">هذه الصفحة تظهر فقط لحساب صاحب الورشة (owner). الموظفون لا يرونها ولا يقدرون يضيفوا/يعدّلوا البيانات الأساسية.</div>
+  <div class="alert">هذه الصفحة وزر G تظهر فقط لحساب owner. الموظفون ما بيشوفوهم.</div>
   <div class="card">
-    <p class="muted">هنا تقدر تعدّل وتضيف مع Grok بدون ما يوصل الموظفون لهالأدوات.</p>
+    <p class="muted">Grok مو سيرفر جوّا الموقع، بس الطلبات محفوظة هون. الصقها بالمحادثة حتى التنفيذ يصير فوراً.</p>
+    <p>${reqs.length?reqs.slice().reverse().map(r=>`<div class="muted">${esc(r.ts)} — ${esc(r.text)}</div>`).join(''):'ما في طلبات بعد. استخدم الزر الذهبي G أسفل يمين الشاشة.'}</p>
     <div class="toolbar">
       <button class="btn" id="expRaw">تصدير JSON كامل</button>
       <button class="btn" id="impRaw">استيراد JSON</button>
