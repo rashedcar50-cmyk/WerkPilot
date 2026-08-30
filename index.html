@@ -90,6 +90,11 @@ th{background:#10141c;position:sticky;top:0}
 .alert{background:#7f1d1d;border:1px solid #b91c1c;border-radius:12px;padding:10px 12px;margin:8px 0}
 .okbox{background:#14532d;border:1px solid #16a34a;border-radius:12px;padding:10px 12px;margin:8px 0}
 .today-item{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.bottom-action{margin-top:16px;padding-bottom:24px}
+.bottom-action .btn{width:100%;padding:16px}
+@media(max-width:900px){
+  .bottom-action{position:sticky;bottom:12px;z-index:9}
+}
 .status.bad{background:#7f1d1d}
 .status.info{background:#1e3a8a}
 
@@ -1037,10 +1042,11 @@ function repairEditModal(rid){
 }
 function appointments(){
   const rows=companyRows('appointments').slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
-  $('#content').innerHTML=head('المواعيد',`<button class="btn primary" id="add">موعد جديد</button>`)+
+  $('#content').innerHTML=head('المواعيد')+
   table(['التاريخ','الوقت','السيارة','الزبون','الفني','ملاحظة','حالة'],rows.map(a=>[
     esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(a.tech||'-'),esc(a.note||'-'),esc(a.status||'')
-  ]),'appointments');
+  ]),'appointments')+
+  `<div class="bottom-action"><button class="btn primary" id="add">+ موعد جديد</button></div>`;
   $('#add').onclick=()=>{
     modal('موعد جديد',`<div class="form-grid">
       <div class="field"><label>السيارة</label><select id="av">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)}</option>`).join('')}</select></div>
