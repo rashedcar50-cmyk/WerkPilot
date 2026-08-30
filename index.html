@@ -474,26 +474,86 @@ function companyRows(name){return db[name].filter(x=>x.companyId===session.compa
 
 function vehicleOf(vid){return db.vehicles.find(x=>x.id===vid)}
 function cleanVin(v){return String(v||'').replace(/[^A-HJ-NPR-Z0-9]/gi,'').toUpperCase()}
+function vinModelYear(vin){
+  const c=(vin||'')[9];
+  const map={A:2010,B:2011,C:2012,D:2013,E:2014,F:2015,G:2016,H:2017,J:2018,K:2019,L:2020,M:2021,N:2022,P:2023,R:2024,S:2025,T:2026,V:2027,W:2028,X:2029,Y:2030,1:2001,2:2002,3:2003,4:2004,5:2005,6:2006,7:2007,8:2008,9:2009};
+  return map[c]||'';
+}
+function vinMakeFromWmi(vin){
+  const w=(vin||'').slice(0,3);
+  const map={WVW:'Volkswagen',WV1:'Volkswagen',WV2:'Volkswagen',WVG:'Volkswagen',WAU:'Audi',WUA:'Audi',TRU:'Audi',WBA:'BMW',WBS:'BMW',WBY:'BMW',WDB:'Mercedes-Benz',WDD:'Mercedes-Benz',WDF:'Mercedes-Benz',W1K:'Mercedes-Benz',W1N:'Mercedes-Benz',TMB:'Skoda',TMK:'Skoda',VSS:'Seat',WF0:'Ford',WFO:'Ford',W0L:'Opel',W0V:'Opel',VF1:'Renault',VF3:'Peugeot',VF7:'Citroen',ZFA:'Fiat',ZFF:'Ferrari',JHM:'Honda',JH4:'Acura',KM8:'Hyundai',KMH:'Hyundai',KNA:'Kia',KND:'Kia',NMT:'Toyota',SB1:'Toyota',JF1:'Subaru',YS3:'Saab',YS2:'Scania',XLR:'DAF',WMA:'MAN',WDA:'Daimler',SAL:'Land Rover',SAJ:'Jaguar',YV1:'Volvo',YV2:'Volvo'};
+  return map[w]||'';
+}
+function pickVinVal(v){
+  v=String(v||'').trim();
+  if(!v || /^0+$/.test(v) || /not applicable|undefined|null|nicht zutreffend/i.test(v)) return '';
+  return v;
+}
+async function lookupVinNhtsa(vin){
+  const out={};
+  try{
+    const res=await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/'+encodeURIComponent(vin)+'?format=json');
+    if(!res.ok) return out;
+    const data=await res.json();
+    const bag={};
+    (data.Results||[]).forEach(x=>{ if(x.Variable) bag[x.Variable]=pickVinVal(x.Value); });
+    out.make=bag.Make||bag.Manufacturer||'';
+    out.model=bag.Model||bag.Series||bag.Trim||bag['Series2']||'';
+    out.year=bag['Model Year']||'';
+    out.engine=pickVinVal(bag['Engine Model']||bag['Engine Configuration']||'');
+    if(bag.DisplacementL) out.engine=(out.engine?out.engine+' ':'')+bag.DisplacementL+'L';
+    if(bag['Turbo']) out.engine=(out.engine+' '+bag['Turbo']).trim();
+    out.fuel_type=bag['Fuel Type - Primary']||bag['Fuel Type - Alternate']||'';
+    out.engine_power_kw=bag['Engine Power (KW)']||'';
+    out.engine_displacement_cm3=bag['Displacement (CC)']||(bag['Displacement (L)']?Math.round(Number(bag['Displacement (L)'])*1000):'')||(bag.DisplacementL?Math.round(Number(bag.DisplacementL)*1000):'');
+    out.body=bag['Body Class']||'';
+    out.cylinders=bag['Engine Number of Cylinders']||'';
+  }catch(e){}
+  return out;
+}
+async function lookupVinEdge(vin){
+  const out={};
+  try{
+    const res=await fetch('https://carchecktools.com/api/v1/decode-vin?vin='+encodeURIComponent(vin));
+    if(!res.ok) return out;
+    const j=await res.json();
+    const d=j.data||j.result||j.vehicle||j;
+    out.make=pickVinVal(d.make||d.Make);
+    out.model=pickVinVal(d.model||d.Model);
+    out.year=pickVinVal(d.year||d.modelYear||d.ModelYear);
+    out.engine=pickVinVal(d.engine||d.engineModel||d.Engine);
+    out.fuel_type=pickVinVal(d.fuel||d.fuelType||d.FuelType);
+    out.engine_power_kw=pickVinVal(d.engineKW||d.kw||d.power_kw);
+    const cc=d.displacementCC||d.displacement_cc||d.engine_displacement_cm3;
+    const liters=d.displacementL||d.displacement_l;
+    out.engine_displacement_cm3=pickVinVal(cc)||(liters?String(Math.round(Number(liters)*1000)):'');
+    if(liters && !out.engine) out.engine=Number(liters).toFixed(1)+'L';
+    out.body=pickVinVal(d.body||d.bodyClass);
+  }catch(e){}
+  return out;
+}
 async function lookupVin(vin){
   vin=cleanVin(vin);
   if(vin.length!==17) throw new Error('VIN لازم 17 خانة');
-  const res=await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/'+encodeURIComponent(vin)+'?format=json');
-  if(!res.ok) throw new Error('تعذر الاتصال بخدمة VIN');
-  const data=await res.json();
-  const r=(data.Results&&data.Results[0])||{};
-  const make=r.Make||r.Manufacturer||'';
-  const model=r.Model||r.Series||'';
-  const year=r.ModelYear||'';
-  if(!make && !model && !year) throw new Error('ما انلقطت بيانات لهالـ VIN');
-  const cc=r.DisplacementCC || (r.DisplacementL?Math.round(Number(r.DisplacementL)*1000):'');
-  return {
-    vin, make, model, year,
-    engine: r.EngineModel||r.EngineConfiguration||'',
-    fuel_type: r.FuelTypePrimary||'',
-    engine_power_kw: r.EngineKW||'',
-    engine_displacement_cm3: cc||'',
-    paint: r.BodyClass||''
+  const [a,b]=await Promise.all([lookupVinNhtsa(vin), lookupVinEdge(vin)]);
+  const merge=(k)=>pickVinVal(a[k])||pickVinVal(b[k])||'';
+  let make=merge('make')||vinMakeFromWmi(vin);
+  let model=merge('model');
+  let year=merge('year')||vinModelYear(vin);
+  let engine=merge('engine');
+  let cc=merge('engine_displacement_cm3');
+  if(!engine && cc) engine=(Number(cc)/1000).toFixed(1)+'L'+(merge('cylinders')?(' '+merge('cylinders')+'Zyl.'):'');
+  if(!cc && engine && /(\d(?:\.\d)?)\s*L/i.test(engine)) cc=String(Math.round(parseFloat(RegExp.$1)*1000));
+  const info={
+    vin, make, model, year, engine,
+    fuel_type: merge('fuel_type'),
+    engine_power_kw: merge('engine_power_kw'),
+    engine_displacement_cm3: cc,
+    body: merge('body'),
+    paint: ''
   };
+  if(!make && !model && !year) throw new Error('ما انلقطت بيانات لهالـ VIN');
+  return info;
 }
 function fillVinFields(info, ids){
   const set=(id,val)=>{ const el=$(id); if(el && val) el.value=val; };
@@ -519,7 +579,11 @@ function bindVinEnter(inputId, ids){
     try{
       const info=await lookupVin(vin);
       fillVinFields(info, ids);
-      toast((info.make||'')+' '+(info.model||'')+' '+(info.year||''));
+      const miss=[];
+      if(!info.model) miss.push('الموديل');
+      if(!info.engine) miss.push('كود المحرك');
+      if(!info.engine_displacement_cm3) miss.push('سعة المحرك');
+      toast(((info.make||'')+' '+(info.model||'')+' '+(info.year||'')+(info.engine_displacement_cm3?(' · '+info.engine_displacement_cm3+' cm³'):'')+(info.engine?(' · '+info.engine):'')).trim()+(miss.length?(' — ناقص: '+miss.join('، ')+' (اللون ما بينقرأ من VIN)'):' — اللون ما بينقرأ من VIN'));
     }catch(e){ toast(e.message||'تعذر قراءة VIN'); }
   });
 }
@@ -1176,7 +1240,7 @@ function vehicleModal(prefill={}){
  <div class="field"><label>نوع الوقود</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
  <div class="field"><label>قوة المحرك (kW)</label><input id="kw" type="number" value="${esc(prefill.engine_power_kw||'')}"></div>
  <div class="field"><label>كود المحرك</label><input id="en" value="${esc(prefill.engine||'')}"></div>
- <div class="field"><label>كود اللون</label><input id="pa" value="${esc(prefill.paint||'')}"></div>
+ <div class="field"><label>كود اللون (مو من VIN — من الورقة)</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="من Fahrzeugschein"></div>
  <div class="field"><label>الكيلومتر الحالي</label><input id="vkm" type="number" value="${esc(prefill.km||'')}"></div>
  <div class="field"><label>الصيانة القادمة عند كم</label><input id="vnext" type="number" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
