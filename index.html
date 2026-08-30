@@ -178,7 +178,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:1,hourlyRate:85,workshopPhone:'+49 170 1112233'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:1,hourlyRate:85,workshopPhone:'+49 170 1112233',workshopAddress:'Musterstraße 12, 10115 Berlin',workshopTaxId:'DE123456789',workshopIban:'DE89 3704 0044 0532 0130 00'}
 };
 let db=load(), session=null;
 
@@ -719,15 +719,22 @@ function buildDocHTML(type, id){
         const cust = customerOfVehicle(x.vehicleId);
         const veh = vehicleOf(x.vehicleId);
         const lines = (x.lines&&x.lines.length)?x.lines:[{name:L.parts,qty:1,price:x.parts||0},{name:L.labor,qty:1,price:x.labor||0}];
-        body = `<div class="meta">${L.workshop}: ${esc(co)} · ${L.date}: ${new Date(x.date||Date.now()).toLocaleDateString('de-DE')}</div>
-        <p><b>${L.number}:</b> ${esc(x.number||x.id)}<br>
-        <b>${L.customer}:</b> ${esc(cust?.name||'-')}<br>
-        <b>${L.vehicle}:</b> ${esc(vehicleName(x.vehicleId)||L.cash)} ${veh&&veh.plate?(' / '+L.plate+': '+esc(veh.plate)) : ''}</p>
+        const w=workshopInfo();
+        body = `<div class="inv-head" style="display:flex;justify-content:space-between;gap:16px;border-bottom:3px solid #E8A54B;padding-bottom:10px;margin-bottom:14px">
+          <div><div style="font-size:22px;font-weight:800">BayMeister</div>
+          <div>${esc(w.name)}<br>${esc(w.address)}<br>${esc(w.phone)}<br>USt-IdNr.: ${esc(w.taxId)}</div></div>
+          <div style="text-align:left"><div style="font-size:28px;font-weight:800">RECHNUNG</div>
+          <div>${L.number}: <b>${esc(x.number||x.id)}</b><br>${L.date}: ${new Date(x.date||Date.now()).toLocaleDateString('de-DE')}</div></div>
+        </div>
+        <p><b>${L.customer}:</b> ${esc(cust?.name||'-')}<br>
+        ${esc(cust?.address||'')}<br>${esc(cust?.phone||'')}<br>
+        <b>${L.vehicle}:</b> ${esc(vehicleName(x.vehicleId)||L.cash)} ${veh&&veh.vin?('<br>VIN: '+esc(veh.vin)) : ''}</p>
         <table><thead><tr><th>${L.item}</th><th>${L.qty}</th><th>${L.price}</th><th>${L.total}</th></tr></thead><tbody>`+
         lines.map(ln=>`<tr><td>${esc(ln.name)}</td><td>${ln.qty||1}</td><td>${money(ln.price)}</td><td>${money((ln.qty||1)*Number(ln.price||0))}</td></tr>`).join('')+
         `</tbody></table>
-        <p>${L.net}: ${money(x.net)} · ${L.tax} ${x.tax||19}% · <b>${L.total}: ${money(x.total)}</b><br>${L.payment}: ${esc(x.payment||'-')}</p>
-        <p>${L.thanks}</p>`;
+        <p style="text-align:left">${L.net}: ${money(x.net)}<br>${L.tax} ${x.tax||19}%: ${money((x.total||0)-(x.net||0))}<br>
+        <b style="font-size:18px">${L.total}: ${money(x.total)}</b><br>${L.payment}: ${esc(x.payment||'-')}</p>
+        <p>IBAN: ${esc(w.iban)}<br>${L.thanks}</p>`;
       } else {
         body = `<table><thead><tr><th>${L.number}</th><th>${L.type}</th><th>${L.vehicle}</th><th>${L.net}</th><th>${L.tax}</th><th>${L.total}</th><th>${L.payment}</th></tr></thead><tbody>`+
           rows.map(r=>`<tr><td>${esc(r.number||r.id)}</td><td>${esc(r.type||L.invoice)}</td><td>${esc(vehicleName(r.vehicleId)||L.cash)}</td><td>${money(r.net)}</td><td>${r.tax||0}%</td><td>${money(r.total)}</td><td>${esc(r.payment||'')}</td></tr>`).join('')+
@@ -1227,17 +1234,65 @@ function estimates(){
 }
 function invoices(){
  const rows=companyRows('invoices');
- $('#content').innerHTML=head('الفواتير و Barverkauf',`<div class="toolbar"><button class="btn primary" id="inv">فاتورة جديدة</button><button class="btn" id="bar">Barverkauf</button></div>`)+
+ $('#content').innerHTML=head('الفواتير',`<div class="toolbar"><button class="btn primary" id="inv">+ إنشاء فاتورة</button><button class="btn" id="bar">Barverkauf</button></div>`)+
  listShareBar('invoices')+
- table(['رقم','النوع','العميل/السيارة','الصافي','الضريبة','الإجمالي','الدفع','إرسال'],rows.map(x=>[
-  esc(x.number||x.id), x.type, vehicleName(x.vehicleId)||'بيع مباشر', money(x.net), x.tax+'%', money(x.total), esc(x.payment||'غير محدد'),
-  `<button class="btn small" onclick="exportPrint('invoices','${x.id}')">🖨️</button>
-   <button class="btn small" onclick="exportPDF('invoices','${x.id}')">📄</button>
-   <button class="btn small" onclick="exportEmail('invoices','${x.id}')">✉️</button>
-   <button class="btn small" onclick="exportWhatsApp('invoices','${x.id}')">💬</button>`
- ]), 'invoices');
- $('#inv').onclick=()=>financeModal('invoice');$('#bar').onclick=()=>financeModal('bar');
+ table(['رقم','النوع','السيارة','الإجمالي','الدفع','تصميم'],rows.map(x=>[
+  esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'بيع مباشر', money(x.total), esc(x.payment||'-'),
+  `<button class="btn small primary" onclick="previewInvoice('${x.id}')">عرض التصميم</button>
+   <button class="btn small" onclick="exportPrint('invoices','${x.id}')">طباعة</button>
+   <button class="btn small" onclick="exportPDF('invoices','${x.id}')">PDF</button>
+   <button class="btn small" onclick="exportWhatsApp('invoices','${x.id}')">واتساب</button>`
+ ]), 'invoices')+
+ `<div class="bottom-action"><button class="btn primary" id="inv2">+ إنشاء فاتورة</button></div>`;
+ $('#inv').onclick=()=>invoiceDesigner();
+ if($('#inv2')) $('#inv2').onclick=()=>invoiceDesigner();
+ $('#bar').onclick=()=>invoiceDesigner('bar');
 }
+function workshopInfo(){
+  const s=db.settings||{};
+  return {
+    name: session?.company?.name || 'BayMeister Werkstatt',
+    address: s.workshopAddress || '',
+    phone: s.workshopPhone || '',
+    taxId: s.workshopTaxId || '',
+    iban: s.workshopIban || ''
+  };
+}
+function invoiceDesigner(kind='invoice'){
+  const title = kind==='bar' ? 'Barverkauf' : 'إنشاء فاتورة';
+  modal(title, `<div class="form-grid">
+    <div class="field"><label>السيارة</label><select id="fv"><option value="">بدون سيارة / بيع مباشر</option>${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+    <div class="field"><label>طريقة الدفع</label><select id="pay"><option>غير محدد</option><option>نقدي</option><option>بطاقة</option><option>تحويل بنكي</option></select></div>
+    <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="19"></div>
+    <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="0"></div>
+    <div class="field span2"><label>بنود الفاتورة (سطر: الاسم|الكمية|السعر)</label>
+      <textarea id="ilines" placeholder="Ölwechsel|1|89.00&#10;Innenraumfilter|1|24.90&#10;Arbeitslohn 1.5h|1|127.50">Arbeitslohn|1|${db.settings.hourlyRate||85}</textarea>
+    </div>
+  </div>`,()=>{
+    const lines=$('#ilines').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+      const [name,qty,price]=l.split('|');
+      return {name:(name||'Position').trim(), qty:Number(qty||1), price:Number(price||0)};
+    });
+    if(!lines.length) return toast('أضف بند واحد على الأقل');
+    const parts=lines.filter(x=>!/lohn|أجر|arbeit/i.test(x.name)).reduce((s,x)=>s+x.qty*x.price,0);
+    const labor=lines.filter(x=>/lohn|أجر|arbeit/i.test(x.name)).reduce((s,x)=>s+x.qty*x.price,0);
+    const discount=+$('#fd').value||0, tax=+$('#ft').value||19;
+    const net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
+    const obj={id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,parts,labor,discount,tax,net,total,date:new Date().toISOString(),
+      type:kind==='bar'?'Barverkauf':'فاتورة', payment:$('#pay').value, paid:['نقدي','بطاقة'].includes($('#pay').value),
+      number:nextInvoiceNumber(), lines};
+    db.invoices.push(obj); upsertInvoiceCloud(obj);
+    db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
+    audit('invoice.create',obj.number); save(); closeModal(); render();
+    setTimeout(()=>previewInvoice(obj.id), 200);
+  }, 'حفظ وعرض التصميم');
+}
+function previewInvoice(iid){
+  exportPrint('invoices', iid);
+}
+window.previewInvoice=previewInvoice;
+window.invoiceDesigner=invoiceDesigner;
+
 function financeModal(type){
  const title=type==='estimate'?'Kostenvoranschlag':type==='bar'?'Barverkauf':'فاتورة جديدة';
  modal(title,`<div class="form-grid">
@@ -1907,6 +1962,9 @@ function settings(){
  <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'ar')}</select></div>
  <div class="field"><label>${t('hourly')}</label><input id="hrate" type="number" step="0.01" value="${db.settings.hourlyRate||85}"></div>
  <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(db.settings.workshopPhone||'')}"></div>
+ <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(db.settings.workshopAddress||'')}"></div>
+ <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(db.settings.workshopTaxId||'')}"></div>
+ <div class="field"><label>IBAN</label><input id="wiban" value="${esc(db.settings.workshopIban||'')}"></div>
  </div>
  <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
@@ -1916,7 +1974,7 @@ function settings(){
   <button class="btn bad" id="reset">${t('reset')}</button>
  </div>
  </div>`;
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;save();applyUiLang();toast(t('saved'));render()};
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;save();applyUiLang();toast(t('saved'));render()};
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
