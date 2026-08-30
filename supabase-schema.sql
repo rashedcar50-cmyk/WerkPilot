@@ -157,3 +157,6 @@ drop policy if exists "wp_invoices_all" on invoices;
 create policy "wp_invoices_all" on invoices for all using (true) with check (true);
 drop policy if exists "wp_expenses_all" on expenses;
 create policy "wp_expenses_all" on expenses for all using (true) with check (true);
+
+alter table repairs add column if not exists photos text;
+

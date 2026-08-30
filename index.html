@@ -373,7 +373,7 @@ async function loadRepairsFromCloud(){
       status:r.status||'استلام', km:r.km||'', fuel:r.fuel||'', date:r.repair_date||'',
       jobs: r.jobs? (typeof r.jobs==='string'? JSON.parse(r.jobs||'[]'):r.jobs):[],
       parts: r.parts? (typeof r.parts==='string'? JSON.parse(r.parts||'[]'):r.parts):[],
-      photos:[]
+      photos: r.photos? (typeof r.photos==='string'? JSON.parse(r.photos||'[]'):r.photos):[]
     }));
     save(); return true;
   }catch(e){console.warn(e);return false}
@@ -381,7 +381,7 @@ async function loadRepairsFromCloud(){
 async function upsertRepairCloud(r){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={company_id:r.companyId||'de',vehicle_id:r.vehicleId||'',description:r.description||'',complaint:r.complaint||'',tech:r.tech||'',hours:Number(r.hours||0),status:r.status||'',km:Number(r.km||0)||null,fuel:r.fuel||'',jobs:JSON.stringify(r.jobs||[]),parts:JSON.stringify(r.parts||[]),repair_date:r.date||new Date().toISOString().slice(0,10)};
+    const row={company_id:r.companyId||'de',vehicle_id:r.vehicleId||'',description:r.description||'',complaint:r.complaint||'',tech:r.tech||'',hours:Number(r.hours||0),status:r.status||'',km:Number(r.km||0)||null,fuel:r.fuel||'',jobs:JSON.stringify(r.jobs||[]),parts:JSON.stringify(r.parts||[]),photos:JSON.stringify((r.photos||[]).map(x=>({kind:x.kind,url:x.url}))),repair_date:r.date||new Date().toISOString().slice(0,10)};
     if(r.cloudId){ await sb.from('repairs').update(row).eq('id',r.cloudId); }
     else { const {data,error}=await sb.from('repairs').insert(row).select('id').single(); if(!error&&data?.id){r.cloudId=data.id;save();} }
   }catch(e){console.warn(e)}
@@ -487,14 +487,31 @@ function globalSearch(q){
 }
 function consumePartsFromRepair(r){
   (r.parts||[]).forEach(p=>{
+    if(p.consumed) return;
     const inv=db.inventory.find(x=>x.companyId===r.companyId && (x.sku===p.sku || x.name===p.name));
     if(inv){
       inv.qty=Math.max(0, Number(inv.qty||0)-Number(p.qty||0));
       upsertInventoryCloud(inv);
+      p.consumed=true;
     }
   });
-  save();
+  save(); upsertRepairCloud(r);
 }
+async function uploadWorkshopFile(file, folder){
+  const sb=window.supabaseClient;
+  if(!sb || !file) return '';
+  const name=(folder||'media')+'/'+Date.now()+'-'+(file.name||'img.jpg').replace(/[^a-zA-Z0-9._-]/g,'_');
+  for(const bucket of ['workshop-media','purchase-receipts']){
+    try{
+      const {error}=await sb.storage.from(bucket).upload(name, file, {contentType:file.type||'image/jpeg', upsert:false});
+      if(error) continue;
+      const {data}=sb.storage.from(bucket).getPublicUrl(name);
+      return data&&data.publicUrl||'';
+    }catch(e){}
+  }
+  return '';
+}
+
 function convertRepairToInvoice(rid){
   const r=db.repairs.find(x=>x.id===rid);
   if(!r) return toast('الأمر غير موجود');
@@ -1139,6 +1156,11 @@ function repairDesk(rid){
  if(!r){ session.repairId=null; return repairs(); }
  const v=vehicleOf(r.vehicleId); const c=customerOfVehicle(r.vehicleId);
  const sts=['استلام','تشخيص','انتظار قطع','قيد التنفيذ','جاهز للتسليم','مسلَّم'];
+ const stock=companyRows('inventory');
+ const photos=r.photos||[];
+ const before=photos.filter(x=>x.kind==='before');
+ const after=photos.filter(x=>x.kind==='after');
+ const img=(arr)=>arr.map(x=>`<img class="ocr-preview" src="${x.url}">`).join('')||'<div class="muted">لا صور</div>';
  $('#content').innerHTML=head('بطاقة الأمر',`<button class="btn ghost" id="backRep">رجوع</button>`)+`
  <div class="card">
   <div class="row" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
@@ -1149,8 +1171,19 @@ function repairDesk(rid){
   <p><b>الشكوى:</b> ${esc(r.complaint||'-')}<br><b>العمل:</b> ${esc(r.description||'-')}<br>
   <b>كم:</b> ${esc(r.km||'-')} · <b>وقود:</b> ${esc(r.fuel||'-')} · <b>فني:</b> ${esc(r.tech||'-')}</p>
   <p><b>الأعمال</b><br>${(r.jobs||[]).map(j=>'• '+esc(j)).join('<br>')||'-'}</p>
-  <p><b>القطع</b><br>${(r.parts||[]).map(p=>esc(p.name)+' × '+(p.qty||1)+' — '+money(p.price)).join('<br>')||'-'}</p>
-  <p>أجور تقديرية: ${money(repairLaborTotal(r))} · قطع: ${money(repairPartsTotal(r))}</p>
+  <h3>صرف قطعة من المخزون</h3>
+  <div class="toolbar">
+    <select id="stockPick">${stock.map(i=>`<option value="${i.id}">${esc(i.sku||'')} ${esc(i.name)} (${i.qty})</option>`).join('')}</select>
+    <input id="stockQty" type="number" value="1" min="1" style="width:80px">
+    <button class="btn primary" id="addStock">صرف</button>
+  </div>
+  <p>${(r.parts||[]).map(p=>esc(p.name)+' × '+(p.qty||1)+' — '+money(p.price)+(p.consumed?' ✓':'')).join('<br>')||'-'}</p>
+  <p>أجور: ${money(repairLaborTotal(r))} · قطع: ${money(repairPartsTotal(r))}</p>
+  <h3>صور قبل / بعد</h3>
+  <div class="form-grid">
+    <div class="field"><label>قبل</label>${img(before)}<input type="file" accept="image/*" onchange="addRepairPhoto('${r.id}','before',this)"></div>
+    <div class="field"><label>بعد</label>${img(after)}<input type="file" accept="image/*" onchange="addRepairPhoto('${r.id}','after',this)"></div>
+  </div>
   <div class="toolbar">
     <button class="btn" onclick="openRepair('${r.id}')">تعديل</button>
     <button class="btn ok" onclick="convertRepairToInvoice('${r.id}')">تحويل لفاتورة</button>
@@ -1158,7 +1191,26 @@ function repairDesk(rid){
   </div>
  </div>`;
  $('#backRep').onclick=()=>{session.repairId=null;render()};
+ const add=$('#addStock');
+ if(add) add.onclick=()=>{
+   const item=db.inventory.find(x=>x.id===$('#stockPick').value);
+   if(!item) return toast('لا قطعة بالمخزون');
+   const qty=Number($('#stockQty').value||1);
+   if(Number(item.qty||0)<qty) return toast('الكمية غير كافية');
+   r.parts=r.parts||[];
+   r.parts.push({sku:item.sku,name:item.name,qty,price:Number(item.sell||item.buy||0),consumed:true});
+   item.qty=Number(item.qty||0)-qty;
+   upsertInventoryCloud(item); upsertRepairCloud(r); save(); audit('repair.part', item.name); render();
+ };
 }
+window.addRepairPhoto=async function(rid,kind,input){
+  const r=db.repairs.find(x=>x.id===rid); if(!r||!input.files||!input.files[0]) return;
+  const file=input.files[0];
+  let url=await uploadWorkshopFile(file,'repairs');
+  if(!url){ try{ url=await compressVehiclePhoto(file);}catch(e){ return toast('تعذر حفظ الصورة'); } }
+  r.photos=r.photos||[]; r.photos.push({kind,url});
+  save(); upsertRepairCloud(r); render(); toast('تم حفظ الصورة');
+};
 window.setRepairStatus=function(rid,st){
   const r=db.repairs.find(x=>x.id===rid); if(!r) return;
   r.status=st; save(); upsertRepairCloud(r); audit('repair.status',st); render();
@@ -1214,11 +1266,13 @@ function repairEditModal(rid){
   if(!r) return toast('الأمر غير موجود');
   repairModal(r);
 }
+window.openRepair=repairEditModal;
 function appointments(){
   const rows=companyRows('appointments').slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
   $('#content').innerHTML=head('المواعيد')+
-  table(['التاريخ','الوقت','السيارة','الزبون','الفني','ملاحظة','حالة'],rows.map(a=>[
-    esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(a.tech||'-'),esc(a.note||'-'),esc(a.status||'')
+  table(['التاريخ','الوقت','السيارة','الزبون','الفني','حالة','إجراء'],rows.map(a=>[
+    esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(a.tech||'-'),esc(a.status||''),
+    a.status==='تم التحويل'?'—':`<button class="btn small primary" onclick="appointmentToRepair('${a.id}')">تحويل لأمر</button>`
   ]),'appointments')+
   `<div class="bottom-action"><button class="btn primary" id="add">+ موعد جديد</button></div>`;
   $('#add').onclick=()=>{
@@ -1239,6 +1293,16 @@ function appointments(){
   };
 }
 
+function appointmentToRepair(aid){
+  const a=db.appointments.find(x=>x.id===aid);
+  if(!a) return toast('الموعد غير موجود');
+  if(a.status==='تم التحويل' && a.repairId){ session.repairId=a.repairId; session.page='repairs'; return render(); }
+  const r={id:id('r'),companyId:session.company.id,vehicleId:a.vehicleId,complaint:a.note||'موعد ورشة',description:a.note||'',jobs:[],parts:[],photos:[],tech:a.tech||'',hours:1,status:'استلام',km:'',fuel:'نصف',date:a.date||todayISO()};
+  db.repairs.push(r); upsertRepairCloud(r);
+  a.status='تم التحويل'; a.repairId=r.id; upsertAppointmentCloud(a);
+  save(); audit('appointment.to_repair', a.date||''); session.repairId=r.id; session.page='repairs'; render(); toast('تم فتح أمر الإصلاح');
+}
+window.appointmentToRepair=appointmentToRepair;
 function estimates(){
  const rows=companyRows('estimates');
  $('#content').innerHTML=head('Kostenvoranschlag',`<button class="btn primary" id="add">إنشاء تقدير</button>`)+
@@ -1979,6 +2043,7 @@ function settings(){
  <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(db.settings.workshopAddress||'')}"></div>
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(db.settings.workshopTaxId||'')}"></div>
  <div class="field"><label>IBAN</label><input id="wiban" value="${esc(db.settings.workshopIban||'')}"></div>
+ <div class="field"><label>كلمة سر جديدة لحسابك</label><input id="newpass" type="password" placeholder="فارغة = بدون تغيير"></div>
  </div>
  <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
@@ -1988,7 +2053,7 @@ function settings(){
   <button class="btn bad" id="reset">${t('reset')}</button>
  </div>
  </div>`;
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;save();applyUiLang();toast(t('saved'));render()};
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
