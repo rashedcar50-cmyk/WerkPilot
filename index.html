@@ -636,16 +636,62 @@ function lookupKbaLocal(hsn,tsn){
   tsn=String(tsn||'').trim().toUpperCase();
   return {hsn,tsn,kba:(hsn+' '+tsn).trim(),make:HSN_MAKE[hsn]||''};
 }
+function parseHsnTsnHtml(html, hsn, tsn){
+  const key=(hsn+'/'+tsn).toUpperCase();
+  const text=String(html||'').replace(/\s+/g,' ');
+  const re=new RegExp(key.replace('/','\\/')+'[\\s\\S]{0,280}','i');
+  const chunk=(text.match(re)||[text])[0];
+  const model=(chunk.match(/>([A-Z][^<]{8,80})</)||chunk.match(/([A-Za-z][A-Za-z0-9 .\/+-]{6,80}\d\.\d[^<]{0,40})/)||[])[1]||'';
+  const kw=(chunk.match(/(\d+)\s*kW/i)||[])[1]||'';
+  const cc=(chunk.match(/(\d{3,5})\s*ccm/i)||[])[1]||'';
+  const fuel=(/Diesel/i.test(chunk)?'Diesel':(/Benzin|Otto/i.test(chunk)?'Benzin':(/Elektro/i.test(chunk)?'Elektro':(/Hybrid/i.test(chunk)?'Hybrid':''))));
+  const clean=String(model).replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+  return {model:clean, engine_power_kw:kw, engine_displacement_cm3:cc, fuel_type:fuel};
+}
+async function fetchText(url){
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),8000);
+  try{
+    const res=await fetch(url,{signal:ctrl.signal});
+    clearTimeout(t);
+    if(!res.ok) return '';
+    return await res.text();
+  }catch(e){ clearTimeout(t); return ''; }
+}
+async function lookupKbaFree(hsn,tsn){
+  hsn=String(hsn||'').replace(/\D/g,'').padStart(4,'0');
+  tsn=String(tsn||'').trim().toUpperCase();
+  const local=lookupKbaLocal(hsn,tsn);
+  const urls=[
+    'https://r.jina.ai/http://www.hsn-tsn.de/'+tsn.toLowerCase()+'.html',
+    'https://r.jina.ai/http://www.hsn-tsn.de/hsn-tsn.php?'+hsn+'-'+tsn,
+    'http://www.hsn-tsn.de/'+tsn.toLowerCase()+'.html'
+  ];
+  for(const url of urls){
+    const html=await fetchText(url);
+    if(!html || html.length<80) continue;
+    const parsed=parseHsnTsnHtml(html,hsn,tsn);
+    if(parsed.model || parsed.engine_power_kw || parsed.engine_displacement_cm3){
+      return Object.assign({},local,parsed);
+    }
+  }
+  return local;
+}
 function bindKbaEnter(hsnId,tsnId,fillIds){
   const run=async()=>{
     const hsn=$(hsnId)?.value.trim();
     const tsn=$(tsnId)?.value.trim();
     if(!hsn||hsn.length<4||!tsn) return toast('أدخل HSN (4) وTSN (3)');
-    const local=lookupKbaLocal(hsn,tsn);
-    if(local.make && fillIds.make && $(fillIds.make) && !$(fillIds.make).value) $(fillIds.make).value=local.make;
-    toast(local.make?('KBA '+local.kba+' · '+local.make+' — أكمل من Katy إذا لزم'):('KBA '+local.kba+' — افتح Katy لنفس المفتاح'));
-    const base=(db.settings.katyUrl||'https://www.matthies.de/software/katy.html').trim();
-    window.open(base+(base.includes('?')?'&':'?')+'q='+encodeURIComponent(local.kba),'_blank');
+    toast('جاري جلب بيانات السيارة من المواقع المجانية...');
+    const info=await lookupKbaFree(hsn,tsn);
+    const set=(id,val)=>{ const el=$(id); if(el && val) el.value=val; };
+    set(fillIds.make, info.make);
+    set(fillIds.model, info.model);
+    set(fillIds.kw, info.engine_power_kw);
+    set(fillIds.cc, info.engine_displacement_cm3);
+    set(fillIds.fuel, info.fuel_type);
+    if(info.model || info.engine_power_kw) toast((info.make||'')+' '+(info.model||'')+(info.engine_displacement_cm3?(' · '+info.engine_displacement_cm3+' cm³'):'')+(info.engine_power_kw?(' · '+info.engine_power_kw+' kW'):''));
+    else toast((info.make||'KBA')+' — الموديل مو موجود بهالمصدر المجاني، كمّل يدوياً');
   };
   [hsnId,tsnId].forEach(id=>{
     const el=$(id); if(!el) return;
@@ -1323,7 +1369,7 @@ function vehicleModal(prefill={}){
 window.open('https://www.partslink24.com/','_blank');
 };
   bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en',pa:'#pa'});
-  bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo'});
+  bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',kw:'#kw',cc:'#cc',fuel:'#fuel'});
 }
 function scanVehicleDocument(){
  modal('تصوير/رفع ورقة السيارة',`<div class="field">
