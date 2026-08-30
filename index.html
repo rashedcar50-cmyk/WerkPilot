@@ -996,9 +996,9 @@ function table(headers, rows, pageKey){
   const pager = pages > 1 ? `<div class="toolbar" style="margin-top:10px;justify-content:space-between">
     <span class="muted">عرض ${page*PAGE_SIZE+1}–${Math.min((page+1)*PAGE_SIZE,total)} من ${total}</span>
     <div class="toolbar">
-      <button class="btn small ghost" ${page<=0?'disabled':''} onclick="window._tblPage['${key}']=${page-1};render()">السابق</button>
+      <button class="btn small ghost" ${page<=0?'disabled':''} onclick="window._tblPage['${key}']=${page-1};render()">${t('prev')}</button>
       <span class="muted">${page+1} / ${pages}</span>
-      <button class="btn small ghost" ${page>=pages-1?'disabled':''} onclick="window._tblPage['${key}']=${page+1};render()">التالي</button>
+      <button class="btn small ghost" ${page>=pages-1?'disabled':''} onclick="window._tblPage['${key}']=${page+1};render()">${t('next')}</button>
     </div>
   </div>` : `<div class="muted" style="margin-top:8px">${total} سجل</div>`;
   return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
@@ -1230,10 +1230,11 @@ window.exportPDF = exportPDF;
 window.exportEmail = exportEmail;
 window.exportWhatsApp = exportWhatsApp;
 
-function modal(title,body,onSave,saveText='حفظ'){
- $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal${/فاتورة|Barverkauf/.test(title)?' wide':''}">
+function modal(title,body,onSave,saveText){
+ saveText=saveText||t('save');
+ $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal${/فاتورة|Rechnung|Barverkauf|invoice/i.test(title)?' wide':''}">
  <div class="modal-head"><h2>${title}</h2><button class="btn ghost small" id="xmod">✕</button></div>
- ${body}<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="msave">${saveText}</button><button class="btn ghost" id="mcancel">إلغاء</button></div>
+ ${body}<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="msave">${saveText}</button><button class="btn ghost" id="mcancel">${t('cancelBtn')}</button></div>
  </div></div>`;
  $('#xmod').onclick=closeModal;$('#mcancel').onclick=closeModal;$('#msave').onclick=onSave;
 }
@@ -1298,28 +1299,28 @@ function customers(){
 }
 function customerModal(existing){
  const c0=existing||{};
- modal(existing?'تعديل عميل':'عميل جديد + سيارة',`<div class="form-grid">
- <div class="field"><label>نوع العميل</label><select id="ctype"><option value="person" ${c0.type!=='company'?'selected':''}>شخص</option><option value="company" ${c0.type==='company'?'selected':''}>شركة</option></select></div>
- <div class="field"><label>الاسم / جهة الاتصال</label><input id="n" value="${esc(c0.name||c0.contact||'')}"></div>
- <div class="field"><label>اسم الشركة</label><input id="cfirma" value="${esc(c0.companyName||'')}" placeholder="إذا الزبون شركة"></div>
+ modal(existing?t('editCustomer'):t('newCustomer'),`<div class="form-grid">
+ <div class="field"><label>${t('customerType')}</label><select id="ctype"><option value="person" ${c0.type!=='company'?'selected':''}>${t('person')}</option><option value="company" ${c0.type==='company'?'selected':''}>${t('company')}</option></select></div>
+ <div class="field"><label>${t('contact')}</label><input id="n" value="${esc(c0.name||c0.contact||'')}"></div>
+ <div class="field"><label>${t('companyName')}</label><input id="cfirma" value="${esc(c0.companyName||'')}"></div>
  <div class="field"><label>USt-IdNr. / Steuernummer</label><input id="ctax" value="${esc(c0.taxId||c0.ustId||'')}" placeholder="DE..."></div>
- <div class="field"><label>Kundennummer</label><input id="kd" value="${esc(c0.kdNr||c0.number||'')}" placeholder="تلقائي إذا فارغ"></div>
- <div class="field"><label>الهاتف</label><input id="ph" value="${esc(c0.phone||'')}"></div>
- <div class="field"><label>الإيميل</label><input id="em" value="${esc(c0.email||'')}"></div>
- <div class="field span2"><label>العنوان</label><input id="ad" value="${esc(c0.address||'')}"></div>
- <div class="field span2"><b>سيارة العميل</b></div>
- <div class="field"><label>اللوحة</label><input id="vplate" placeholder="HH-AB 1234"></div>
- <div class="field"><label>VIN (Enter لجلب البيانات)</label><input id="vvin" maxlength="17" placeholder="17 خانة ثم Enter"></div>
- <div class="field span2"><label>مفتاح KBA</label>
+ <div class="field"><label>${t('custNo')}</label><input id="kd" value="${esc(c0.kdNr||c0.number||'')}"></div>
+ <div class="field"><label>${t('phone')}</label><input id="ph" value="${esc(c0.phone||'')}"></div>
+ <div class="field"><label>${t('email')}</label><input id="em" value="${esc(c0.email||'')}"></div>
+ <div class="field span2"><label>${t('address')}</label><input id="ad" value="${esc(c0.address||'')}"></div>
+ <div class="field span2"><b>${t('custVehicle')}</b></div>
+ <div class="field"><label>${t('plate')}</label><input id="vplate" placeholder="HH-AB 1234"></div>
+ <div class="field"><label>${t('vinLbl')}</label><input id="vvin" maxlength="17" placeholder="W0L..."></div>
+ <div class="field span2"><label>${t('kbaKey')}</label>
   <div class="kba-row">
     <input id="vhsn" maxlength="4" inputmode="numeric" placeholder="HSN 2.1">
     <input id="vtsn" maxlength="3" placeholder="TSN 2.2">
   </div>
  </div>
- <div class="field"><label>الماركة</label><input id="vmake"></div>
- <div class="field"><label>الموديل</label><input id="vmodel"></div>
- <div class="field"><label>السنة</label><input id="vyear"></div>
- <div class="field"><label>الكيلومتر</label><input id="vkm" type="number"></div>
+ <div class="field"><label>${t('make')}</label><input id="vmake"></div>
+ <div class="field"><label>${t('model')}</label><input id="vmodel"></div>
+ <div class="field"><label>${t('year')}</label><input id="vyear"></div>
+ <div class="field"><label>${t('km')}</label><input id="vkm" type="number"></div>
  </div>`,()=>{
   const firma=$('#cfirma').value.trim();
   const person=$('#n').value.trim();
@@ -1327,7 +1328,7 @@ function customerModal(existing){
     type:$('#ctype').value, name:firma||person, contact:person, companyName:firma,
     taxId:$('#ctax').value.trim(), phone:$('#ph').value, email:$('#em').value, address:$('#ad').value, kdNr:$('#kd').value.trim()};
   if(!c.kdNr) c.kdNr=nextKdNr();
-  if(!c.name)return toast('أدخل اسم العميل أو اسم الشركة');
+  if(!c.name)return toast(t('needName'));
   if(existing){ const i=db.customers.findIndex(x=>x.id===c0.id); if(i>=0) db.customers[i]={...db.customers[i],...c}; audit('customer.update',c.name); }
   else { db.customers.push(c); audit('customer.create',c.name); }
   const plate=$('#vplate').value.trim(), vin=$('#vvin').value.trim();
@@ -1377,7 +1378,7 @@ function addVehiclePhoto(vid){
     </div>
   `, async()=>{
     const f=$('#vphoto').files[0];
-    if(!f) return toast('اختر صورة أولاً');
+    if(!f) return toast(t('pickPhoto'));
     try{
       v.photo=await compressVehiclePhoto(f);
       save(); audit('vehicle.photo', v.plate||v.vin);
@@ -1389,7 +1390,7 @@ window.addVehiclePhoto=addVehiclePhoto;
 
 function vehicles(){
  const rows=companyRows('vehicles');
- const addBtn=canEdit()?`<button class="btn primary" id="add">إضافة سيارة</button><button class="btn ok" id="scan">📷 تصوير ورقة السيارة</button>`:`<span class="muted">عرض فقط</span>`;
+ const addBtn=canEdit()?`<button class="btn primary" id="add">${t('newVehicle')}</button><button class="btn ok" id="scan">📷 Fahrzeugschein</button>`:`<span class="muted">—</span>`;
  $('#content').innerHTML=head(t('vehicles'),`<div class="toolbar">${addBtn}</div>`)+
  listShareBar('vehicles')+
  table(['صورة','العميل','اللوحة','VIN','الماركة','الموديل','السنة','إجراء'],rows.map(v=>[
@@ -1407,35 +1408,35 @@ window.editVehicle=editVehicle;
 function vehicleModal(prefill={}){
  const customers=companyRows('customers');
  if(!prefill.hsn && prefill.kba){ const p=String(prefill.kba).trim().split(/\s+/); prefill.hsn=p[0]||''; prefill.tsn=p[1]||''; }
- modal('إضافة سيارة',`<div class="form-grid">
- <div class="field"><label>العميل</label><select id="cu"><option value="">اختر العميل</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
- <div class="field"><label>رقم اللوحة</label><input id="pl" value="${esc(prefill.plate||'')}"></div>
- <div class="field"><label>VIN (Enter لجلب البيانات)</label><input id="vin" value="${esc(prefill.vin||'')}" maxlength="17" placeholder="17 خانة ثم Enter"></div>
- <div class="field span2"><label>مفتاح KBA</label>
+ modal(t('addVehicle'),`<div class="form-grid">
+ <div class="field"><label>${t('customer')}</label><select id="cu"><option value="">—</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+ <div class="field"><label>${t('plate')}</label><input id="pl" value="${esc(prefill.plate||'')}"></div>
+ <div class="field"><label>${t('vinLbl')}</label><input id="vin" value="${esc(prefill.vin||'')}" maxlength="17" placeholder="W0L..."></div>
+ <div class="field span2"><label>${t('kbaKey')}</label>
   <div class="kba-row">
     <input id="hsn" value="${esc(prefill.hsn||'')}" maxlength="4" inputmode="numeric" placeholder="HSN 2.1">
     <input id="tsn" value="${esc(prefill.tsn||'')}" maxlength="3" placeholder="TSN 2.2">
   </div>
  </div>
- <div class="field span2"><label>كتالوج القطع</label>
+ <div class="field span2"><label>${t('partsCat')}</label>
   <div class="toolbar">
     <button type="button" class="btn" id="partslinkBtn">PartsLink24</button>
     <button type="button" class="btn primary" id="distriBtn">DistriAuto (VIN)</button>
   </div>
  </div>
- <div class="field"><label>الماركة</label><input id="mk" value="${esc(prefill.make||'')}"></div>
- <div class="field"><label>الموديل</label><input id="mo" value="${esc(prefill.model||'')}"></div>
- <div class="field"><label>السنة</label><input id="yr" type="number" value="${esc(prefill.year||'')}"></div>
- <div class="field"><label>سعة المحرك (cm³)</label><input id="cc" type="number" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
- <div class="field"><label>نوع الوقود</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
- <div class="field"><label>قوة المحرك (kW)</label><input id="kw" type="number" value="${esc(prefill.engine_power_kw||'')}"></div>
+ <div class="field"><label>${t('make')}</label><input id="mk" value="${esc(prefill.make||'')}"></div>
+ <div class="field"><label>${t('model')}</label><input id="mo" value="${esc(prefill.model||'')}"></div>
+ <div class="field"><label>${t('year')}</label><input id="yr" type="number" value="${esc(prefill.year||'')}"></div>
+ <div class="field"><label>${t('displacement')}</label><input id="cc" type="number" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
+ <div class="field"><label>${t('fuel')}</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
+ <div class="field"><label>${t('powerKw')}</label><input id="kw" type="number" value="${esc(prefill.engine_power_kw||'')}"></div>
  <div class="field"><label>الوزن الأقصى (kg)</label><input id="vmaxw" type="number" value="${esc(prefill.maxWeight||'')}"></div>
  <div class="field"><label>عدد المقاعد</label><input id="vseats" type="number" value="${esc(prefill.seats||'')}"></div>
  <div class="field"><label>فئة المركبة</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
- <div class="field"><label>كود المحرك</label><input id="en" value="${esc(prefill.engine||'')}"></div>
- <div class="field"><label>كود اللون (مو من VIN — من الورقة)</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="من Fahrzeugschein"></div>
- <div class="field"><label>الكيلومتر الحالي</label><input id="vkm" type="number" value="${esc(prefill.km||'')}"></div>
- <div class="field"><label>الصيانة القادمة عند كم</label><input id="vnext" type="number" value="${esc(prefill.nextServiceKm||'')}"></div>
+ <div class="field"><label>${t('engineCode')}</label><input id="en" value="${esc(prefill.engine||'')}"></div>
+ <div class="field"><label>${t('paintCode')}</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="Fahrzeugschein"></div>
+ <div class="field"><label>${t('km')}</label><input id="vkm" type="number" value="${esc(prefill.km||'')}"></div>
+ <div class="field"><label>${t('nextService')}</label><input id="vnext" type="number" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
   if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
   const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
@@ -2252,9 +2253,9 @@ function addInvoiceRow(data){
   const tb=$('#invRows'); if(!tb) return;
   const tr=document.createElement('tr');
   tr.innerHTML=`<td class="c-pos"></td>
-    <td><select class="c-kind"><option value="parts" ${d.kind!=='labor'?'selected':''}>قطع غيار</option><option value="labor" ${d.kind==='labor'?'selected':''}>أجور عمالة</option></select></td>
-    <td><input class="c-sku" value="${esc(d.sku)}" placeholder="رقم"></td>
-    <td><input class="c-name" value="${esc(d.name)}" placeholder="الوصف"></td>
+    <td><select class="c-kind"><option value="parts" ${d.kind!=='labor'?'selected':''}>${t('kindParts')}</option><option value="labor" ${d.kind==='labor'?'selected':''}>${t('kindLabor')}</option></select></td>
+    <td><input class="c-sku" value="${esc(d.sku)}" placeholder="${t('sku')}"></td>
+    <td><input class="c-name" value="${esc(d.name)}" placeholder="${t('desc')}"></td>
     <td><input class="c-qty" type="number" step="0.01" value="${d.qty}"></td>
     <td><input class="c-price" type="number" step="0.01" value="${d.price}"></td>
     <td class="c-sum">${(Number(d.qty||0)*Number(d.price||0)).toLocaleString('de-DE',{minimumFractionDigits:2})}</td>
@@ -2271,14 +2272,14 @@ function numberInvoiceRows(){
   });
 }
 function invoiceDesigner(kind='invoice', customerId='', existing=null){
-  const title = existing ? ('تعديل فاتورة '+(existing.number||'')) : (kind==='bar' ? 'Barverkauf' : 'إنشاء فاتورة');
+  const title = existing ? (t('editInvoice')+' '+(existing.number||'')) : (kind==='bar' ? 'Barverkauf' : t('createInv'));
   const rate=db.settings.hourlyRate||100;
   if(existing){ customerId=customerId||existing.customerId||''; }
   modal(title, `<div class="form-grid">
-    <div class="field"><label>السيارة</label><select id="fv"><option value="">بدون سيارة / بيع مباشر</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)).map(v=>`<option value="${v.id}" ${existing&&v.id===existing.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
-    <div class="field"><label>طريقة الدفع</label><select id="pay">${['غير محدد','نقدي','بطاقة','تحويل بنكي'].map(p=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
-    <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="${existing?existing.tax:19}"></div>
-    <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="${existing?existing.discount||0:0}"></div>
+    <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)).map(v=>`<option value="${v.id}" ${existing&&v.id===existing.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+    <div class="field"><label>${t('payMethod')}</label><select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
+    <div class="field"><label>${t('taxPct')}</label><input id="ft" type="number" step=".01" value="${existing?existing.tax:19}"></div>
+    <div class="field"><label>${t('discount')}</label><input id="fd" type="number" step=".01" value="${existing?existing.discount||0:0}"></div>
     <div class="field span2"><label>قطع Katy / Henry</label>
       <div class="toolbar">
         <input id="katySku" placeholder="رقم القطعة ثم Enter">
@@ -2765,7 +2766,7 @@ async function scanPurchaseDocument(){
     // قراءة سريعة: OCR فقط بدون رفع
     btnRead.onclick = async ()=>{
       const f = pendingFile || fileInput.files[0];
-      if(!f) return toast('اختر صورة أولاً');
+      if(!f) return toast(t('pickPhoto'));
 
       btnRead.disabled = true;
       status.textContent = '⚡ جاري قراءة البيانات...';
