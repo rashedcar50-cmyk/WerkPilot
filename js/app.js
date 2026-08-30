@@ -362,19 +362,19 @@ function dashboard(){
  ${low.length?`<div class="alert"><b>${t('stockAlert')}:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+')').join(' · ')}</div>`:''}
  ${due.length?`<div class="alert"><b>${t('maintDue')}:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' km').join(' · ')}</div>`:''}
  ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
- return `<div class="card" style="margin-top:12px"><b>تقرير الضريبة (USt 19%)</b>
+ return `<div class="card" style="margin-top:12px"><b>${t('vatReport')}</b>
  <div class="grid" style="margin-top:8px">
   <div class="card"><div class="muted">Netto Teile</div><div class="metric">${money(teile)}</div></div>
   <div class="card"><div class="muted">Netto Leistungen</div><div class="metric">${money(leist)}</div></div>
   <div class="card"><div class="muted">MwSt 19%</div><div class="metric">${money(vat)}</div></div>
- </div></div>`+(stale?'<div class="alert"><b>نسخة احتياطية:</b> لم يتم تصدير البيانات منذ أكثر من يوم. من الإعدادات → نسخ احتياطي.</div>':'');
+ </div></div>`+(stale?`<div class="alert">${t('backupWarn')}</div>`:'');
  })()}
- <div class="card" style="margin-top:12px"><b>سيارات اليوم / الأوامر النشطة</b>
- ${inside.length?inside.map(r=>`<div class="today-item"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(r.description||'')} · ${esc(r.tech||'')}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(r.status)}</span>
- <button class="btn small" onclick="openRepair('${r.id}')">فتح</button></div></div>`).join(''):'<p class="muted">لا توجد سيارات داخل الورشة الآن.</p>'}
+ <div class="card" style="margin-top:12px"><b>${t('todayCars')}</b>
+ ${inside.length?inside.map(r=>`<div class="today-item"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(r.description||'')} · ${esc(r.tech||'')}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(stLabel(r.status))}</span>
+ <button class="btn small" onclick="openRepair('${r.id}')">${t('openBtn')}</button></div></div>`).join(''):`<p class="muted">${t('noCarsInShop')}</p>`}
  </div>
- <div class="card" style="margin-top:12px"><b>مواعيد اليوم</b>
- ${todayAp.length?todayAp.map(a=>`<div class="today-item"><div>${esc(a.time||'')} · ${esc(vehicleName(a.vehicleId))}<div class="muted">${esc(a.note||'')} · ${esc(a.tech||'')}</div></div><span class="status info">${esc(a.status||'')}</span></div>`).join(''):'<p class="muted">لا مواعيد اليوم.</p>'}
+ <div class="card" style="margin-top:12px"><b>${t('todayApptsTitle')}</b>
+ ${todayAp.length?todayAp.map(a=>`<div class="today-item"><div>${esc(a.time||'')} · ${esc(vehicleName(a.vehicleId))}<div class="muted">${esc(a.note||'')} · ${esc(a.tech||'')}</div></div><span class="status info">${esc(stLabel(a.status))}</span></div>`).join(''):`<p class="muted">${t('noApptsToday')}</p>`}
  </div>`;
 }
 function showSearchResults(q){

@@ -25,6 +25,12 @@ window.WP_I18N = {
 en:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
 dash:'Today',todayBoard:'Today',carsInShop:'Cars in shop',openJobs:'Open jobs',todayAppts:'Appointments today',lowStock:'Low stock',sales:'Sales',netApprox:'Approx. net',
 stockAlert:'Stock alert',maintDue:'Service due',
+vatReport:'VAT report (19%)',backupWarn:'No backup exported for more than a day. Settings → Export backup.',
+todayCars:'Today / active jobs',todayApptsTitle:'Appointments today',
+noCarsInShop:'No vehicles in the shop now.',noApptsToday:'No appointments today.',
+openBtn:'Open',stInProgress:'In progress',stWaitParts:'Waiting for parts',
+stConfirmed:'Confirmed',stIntake:'Check-in',stDiag:'Diagnosis',stWorking:'Working',
+stDone:'Completed',stClosed:'Closed',
 customers:'Customers',vehicles:'Vehicles',repairs:'Repair orders',appointments:'Appointments',
 estimates:'Quotes',invoices:'Invoices & cash sale',purchases:'Purchases',inventory:'Inventory & parts',
 employees:'Staff & payroll',expenses:'Expenses',journal:'Journal',reports:'Reports',integrations:'Integrations',
@@ -59,6 +65,12 @@ saved:'Saved',backup:'Export backup',sync:'Sync from cloud',reset:'Reset demo da
 de:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Benutzername',pass:'Passwort',login:'Anmelden',logout:'Abmelden',
 dash:'Heute',todayBoard:'Heute',carsInShop:'Fahrzeuge in der Werkstatt',openJobs:'Offene Aufträge',todayAppts:'Termine heute',lowStock:'Lagerengpass',sales:'Umsatz',netApprox:'Näherungsweise Netto',
 stockAlert:'Lagerhinweis',maintDue:'Fällige Wartung',
+vatReport:'USt-Bericht (19%)',backupWarn:'Seit über einem Tag kein Backup. Einstellungen → Backup exportieren.',
+todayCars:'Heute / aktive Aufträge',todayApptsTitle:'Termine heute',
+noCarsInShop:'Keine Fahrzeuge in der Werkstatt.',noApptsToday:'Keine Termine heute.',
+openBtn:'Öffnen',stInProgress:'In Arbeit',stWaitParts:'Wartet auf Teile',
+stConfirmed:'Bestätigt',stIntake:'Annahme',stDiag:'Diagnose',stWorking:'In Arbeit',
+stDone:'Fertig',stClosed:'Abgeschlossen',
 customers:'Kunden',vehicles:'Fahrzeuge',repairs:'Reparaturaufträge',appointments:'Termine',
 estimates:'Kostenvoranschläge',invoices:'Rechnungen & Barverkauf',purchases:'Einkäufe',inventory:'Lager & Teile',
 employees:'Mitarbeiter & Lohn',expenses:'Ausgaben',journal:'Journal',reports:'Berichte',integrations:'Integrationen',
@@ -93,6 +105,12 @@ saved:'Gespeichert',backup:'Backup exportieren',sync:'Aus Cloud synchronisieren'
 ar:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'اسم المستخدم',pass:'كلمة المرور',login:'دخول',logout:'خروج',
 dash:'الرئيسية',todayBoard:'لوحة اليوم',carsInShop:'سيارات داخل الورشة',openJobs:'أوامر مفتوحة',todayAppts:'مواعيد اليوم',lowStock:'نقص مخزون',sales:'المبيعات',netApprox:'صافي تقريبي',
 stockAlert:'تنبيه مخزون',maintDue:'صيانة مستحقة',
+vatReport:'تقرير الضريبة (USt 19%)',backupWarn:'لم يتم تصدير البيانات منذ أكثر من يوم. من الإعدادات → نسخ احتياطي.',
+todayCars:'سيارات اليوم / الأوامر النشطة',todayApptsTitle:'مواعيد اليوم',
+noCarsInShop:'لا توجد سيارات داخل الورشة الآن.',noApptsToday:'لا مواعيد اليوم.',
+openBtn:'فتح',stInProgress:'قيد التنفيذ',stWaitParts:'انتظار قطع',
+stConfirmed:'مؤكد',stIntake:'استلام',stDiag:'تشخيص',stWorking:'جاري العمل',
+stDone:'منجز',stClosed:'مغلق',
 customers:'العملاء',vehicles:'السيارات',repairs:'أوامر الإصلاح',appointments:'المواعيد',
 estimates:'Kostenvoranschlag',invoices:'الفواتير و Barverkauf',purchases:'المشتريات',inventory:'المخزون وقطع الغيار',
 employees:'الموظفون والرواتب',expenses:'المصاريف',journal:'دفتر اليومية',reports:'التقارير',integrations:'التكاملات',
@@ -147,6 +165,14 @@ window.t = function(key){
   const lang = (store && store.settings && store.settings.uiLang) || 'ar';
   const pack = (window.WP_I18N && (WP_I18N[lang] || WP_I18N.en)) || {};
   return pack[key] || (window.WP_I18N && WP_I18N.en && WP_I18N.en[key]) || key;
+};
+window.stLabel = function(s){
+  const map={
+    'قيد التنفيذ':'stInProgress','جاري العمل':'stWorking','استلام':'stIntake',
+    'تشخيص':'stDiag','انتظار قطع':'stWaitParts','مؤكد':'stConfirmed',
+    'منجز':'stDone','مغلق':'stClosed','In Arbeit':'stInProgress','Bestätigt':'stConfirmed'
+  };
+  return map[s] ? t(map[s]) : (s||'');
 };
 window.docLang = function(){
   const co = window.session && session.company;
