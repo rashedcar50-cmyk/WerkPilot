@@ -186,7 +186,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',workshopBrand:'Autoservice und Autoteile, Tabah UG',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',workshopHrb:'',workshopBic:'',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'Autoservice und Autoteile, Tabah UG',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
 };
 let db=load(), session=null;
 
@@ -206,6 +206,11 @@ function load(){
   const placeholders=['Musterstraße 12, 10115 Berlin','DE123456789','DE89 3704 0044 0532 0130 00','+49 170 1112233'];
   merged.settings.workshopBrand=seed.settings.workshopBrand;
   merged.settings.workshopName=seed.settings.workshopName;
+  merged.settings.workshopHrb=seed.settings.workshopHrb;
+  merged.settings.workshopBic=seed.settings.workshopBic;
+  merged.settings.workshopSitz=seed.settings.workshopSitz;
+  merged.settings.workshopCourt=seed.settings.workshopCourt;
+  merged.settings.workshopAccountHolder=seed.settings.workshopAccountHolder;
   if(placeholders.includes(merged.settings.workshopAddress)) merged.settings.workshopAddress=seed.settings.workshopAddress;
   if(placeholders.includes(merged.settings.workshopTaxId)) merged.settings.workshopTaxId=seed.settings.workshopTaxId;
   if(placeholders.includes(merged.settings.workshopIban)) merged.settings.workshopIban=seed.settings.workshopIban;
@@ -1550,7 +1555,7 @@ function workshopInfo(){
   const s=db.settings||{};
   return {
     brand: s.workshopBrand || 'Autoservice und Autoteile, Tabah UG',
-    name: s.workshopName || session?.company?.name || 'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',
+    name: s.workshopName || 'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',
     address: s.workshopAddress || 'Hans-Koch-Ring 12, 21493 Schwarzenbek',
     phone: s.workshopPhone || '016096585124',
     email: s.workshopEmail || 'rashed.car50@gmail.com',
@@ -1560,9 +1565,9 @@ function workshopInfo(){
     owner: s.workshopOwner || 'Rashid Tabah',
     bank: s.workshopBank || 'Raiffeisenbank eG',
     iban: s.workshopIban || 'DE36230631290000273384',
-    accountHolder: s.workshopAccountHolder || 'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',
-    hrb: s.workshopHrb || '',
-    bic: s.workshopBic || '',
+    accountHolder: s.workshopAccountHolder || 'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',
+    hrb: s.workshopHrb || '25248 HL',
+    bic: s.workshopBic || 'GENODEF1RLB',
     sitz: s.workshopSitz || 'Schwarzenbek',
     paymentDays: Number(s.paymentDays||0)
   };
@@ -1862,7 +1867,9 @@ function invoiceDesigner(kind='invoice'){
     const labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
     const discount=+$('#fd').value||0, tax=+$('#ft').value||19;
     const net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
-    const obj={id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,parts,labor,discount,tax,net,total,date:new Date().toISOString(),
+    parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
+    const veh=vehicleOf($('#fv').value)||{};
+    const obj={id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||'',customerId:(veh.customerId||''),parts,labor,discount,tax,net,total,date:new Date().toISOString(),
       type:kind==='bar'?'Barverkauf':'فاتورة', payment:$('#pay').value, paid:['نقدي','بطاقة'].includes($('#pay').value),
       number:nextInvoiceNumber(), lines};
     lines.forEach(rememberKatyArticle);
@@ -2608,8 +2615,8 @@ function settings(){
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(db.settings.workshopTaxId||'')}"></div>
  <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(db.settings.workshopSteuerNr||'')}"></div>
  <div class="field"><label>IBAN</label><input id="wiban" value="${esc(db.settings.workshopIban||'')}"></div>
- <div class="field"><label>BIC</label><input id="wbic" value="${esc(db.settings.workshopBic||'')}" placeholder="من كشف البنك"></div>
- <div class="field"><label>HRB</label><input id="whrb" value="${esc(db.settings.workshopHrb||'')}" placeholder="رقم السجل التجاري"></div>
+ <div class="field"><label>BIC</label><input id="wbic" value="${esc(db.settings.workshopBic||'GENODEF1RLB')}" placeholder="GENODEF1RLB"></div>
+ <div class="field"><label>HRB</label><input id="whrb" value="${esc(db.settings.workshopHrb||'25248 HL')}" placeholder="25248 HL"></div>
  <div class="field"><label>Sitz</label><input id="wsitz" value="${esc(db.settings.workshopSitz||'Schwarzenbek')}"></div>
  <div class="field"><label>مهلة الدفع (أيام)</label><input id="pdays" type="number" value="${db.settings.paymentDays||0}"></div>
  <div class="field"><label>البنك</label><input id="wbank" value="${esc(db.settings.workshopBank||'')}"></div>
