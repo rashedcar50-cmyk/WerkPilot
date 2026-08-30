@@ -82,7 +82,7 @@ payOpen:'Offen',payCash:'Bar',payCard:'Karte',payBank:'Überweisung',
 taxPct:'MwSt. %',discount:'Rabatt €',invLines:'Rechnungspositionen',
 kindParts:'Ersatzteile',kindLabor:'Arbeitslohn',sku:'Art.-Nr.',desc:'Bezeichnung',
 qty:'Menge',price:'Preis',noVehicle:'Kein Fahrzeug / Barverkauf',
-prev:'Zurück',next:'Weiter',cancelBtn:'Abbrechen'}
+prev:'Zurück',next:'Weiter',cancelBtn:'Abbrechen',
 font:'Schriftgröße',language:'Programmsprache',hourly:'Stundensatz €',phone:'Werkstatt / WhatsApp',
 invoiceNote:'Rechnungen bleiben auf Deutsch, wenn die aktive Firma in Deutschland ist.',
 saved:'Gespeichert',backup:'Backup exportieren',sync:'Aus Cloud synchronisieren',reset:'Demodaten löschen'},
@@ -114,7 +114,7 @@ payOpen:'غير محدد',payCash:'نقدي',payCard:'بطاقة',payBank:'تح�
 taxPct:'الضريبة %',discount:'الخصم €',invLines:'بنود الفاتورة',
 kindParts:'قطع غيار',kindLabor:'أجور عمالة',sku:'البند',desc:'الوصف',
 qty:'العدد',price:'السعر',noVehicle:'بدون سيارة / بيع مباشر',
-prev:'السابق',next:'التالي',cancelBtn:'إلغاء'}
+prev:'السابق',next:'التالي',cancelBtn:'إلغاء',
 font:'حجم الخط',language:'لغة البرنامج',hourly:'سعر ساعة العمل €',phone:'هاتف الورشة / واتساب',
 invoiceNote:'الفاتورة تبقى بالألمانية إذا كانت الشركة النشطة في ألمانيا.',
 saved:'تم الحفظ',backup:'تصدير نسخة احتياطية',sync:'مزامنة من السحابة',reset:'مسح بيانات التجربة'}
