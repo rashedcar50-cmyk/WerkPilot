@@ -144,7 +144,7 @@ const seed={
   {u:'warehouse',p:'1234',name:'أمين المستودع',role:'warehouse'}
  ],
  companies:[
-  {id:'de',name:'TST — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
+  {id:'de',name:'STS — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
  customers:[
@@ -186,7 +186,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'STS',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
 };
 let db=load(), session=null;
 
@@ -796,7 +796,7 @@ function exportPrint(type, id){
   const w = window.open('', '_blank', 'width=900,height=700');
   if(!w) return toast('اسمح بالنوافذ المنبثقة');
   const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":(WP_RTL.includes(db.settings.uiLang||"ar")?"rtl":"ltr");
-  w.document.write(`<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>${type==="invoices"&&dl==="de"?"Rechnung":"Print"}</title>
+  w.document.write(`<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>${type==="invoices"?"STS":"Print"}</title>
     <style>
       @page{size:A4;margin:8mm}
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -805,7 +805,7 @@ function exportPrint(type, id){
       .print-doc,.inv-a4{margin:0;padding:0}
       .rechnung{width:100%;max-width:190mm;margin:0 auto;min-height:0;height:auto;display:flex;flex-direction:column;page-break-inside:avoid;page-break-after:avoid}
       .rh-main{flex:0 1 auto}
-      .rh-title{text-align:center;font-size:28px;font-weight:800;letter-spacing:2px;margin:0}
+      .rh-title{text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;margin:0}
       .rh-legal{text-align:center;font-size:10px;margin:2px 0}
       .rh-sub{text-align:center;font-size:10px;margin-bottom:10px}
       .rh-grid{display:flex;justify-content:space-between;gap:16px;margin-bottom:10px}
@@ -1554,7 +1554,7 @@ function invoices(){
 function workshopInfo(){
   const s=db.settings||{};
   return {
-    brand: s.workshopBrand || 'TST',
+    brand: s.workshopBrand || 'STS',
     name: s.workshopName || 'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',
     address: s.workshopAddress || 'Hans-Koch-Ring 12, 21493 Schwarzenbek',
     phone: s.workshopPhone || '016096585124',
@@ -1690,8 +1690,7 @@ function buildWorkshopRechnung(x){
     return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
       <table class="rh-band" width="100%" cellpadding="0" cellspacing="0" bgcolor="#111111" style="background:#111;color:#d4af37;width:100%;border-collapse:collapse;border-bottom:3px solid #d4af37">
         <tr>
-          <td style="padding:10px 12px;color:#d4af37;font-size:26px;font-weight:800;letter-spacing:3px">${esc(w.brand)}</td>
-          <td style="padding:10px 12px;color:#fff;font-size:22px;font-weight:800;text-align:right;letter-spacing:1px">RECHNUNG</td>
+          <td style="padding:12px;color:#d4af37;font-size:28px;font-weight:800;letter-spacing:6px;text-align:center">${esc(w.brand)}</td>
         </tr>
       </table>
       <div class="rh-sub">${esc(w.address)} · Tel. ${esc(w.phone)} · ${esc(w.email)}</div>
@@ -1700,13 +1699,13 @@ function buildWorkshopRechnung(x){
   }
   if(tpl==='classic'){
     return `<div class="rechnung tpl-classic" dir="ltr" lang="de"><div class="rh-main">
-      <div class="rh-top"><div><div class="rh-title">${esc(w.brand)}</div><div class="rh-sub">${esc(w.address)}</div></div><div class="rh-doc">Rechnung</div></div>
+      <div class="rh-top"><div><div class="rh-title">${esc(w.brand)}</div><div class="rh-sub">${esc(w.address)}</div></div></div>
       <div class="rh-grid"><div class="rh-cust"><div class="muted">Kunde</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
   }
   if(tpl==='atelier'){
     return `<div class="rechnung tpl-atelier" dir="ltr" lang="de"><div class="rh-main">
-      <div class="rh-split"><div class="rh-title">${esc(w.brand)}</div><div><div class="rh-doc">Rechnung</div><div class="rh-sub">Beleg ${esc(m.beleg)} · ${deDate(x.date)}</div></div></div>
+      <div class="rh-split"><div class="rh-title">${esc(w.brand)}</div><div><div class="rh-sub">Beleg ${esc(m.beleg)} · ${deDate(x.date)}</div></div></div>
       <div class="rh-grid"><div class="rh-cust"><div class="muted">An</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
   }
@@ -1714,7 +1713,7 @@ function buildWorkshopRechnung(x){
     <div class="rh-title">${esc(w.brand)}</div>
     <div class="rh-sub">${esc(w.address)}</div>
     <div class="rh-grid"><div class="rh-cust"><div class="muted">Firma</div><div>${esc(cust.name||'')}</div><div>${esc(cust.contact||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
-    <h2 class="rh-h">Rechnung</h2>
+    
     ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
 }
 
@@ -2610,7 +2609,7 @@ function settings(){
   <option value="classic" ${db.settings.invoiceTpl==='classic'?'selected':''}>كلاسيكي — إطار أزرق رسمي</option>
   <option value="atelier" ${db.settings.invoiceTpl==='atelier'?'selected':''}>أتيليه — عنوان عريض وBeleg بارز</option>
  </select></div>
- <div class="field span2"><label>اسم الورشة التجاري</label><input id="wbrand" value="${esc(db.settings.workshopBrand||'TST')}"></div>
+ <div class="field span2"><label>اسم الورشة التجاري</label><input id="wbrand" value="${esc(db.settings.workshopBrand||'STS')}"></div>
  <div class="field span2"><label>الاسم القانوني على الفاتورة</label><input id="wname" value="${esc(db.settings.workshopName||'')}"></div>
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(db.settings.workshopTaxId||'')}"></div>
  <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(db.settings.workshopSteuerNr||'')}"></div>
