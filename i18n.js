@@ -23,7 +23,9 @@ window.WP_LANGS = [
 
 window.WP_I18N = {
 en:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
-dash:'Today',customers:'Customers',vehicles:'Vehicles',repairs:'Repair orders',appointments:'Appointments',
+dash:'Today',todayBoard:'Today',carsInShop:'Cars in shop',openJobs:'Open jobs',todayAppts:'Appointments today',lowStock:'Low stock',sales:'Sales',netApprox:'Approx. net',
+stockAlert:'Stock alert',maintDue:'Service due',
+customers:'Customers',vehicles:'Vehicles',repairs:'Repair orders',appointments:'Appointments',
 estimates:'Quotes',invoices:'Invoices & cash sale',purchases:'Purchases',inventory:'Inventory & parts',
 employees:'Staff & payroll',expenses:'Expenses',journal:'Journal',reports:'Reports',integrations:'Integrations',
 audit:'Activity log',settings:'Settings',search:'Search: plate / customer / part / job',
@@ -55,7 +57,9 @@ font:'Font size',language:'Program language',hourly:'Labor hourly rate €',phon
 invoiceNote:'Invoices stay in German when the active company is in Germany.',
 saved:'Saved',backup:'Export backup',sync:'Sync from cloud',reset:'Reset demo data'},
 de:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Benutzername',pass:'Passwort',login:'Anmelden',logout:'Abmelden',
-dash:'Heute',customers:'Kunden',vehicles:'Fahrzeuge',repairs:'Reparaturaufträge',appointments:'Termine',
+dash:'Heute',todayBoard:'Heute',carsInShop:'Fahrzeuge in der Werkstatt',openJobs:'Offene Aufträge',todayAppts:'Termine heute',lowStock:'Lagerengpass',sales:'Umsatz',netApprox:'Näherungsweise Netto',
+stockAlert:'Lagerhinweis',maintDue:'Fällige Wartung',
+customers:'Kunden',vehicles:'Fahrzeuge',repairs:'Reparaturaufträge',appointments:'Termine',
 estimates:'Kostenvoranschläge',invoices:'Rechnungen & Barverkauf',purchases:'Einkäufe',inventory:'Lager & Teile',
 employees:'Mitarbeiter & Lohn',expenses:'Ausgaben',journal:'Journal',reports:'Berichte',integrations:'Integrationen',
 audit:'Aktivitätsprotokoll',settings:'Einstellungen',search:'Suche: Kennzeichen / Kunde / Teil / Auftrag',
@@ -87,7 +91,9 @@ font:'Schriftgröße',language:'Programmsprache',hourly:'Stundensatz €',phone:
 invoiceNote:'Rechnungen bleiben auf Deutsch, wenn die aktive Firma in Deutschland ist.',
 saved:'Gespeichert',backup:'Backup exportieren',sync:'Aus Cloud synchronisieren',reset:'Demodaten löschen'},
 ar:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'اسم المستخدم',pass:'كلمة المرور',login:'دخول',logout:'خروج',
-dash:'الرئيسية',customers:'العملاء',vehicles:'السيارات',repairs:'أوامر الإصلاح',appointments:'المواعيد',
+dash:'الرئيسية',todayBoard:'لوحة اليوم',carsInShop:'سيارات داخل الورشة',openJobs:'أوامر مفتوحة',todayAppts:'مواعيد اليوم',lowStock:'نقص مخزون',sales:'المبيعات',netApprox:'صافي تقريبي',
+stockAlert:'تنبيه مخزون',maintDue:'صيانة مستحقة',
+customers:'العملاء',vehicles:'السيارات',repairs:'أوامر الإصلاح',appointments:'المواعيد',
 estimates:'Kostenvoranschlag',invoices:'الفواتير و Barverkauf',purchases:'المشتريات',inventory:'المخزون وقطع الغيار',
 employees:'الموظفون والرواتب',expenses:'المصاريف',journal:'دفتر اليومية',reports:'التقارير',integrations:'التكاملات',
 audit:'سجل النشاط',settings:'الإعدادات',search:'بحث: لوحة / زبون / قطعة / أمر',
@@ -137,9 +143,10 @@ window.WP_INV_DE = {
 };
 
 window.t = function(key){
-  const lang = (window.db && db.settings && db.settings.uiLang) || (window.db && window.db.settings && window.db.settings.uiLang) || 'ar';
-  const pack = window.WP_I18N[lang] || window.WP_I18N.en;
-  return pack[key] || window.WP_I18N.en[key] || key;
+  const store = (typeof db!=='undefined' && db) || window.db || window.WP && WP.db;
+  const lang = (store && store.settings && store.settings.uiLang) || 'ar';
+  const pack = (window.WP_I18N && (WP_I18N[lang] || WP_I18N.en)) || {};
+  return pack[key] || (window.WP_I18N && WP_I18N.en && WP_I18N.en[key]) || key;
 };
 window.docLang = function(){
   const co = window.session && session.company;

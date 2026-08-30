@@ -350,17 +350,17 @@ function dashboard(){
  const low=lowStock(), due=maintenanceDue();
  const todayAp=companyRows('appointments').filter(a=>a.date===todayISO());
  const inside=rep.filter(r=>['قيد التنفيذ','جاري العمل','استلام','تشخيص','انتظار قطع'].includes(r.status));
- $('#content').innerHTML=head('لوحة اليوم')+`
+ $('#content').innerHTML=head(t('todayBoard'))+`
  <div class="grid">
-  <div class="card"><div class="muted">سيارات داخل الورشة</div><div class="metric">${inside.length}</div></div>
-  <div class="card"><div class="muted">أوامر مفتوحة</div><div class="metric">${rep.length}</div></div>
-  <div class="card"><div class="muted">مواعيد اليوم</div><div class="metric">${todayAp.length}</div></div>
-  <div class="card"><div class="muted">نقص مخزون</div><div class="metric">${low.length}</div></div>
-  <div class="card"><div class="muted">المبيعات</div><div class="metric">${money(sales)}</div></div>
-  ${session.user.role==='manager'?`<div class="card"><div class="muted">صافي تقريبي</div><div class="metric">${money(sales-costs)}</div></div>`:''}
+  <div class="card"><div class="muted">${t('carsInShop')}</div><div class="metric">${inside.length}</div></div>
+  <div class="card"><div class="muted">${t('openJobs')}</div><div class="metric">${rep.length}</div></div>
+  <div class="card"><div class="muted">${t('todayAppts')}</div><div class="metric">${todayAp.length}</div></div>
+  <div class="card"><div class="muted">${t('lowStock')}</div><div class="metric">${low.length}</div></div>
+  <div class="card"><div class="muted">${t('sales')}</div><div class="metric">${money(sales)}</div></div>
+  ${session.user.role==='manager'?`<div class="card"><div class="muted">${t('netApprox')}</div><div class="metric">${money(sales-costs)}</div></div>`:''}
  </div>
- ${low.length?`<div class="alert"><b>تنبيه مخزون:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+')').join(' · ')}</div>`:''}
- ${due.length?`<div class="alert"><b>صيانة مستحقة:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' كم').join(' · ')}</div>`:''}
+ ${low.length?`<div class="alert"><b>${t('stockAlert')}:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+')').join(' · ')}</div>`:''}
+ ${due.length?`<div class="alert"><b>${t('maintDue')}:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' km').join(' · ')}</div>`:''}
  ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
  return `<div class="card" style="margin-top:12px"><b>تقرير الضريبة (USt 19%)</b>
  <div class="grid" style="margin-top:8px">
