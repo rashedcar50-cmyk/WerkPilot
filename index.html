@@ -1596,7 +1596,7 @@ function invoices(){
  listShareBar('invoices')+
  table(['رقم','النوع','السيارة','الإجمالي','الدفع','تصميم'],rows.map(x=>[
   esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'بيع مباشر', money(x.total), esc(x.payment||'-'),
-  `<button class="btn small primary" onclick="previewInvoice('${x.id}')">عرض</button>
+  `<button class="btn small primary" onclick="previewInvoice('${x.id}')">معاينة</button>
    <button class="btn small" onclick="editInvoice('${x.id}')">تعديل</button>
    <button class="btn small bad" onclick="deleteInvoice('${x.id}')">حذف</button>
    <button class="btn small" onclick="exportPrint('invoices','${x.id}')">طباعة</button>`
