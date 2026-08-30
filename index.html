@@ -183,7 +183,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',workshopAddress:'HANS-KOCH-RING 12, 21493 SCHWARZENBEK',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'RASHID TABAH',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',workshopAddress:'HANS-KOCH-RING 12, 21493 SCHWARZENBEK',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'RASHID TABAH',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html'}
 };
 let db=load(), session=null;
 
@@ -197,6 +197,7 @@ function load(){
   ['customers','vehicles','repairs','invoices','purchases','inventory','employees','expenses','appointments','estimates','journal'].forEach(k=>{
    if(!Array.isArray(merged[k]) || merged[k].length===0) merged[k]=clone(seed[k]||[]);
   });
+  if(!Array.isArray(merged.katyCache)) merged.katyCache=[];
   if(!merged.settings) merged.settings=clone(seed.settings);
   merged.settings={...clone(seed.settings),...merged.settings};
   const placeholders=['Musterstraße 12, 10115 Berlin','DE123456789','DE89 3704 0044 0532 0130 00','+49 170 1112233'];
@@ -1642,6 +1643,49 @@ function buildWorkshopRechnung(x){
   </div>`;
 }
 
+
+function lookupKatyArticle(sku){
+  sku=String(sku||'').trim();
+  if(!sku) return null;
+  const up=sku.toUpperCase();
+  const inv=(db.inventory||[]).find(x=>String(x.sku||'').toUpperCase()===up || String(x.name||'').toUpperCase()===up);
+  if(inv) return {sku:inv.sku||sku,name:inv.name,qty:1,price:Number(inv.sell||inv.buy||0),source:'مخزون'};
+  const cache=(db.katyCache||[]).find(x=>String(x.sku||'').toUpperCase()===up);
+  if(cache) return {sku:cache.sku,name:cache.name,qty:1,price:Number(cache.price||0),source:'Katy'};
+  const fromInv=(db.invoices||[]).flatMap(i=>i.lines||[]).find(l=>String(l.sku||'').toUpperCase()===up);
+  if(fromInv) return {sku:fromInv.sku,name:fromInv.name,qty:1,price:Number(fromInv.price||0),source:'فاتورة سابقة'};
+  return null;
+}
+function rememberKatyArticle(art){
+  if(!art||!art.sku) return;
+  db.katyCache=db.katyCache||[];
+  const i=db.katyCache.findIndex(x=>String(x.sku).toUpperCase()===String(art.sku).toUpperCase());
+  const row={sku:art.sku,name:art.name,price:Number(art.price||0),ts:Date.now()};
+  if(i>=0) db.katyCache[i]=row; else db.katyCache.unshift(row);
+  db.katyCache=db.katyCache.slice(0,400);
+  save();
+}
+function openKatySearch(sku){
+  const base=(db.settings.katyUrl||'https://www.matthies.de/software/katy.html').trim();
+  const q=encodeURIComponent(sku||'');
+  window.open(q? (base + (base.includes('?')?'&':'?') + 'q='+q) : base, '_blank');
+}
+function parseInvoiceLine(l){
+  const parts=l.split('|').map(x=>x.trim());
+  if(parts.length>=4) return {sku:parts[0],name:parts[1],qty:Number(parts[2]||1),price:Number(parts[3]||0)};
+  if(parts.length===3){
+    const hit=lookupKatyArticle(parts[0]);
+    if(hit && !isNaN(parts[1]) && !isNaN(parts[2])) return {sku:parts[0],name:hit.name,qty:Number(parts[1]),price:Number(parts[2])};
+    return {sku:'',name:parts[0],qty:Number(parts[1]||1),price:Number(parts[2]||0)};
+  }
+  if(parts.length===1){
+    const hit=lookupKatyArticle(parts[0]);
+    if(hit) return hit;
+    return {sku:parts[0],name:parts[0],qty:1,price:0};
+  }
+  return {sku:'',name:parts[0]||'Position',qty:Number(parts[1]||1),price:Number(parts[2]||0)};
+}
+
 function invoiceDesigner(kind='invoice'){
   const title = kind==='bar' ? 'Barverkauf' : 'إنشاء فاتورة';
   modal(title, `<div class="form-grid">
@@ -1649,14 +1693,21 @@ function invoiceDesigner(kind='invoice'){
     <div class="field"><label>طريقة الدفع</label><select id="pay"><option>غير محدد</option><option>نقدي</option><option>بطاقة</option><option>تحويل بنكي</option></select></div>
     <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="19"></div>
     <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="0"></div>
-    <div class="field span2"><label>بنود الفاتورة (سطر: الاسم|الكمية|السعر)</label>
-      <textarea id="ilines" placeholder="Ölwechsel|1|89.00&#10;Innenraumfilter|1|24.90&#10;Arbeitslohn 1.5h|1|127.50">Arbeitslohn|1|${db.settings.hourlyRate||85}</textarea>
+    <div class="field span2"><label>رقم قطعة Katy / Matthies</label>
+      <div class="toolbar">
+        <input id="katySku" placeholder="مثلاً 5584060">
+        <input id="katyQty" type="number" value="1" min="1" style="width:80px">
+        <button type="button" class="btn primary" id="katyFetch">جلب البيانات</button>
+        <button type="button" class="btn" id="katyOpen">فتح Katy</button>
+      </div>
+      <div id="katyHint" class="hint">اكتب رقم القطعة — إذا موجودة بالمخزون أو كاتي المحفوظ تتعبّى تلقائي. أول مرة افتح Katy وسجّل دخول.</div>
+    </div>
+    <div class="field span2"><label>بنود الفاتورة (رقم|الاسم|الكمية|السعر)</label>
+      <textarea id="ilines" placeholder="5584060|OEL MOT 0W30 P 1L JMC|7|14.79">Arbeitswert||1.5|${db.settings.hourlyRate||100}</textarea>
     </div>
   </div>`,()=>{
-    const lines=$('#ilines').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
-      const [name,qty,price]=l.split('|');
-      return {name:(name||'Position').trim(), qty:Number(qty||1), price:Number(price||0)};
-    });
+    const lines=$('#ilines').value.split('\n').map(l=>l.trim()).filter(Boolean).map(parseInvoiceLine);
+
     if(!lines.length) return toast('أضف بند واحد على الأقل');
     const parts=lines.filter(x=>!/lohn|أجر|arbeit/i.test(x.name)).reduce((s,x)=>s+x.qty*x.price,0);
     const labor=lines.filter(x=>/lohn|أجر|arbeit/i.test(x.name)).reduce((s,x)=>s+x.qty*x.price,0);
@@ -1665,11 +1716,32 @@ function invoiceDesigner(kind='invoice'){
     const obj={id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,parts,labor,discount,tax,net,total,date:new Date().toISOString(),
       type:kind==='bar'?'Barverkauf':'فاتورة', payment:$('#pay').value, paid:['نقدي','بطاقة'].includes($('#pay').value),
       number:nextInvoiceNumber(), lines};
+    lines.forEach(rememberKatyArticle);
     db.invoices.push(obj); upsertInvoiceCloud(obj);
     db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
     audit('invoice.create',obj.number); save(); closeModal(); render();
     setTimeout(()=>previewInvoice(obj.id), 200);
   }, 'حفظ وعرض التصميم');
+  const doFetch=()=>{
+    const sku=$('#katySku').value.trim();
+    if(!sku) return toast('أدخل رقم القطعة');
+    const qty=Number($('#katyQty').value||1);
+    const hit=lookupKatyArticle(sku);
+    if(hit){
+      hit.qty=qty;
+      const line=[hit.sku||sku, hit.name, hit.qty, hit.price].join('|');
+      const ta=$('#ilines');
+      ta.value=(ta.value?ta.value+'\n':'')+line;
+      $('#katyHint').textContent='تم الجلب من '+hit.source+' — '+hit.name+' / '+hit.price+' €';
+      rememberKatyArticle(hit);
+    } else {
+      $('#katyHint').textContent='ما انوجدت محلياً. سجّل دخول Katy مرة، انسخ الاسم والسعر، أو أضف القطعة للمخزون.';
+      openKatySearch(sku);
+    }
+  };
+  if($('#katyFetch')) $('#katyFetch').onclick=doFetch;
+  if($('#katyOpen')) $('#katyOpen').onclick=()=>openKatySearch($('#katySku').value.trim());
+  if($('#katySku')) $('#katySku').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
 }
 function previewInvoice(iid){
   exportPrint('invoices', iid);
@@ -2331,10 +2403,26 @@ function integrations(){
  </div>
  <div class="card"><b>واتساب الورشة</b><p class="muted">إرسال جاهزية السيارة من شاشة أوامر الإصلاح.</p></div>
  <div class="card"><b>TSE / Kasse</b><p class="muted">نقطة تكامل جاهزة. الربط الحقيقي يحتاج مزوداً معتمداً.</p></div>
- <div class="card"><b>البنك / MATIS</b><p class="muted">يتطلب حساب وواجهة مرخّصة.</p></div>
+ <div class="card"><b>Matthies Katy / ماتيس</b>
+  <p class="muted">سجّل دخولك مرة. بعدها اكتب رقم القطعة بالفاتورة وبنجيب الاسم والسعر من المخزون أو من القطع المحفوظة. الربط السعري المباشر مع سيرفر Katy يحتاج واجهة رسمية من Matthies.</p>
+  <div class="field"><label>مستخدم Katy</label><input id="katyU" value="${esc(db.settings.katyUser||'')}"></div>
+  <div class="field"><label>كلمة سر Katy</label><input id="katyP" type="password" value="${esc(db.settings.katyPass||'')}"></div>
+  <div class="toolbar"><button class="btn primary" id="katySave">حفظ الدخول</button>
+  <button class="btn" id="katyGo">فتح Katy وتسجيل الدخول</button></div>
+ </div>
  </div>`;
  const btn=$('#plOpen');
  if(btn) btn.onclick=()=>openPartsLink($('#plCar').value);
+ if($('#katySave')) $('#katySave').onclick=()=>{
+   db.settings.katyUser=$('#katyU').value.trim();
+   db.settings.katyPass=$('#katyP').value;
+   db.settings.katyLogged=true;
+   save(); toast('تم حفظ دخول Katy على هذا الجهاز');
+ };
+ if($('#katyGo')) $('#katyGo').onclick=()=>{
+   db.settings.katyLogged=true; save();
+   openKatySearch('');
+ };
 }
 function auditPage(){
  const rows=db.audit.filter(a=>!session.company||a.company===session.company.id||!a.company).slice(0,200);
