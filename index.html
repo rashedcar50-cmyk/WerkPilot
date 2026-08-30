@@ -186,7 +186,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
 };
 let db=load(), session=null;
 
@@ -796,10 +796,10 @@ function printDocMarkup(type, id){
   const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":(WP_RTL.includes(db.settings.uiLang||"ar")?"rtl":"ltr");
   return `<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>TST</title>
     <style>
-      @page{size:A4;margin:8mm}
+      @page{size:${(db.settings.printPaper||'A4')} portrait;margin:${(db.settings.printMargin||'8mm')}}
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
       html,body{height:auto;margin:0}
-      body{font-family:Arial,Helvetica,sans-serif;padding:0;direction:${ddr};color:#111;font-size:11px}
+      body{font-family:Arial,Helvetica,sans-serif;padding:0;direction:${ddr};color:#111;font-size:11px${(db.settings.printColor===false)?';filter:grayscale(1)':''}}
       .print-doc,.inv-a4{margin:0;padding:0}
       .rechnung{width:100%;max-width:190mm;margin:0 auto}
       .rh-main{display:block}
@@ -2644,6 +2644,19 @@ function settings(){
  <div class="field"><label>HRB</label><input id="whrb" value="${esc(db.settings.workshopHrb||'25248 HL')}" placeholder="25248 HL"></div>
  <div class="field"><label>Sitz</label><input id="wsitz" value="${esc(db.settings.workshopSitz||'Schwarzenbek')}"></div>
  <div class="field"><label>مهلة الدفع (أيام)</label><input id="pdays" type="number" value="${db.settings.paymentDays||0}"></div>
+ <div class="field"><label>ورق الطباعة</label><select id="ppaper">
+  <option value="A4" ${(db.settings.printPaper||'A4')==='A4'?'selected':''}>A4</option>
+  <option value="A5" ${db.settings.printPaper==='A5'?'selected':''}>A5</option>
+ </select></div>
+ <div class="field"><label>هوامش الطباعة</label><select id="pmargin">
+  <option value="6mm" ${db.settings.printMargin==='6mm'?'selected':''}>ضيقة 6مم</option>
+  <option value="8mm" ${(db.settings.printMargin||'8mm')==='8mm'?'selected':''}>افتراضي 8مم</option>
+  <option value="12mm" ${db.settings.printMargin==='12mm'?'selected':''}>عادية 12مم</option>
+ </select></div>
+ <div class="field"><label>ألوان الطباعة</label><select id="pcolor">
+  <option value="1" ${db.settings.printColor!==false?'selected':''}>ملون (أسود/ذهبي)</option>
+  <option value="0" ${db.settings.printColor===false?'selected':''}>أبيض وأسود</option>
+ </select></div>
  <div class="field"><label>البنك</label><input id="wbank" value="${esc(db.settings.workshopBank||'')}"></div>
  <div class="field"><label>إيميل الفاتورة</label><input id="wmail" value="${esc(db.settings.workshopEmail||'')}"></div>
  <div class="field"><label>Amtsgericht</label><input id="wcourt" value="${esc(db.settings.workshopCourt||'')}"></div>
@@ -2659,7 +2672,7 @@ function settings(){
  </div>
  </div>`;
  if($('#lang')) $('#lang').onchange=()=>{db.settings.uiLang=$('#lang').value;save();applyUiLang();render();};
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;if($('#itpl')) db.settings.invoiceTpl=$('#itpl').value;if($('#wbrand')) db.settings.workshopBrand=$('#wbrand').value;if($('#wname')) db.settings.workshopName=$('#wname').value;if($('#wstnr')) db.settings.workshopSteuerNr=$('#wstnr').value;if($('#wbank')) db.settings.workshopBank=$('#wbank').value;if($('#wmail')) db.settings.workshopEmail=$('#wmail').value;if($('#wcourt')) db.settings.workshopCourt=$('#wcourt').value;if($('#wowner')) db.settings.workshopOwner=$('#wowner').value;if($('#wbic')) db.settings.workshopBic=$('#wbic').value;if($('#whrb')) db.settings.workshopHrb=$('#whrb').value;if($('#wsitz')) db.settings.workshopSitz=$('#wsitz').value;if($('#pdays')) db.settings.paymentDays=+$('#pdays').value||0;const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;if($('#itpl')) db.settings.invoiceTpl=$('#itpl').value;if($('#wbrand')) db.settings.workshopBrand=$('#wbrand').value;if($('#wname')) db.settings.workshopName=$('#wname').value;if($('#wstnr')) db.settings.workshopSteuerNr=$('#wstnr').value;if($('#wbank')) db.settings.workshopBank=$('#wbank').value;if($('#wmail')) db.settings.workshopEmail=$('#wmail').value;if($('#wcourt')) db.settings.workshopCourt=$('#wcourt').value;if($('#wowner')) db.settings.workshopOwner=$('#wowner').value;if($('#wbic')) db.settings.workshopBic=$('#wbic').value;if($('#whrb')) db.settings.workshopHrb=$('#whrb').value;if($('#wsitz')) db.settings.workshopSitz=$('#wsitz').value;if($('#pdays')) db.settings.paymentDays=+$('#pdays').value||0;if($('#ppaper')) db.settings.printPaper=$('#ppaper').value;if($('#pmargin')) db.settings.printMargin=$('#pmargin').value;if($('#pcolor')) db.settings.printColor=$('#pcolor').value!=='0';const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
