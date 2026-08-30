@@ -609,6 +609,13 @@ function fillVinFields(info, ids){
   if(ids.en) set(ids.en, info.engine);
   if(ids.pa && info.paint) set(ids.pa, info.paint);
 }
+function openDistriAutoVin(vin){
+  vin=cleanVin(vin);
+  const url=vin
+    ? 'https://www.distriauto.de/teile-auto/suche?q='+encodeURIComponent(vin)
+    : 'https://www.distriauto.de/';
+  window.open(url,'_blank');
+}
 function bindVinEnter(inputId, ids){
   const el=$(inputId); if(!el) return;
   el.placeholder=el.placeholder||'17 خانة ثم Enter';
@@ -627,6 +634,7 @@ function bindVinEnter(inputId, ids){
       if(!info.engine) miss.push('كود المحرك');
       if(!info.engine_displacement_cm3) miss.push('سعة المحرك');
       toast(((info.make||'')+' '+(info.model||'')+' '+(info.year||'')+(info.engine_displacement_cm3?(' · '+info.engine_displacement_cm3+' cm³'):'')+(info.engine?(' · '+info.engine):'')).trim()+(miss.length?(' — ناقص: '+miss.join('، ')+' (اللون ما بينقرأ من VIN)'):' — اللون ما بينقرأ من VIN'));
+      openDistriAutoVin(vin);
     }catch(e){ toast(e.message||'تعذر قراءة VIN'); }
   });
 }
@@ -1409,7 +1417,12 @@ function vehicleModal(prefill={}){
     <input id="tsn" value="${esc(prefill.tsn||'')}" maxlength="3" placeholder="TSN 2.2">
   </div>
  </div>
- <div class="field"><label>Partslink24</label><button type="button" class="btn" id="partslinkBtn">فتح partslink24</button></div>
+ <div class="field span2"><label>كتالوج القطع</label>
+  <div class="toolbar">
+    <button type="button" class="btn" id="partslinkBtn">PartsLink24</button>
+    <button type="button" class="btn primary" id="distriBtn">DistriAuto (VIN)</button>
+  </div>
+ </div>
  <div class="field"><label>الماركة</label><input id="mk" value="${esc(prefill.make||'')}"></div>
  <div class="field"><label>الموديل</label><input id="mo" value="${esc(prefill.model||'')}"></div>
  <div class="field"><label>السنة</label><input id="yr" type="number" value="${esc(prefill.year||'')}"></div>
@@ -1429,9 +1442,8 @@ function vehicleModal(prefill={}){
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
   else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
  });
-  $('#partslinkBtn').onclick=()=>{
-window.open('https://www.partslink24.com/','_blank');
-};
+  $('#partslinkBtn').onclick=()=>window.open('https://www.partslink24.com/','_blank');
+  if($('#distriBtn')) $('#distriBtn').onclick=()=>openDistriAutoVin($('#vin')?.value||'');
   bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en',pa:'#pa'});
   bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',year:'#yr',kw:'#kw',cc:'#cc',fuel:'#fuel',seats:'#vseats',weight:'#vmaxw',klass:'#vklass'});
 }
