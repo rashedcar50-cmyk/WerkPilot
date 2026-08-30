@@ -1684,15 +1684,13 @@ function metaTbl(m){
 }
 function buildWorkshopRechnung(x){
   const m=invoiceModel(x);
-  const tpl=db.settings.invoiceTpl||'werkstatt';
+  const tpl=db.settings.invoiceTpl||'modern';
   const {w,cust}=m;
   if(tpl==='modern'){
     return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
-      <table class="rh-band" width="100%" cellpadding="0" cellspacing="0" bgcolor="#111111" style="background:#111;color:#d4af37;width:100%;border-collapse:collapse;border-bottom:3px solid #d4af37">
-        <tr>
-          <td style="padding:12px;color:#d4af37;font-size:28px;font-weight:800;letter-spacing:6px;text-align:center">${esc(w.brand)}</td>
-        </tr>
-      </table>
+      <div class="rh-band" style="display:block;width:100%;text-align:center;background:#111;padding:16px 0;margin:0 0 10px;border-bottom:3px solid #d4af37">
+        <div style="display:block;width:100%;text-align:center;color:#d4af37;font-size:32px;font-weight:800;letter-spacing:10px">${esc(w.brand)}</div>
+      </div>
       <div class="rh-sub">${esc(w.address)} · Tel. ${esc(w.phone)} · ${esc(w.email)}</div>
       <div class="rh-grid"><div class="rh-cust"><div class="muted">Rechnungsempfänger</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
@@ -2604,7 +2602,7 @@ function settings(){
  <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(db.settings.workshopPhone||'')}"></div>
  <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(db.settings.workshopAddress||'')}"></div>
  <div class="field span2"><label>قالب الفاتورة</label><select id="itpl">
-  <option value="werkstatt" ${(db.settings.invoiceTpl||'werkstatt')==='werkstatt'?'selected':''}>ورشة — مثل فاتورتكم الحالية</option>
+  <option value="werkstatt" ${(db.settings.invoiceTpl||'modern')==='werkstatt'?'selected':''}>ورشة — مثل فاتورتكم الحالية</option>
   <option value="modern" ${db.settings.invoiceTpl==='modern'?'selected':''}>حديث — شريط أسود وذهبي</option>
   <option value="classic" ${db.settings.invoiceTpl==='classic'?'selected':''}>كلاسيكي — إطار أزرق رسمي</option>
   <option value="atelier" ${db.settings.invoiceTpl==='atelier'?'selected':''}>أتيليه — عنوان عريض وBeleg بارز</option>
