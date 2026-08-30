@@ -183,7 +183,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',workshopAddress:'HANS-KOCH-RING 12, 21493 SCHWARZENBEK',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'RASHID TABAH',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html'}
+ settings:{theme:'dark',font:16,uiLang:'ar',invoiceSeq:311,hourlyRate:100,workshopName:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',workshopAddress:'HANS-KOCH-RING 12, 21493 SCHWARZENBEK',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'RASHID TABAH',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'AUTOSERVICE UND AUTOTEILE UG (haftungsbeschränkt)',katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/'}
 };
 let db=load(), session=null;
 
@@ -1644,6 +1644,38 @@ function buildWorkshopRechnung(x){
 }
 
 
+
+function importHenryArticles(text){
+  const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(!lines.length) return 0;
+  const sep=lines[0].includes(';')?';':(lines[0].includes('\t')?'\t':',');
+  let n=0;
+  lines.forEach((line,idx)=>{
+    const c=line.split(sep).map(x=>x.replace(/^"|"$/g,'').trim());
+    if(!c.length) return;
+    if(idx===0 && /artikel|nr|bezeich|name|sku/i.test(line) && !/\d{4,}/.test(c[0])) return;
+    const sku=c[0];
+    if(!sku) return;
+    const name=c[1]||sku;
+    let price=0;
+    for(const x of c.slice(2)){
+      const v=Number(String(x).replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''));
+      if(v>0){ price=v; break; }
+    }
+    rememberKatyArticle({sku,name,price});
+    let inv=(db.inventory||[]).find(x=>String(x.sku||'').toUpperCase()===sku.toUpperCase());
+    if(!inv){
+      inv={id:id('n'),companyId:session.company.id,sku,name,qty:0,buy:price,sell:price,minQty:3};
+      db.inventory.push(inv);
+    } else {
+      if(price) inv.sell=price;
+      if(name) inv.name=name;
+    }
+    n++;
+  });
+  save();
+  return n;
+}
 function lookupKatyArticle(sku){
   sku=String(sku||'').trim();
   if(!sku) return null;
@@ -2408,7 +2440,10 @@ function integrations(){
   <div class="field"><label>مستخدم Katy</label><input id="katyU" value="${esc(db.settings.katyUser||'')}"></div>
   <div class="field"><label>كلمة سر Katy</label><input id="katyP" type="password" value="${esc(db.settings.katyPass||'')}"></div>
   <div class="toolbar"><button class="btn primary" id="katySave">حفظ الدخول</button>
-  <button class="btn" id="katyGo">فتح Katy وتسجيل الدخول</button></div>
+  <button class="btn" id="katyGo">فتح Katy</button>
+  <button class="btn" id="henryGo">فتح Henry</button></div>
+  <p class="hint">استورد قائمة القطع من Henry (CSV أو Excel محفوظ كـ CSV: رقم؛اسم؛سعر). بعدها رقم القطعة بالفاتورة بيعبّي الباقي تلقائي.</p>
+  <input id="henryFile" type="file" accept=".csv,.txt,.tsv">
  </div>
  </div>`;
  const btn=$('#plOpen');
@@ -2422,6 +2457,13 @@ function integrations(){
  if($('#katyGo')) $('#katyGo').onclick=()=>{
    db.settings.katyLogged=true; save();
    openKatySearch('');
+ };
+ if($('#henryGo')) $('#henryGo').onclick=()=>window.open(db.settings.henryUrl||'https://www.matthies.de/software/henry-jr.print.html','_blank');
+ if($('#henryFile')) $('#henryFile').onchange=e=>{
+   const f=e.target.files[0]; if(!f) return;
+   const r=new FileReader();
+   r.onload=()=>{ const n=importHenryArticles(r.result); toast('تم استيراد '+n+' قطعة من Henry'); };
+   r.readAsText(f);
  };
 }
 function auditPage(){
