@@ -62,6 +62,7 @@ th{background:#10141c;position:sticky;top:0}
 .status{padding:4px 8px;border-radius:999px;background:#334155}.status.ok{background:#14532d}.status.warn{background:#78350f}
 .modal-back{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:18px;z-index:50}
 .modal{width:min(760px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
+.modal.wide{width:min(980px,100%)}
 .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.span2{grid-column:1/-1}
 .filebox{border:1px dashed #64748b;border-radius:12px;padding:12px;background:#0f172a}
@@ -870,7 +871,7 @@ window.exportEmail = exportEmail;
 window.exportWhatsApp = exportWhatsApp;
 
 function modal(title,body,onSave,saveText='حفظ'){
- $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal">
+ $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal${/فاتورة|Barverkauf/.test(title)?' wide':''}">
  <div class="modal-head"><h2>${title}</h2><button class="btn ghost small" id="xmod">✕</button></div>
  ${body}<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="msave">${saveText}</button><button class="btn ghost" id="mcancel">إلغاء</button></div>
  </div></div>`;
@@ -1779,7 +1780,7 @@ function invoiceDesigner(kind='invoice'){
       <label>بنود الفاتورة</label>
       <div class="table-wrap">
         <table class="inv-edit">
-          <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>البند</th><th>الوصف</th><th>العدد</th><th>السعر</th><th>المجموع</th><th>MwSt.</th><th></th></tr></thead>
           <tbody id="invRows"></tbody>
         </table>
       </div>
