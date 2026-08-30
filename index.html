@@ -72,7 +72,7 @@ th{background:#10141c;position:sticky;top:0}
 @media(max-width:560px){.grid,.form-grid{grid-template-columns:1fr}.span2{grid-column:auto}.hide-mobile{display:none}}
 
 @media print{
-  .sidebar,.topbar,.toolbar,.btn,.nav,.mobile-menu,#modalRoot,.toast{display:none!important}
+  .sidebar,.topbar,.toolbar,.btn,.nav,.mobile-menu,.bottom-nav,#modalRoot,.toast{display:none!important}
   .shell{display:block}
   .main,.content{padding:0;max-width:100%}
   body{background:#fff;color:#000}
@@ -97,6 +97,24 @@ th{background:#10141c;position:sticky;top:0}
 }
 .status.bad{background:#7f1d1d}
 .status.info{background:#1e3a8a}
+.login-fail{color:#E8A54B;min-height:1.2em;margin-top:8px}
+.bottom-nav{display:none}
+.repair-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px}
+.repair-card .row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.steps button{font-size:.8rem}
+@media(max-width:900px){
+  .content{padding:14px 14px 88px}
+  .topbar{flex-wrap:wrap}
+  .searchbox{min-width:0;width:100%;max-width:none}
+  .top-actions{width:100%}
+  .table-wrap{margin-bottom:8px}
+  table{min-width:520px}
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:20;background:#10141c;border-top:1px solid var(--line);justify-content:space-around;padding:8px 4px calc(8px + env(safe-area-inset-bottom))}
+  .bottom-nav button{flex:1;background:transparent;border:0;color:var(--muted);font-size:.72rem;padding:8px 4px}
+  .bottom-nav button.active{color:var(--pri);font-weight:800}
+}
+
 
 
 </style>
@@ -459,18 +477,21 @@ function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
  <div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="tag">WERKSTATT. DIGITAL. EFFIZIENT.</div>
- <div class="field"><label>${t('user')}</label><input id="lu" value="admin"></div>
- <div class="field"><label>${t('pass')}</label><input id="lp" type="password" value="1234"></div>
+ <div class="field"><label>${t('user')}</label><input id="lu" autocomplete="username"></div>
+ <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'ar')}</select></div>
  <button class="btn primary full" id="loginBtn">${t('login')}</button>
- <div class="hint" style="margin-top:12px">admin / 1234 · accountant / 1234 · mechanic / 1234 · warehouse / 1234</div>
+ <div class="login-fail" id="loginErr"></div>
  </div></div>`;
+ window._loginFails = window._loginFails || 0;
  const lg=$('#loginLang');
  if(lg){ lg.onchange=()=>{db.settings.uiLang=lg.value;save();login();}; }
  $('#loginBtn').onclick=()=>{
   if(lg) {db.settings.uiLang=lg.value;save();}
-  const u=db.users.find(x=>x.u===$('#lu').value&&x.p===$('#lp').value);
-  if(!u)return toast('بيانات الدخول غير صحيحة');
+  if(window._loginFails>=5) return $('#loginErr').textContent='تم إيقاف المحاولة مؤقتاً. حدّث الصفحة بعد قليل.';
+  const u=db.users.find(x=>x.u===$('#lu').value.trim()&&x.p===$('#lp').value);
+  if(!u){ window._loginFails++; $('#loginErr').textContent='بيانات الدخول غير صحيحة'; return toast('بيانات الدخول غير صحيحة'); }
+  window._loginFails=0;
   session={user:u,company:db.companies[0],page:'dashboard'};
   audit('login');
   Promise.all([
@@ -497,7 +518,11 @@ function render(){
    <div class="top-actions"><span class="badge hide-mobile"><span class="dot"></span>${session.user.name}</span><button class="btn ghost small" id="logout">${t('logout')}</button></div>
   </div>
   <div class="content" id="content"></div>
- </main></div>`;
+ </main>
+ <nav class="bottom-nav">
+  ${[['dashboard','اليوم'],['repairs','الأوامر'],['vehicles','سيارات'],['appointments','مواعيد'],['invoices','فواتير']].filter(([k])=>roleCan(k)).map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
+ </nav>
+</div>`;
  $$('[data-page]').forEach(b=>b.onclick=()=>{session.page=b.dataset.page;render()});
  $('#logout').onclick=()=>{audit('logout');session=null;login()};
  $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';render()};
@@ -977,21 +1002,51 @@ function repairStatusClass(st){
   return '';
 }
 function repairs(){
+ if(session.repairId) return repairDesk(session.repairId);
  const rows=companyRows('repairs').slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
- $('#content').innerHTML=head('أوامر الإصلاح',canEdit()?`<button class="btn primary" id="add">أمر إصلاح جديد</button>`:'')+
- table(['السيارة','العطل','الفني','ساعات','قطع €','حالة','إجراءات'],rows.map(r=>[
-  vehicleName(r.vehicleId),
-  esc(r.complaint||r.description||'-'),
-  esc(r.tech||'-'),
-  esc(r.hours||0),
-  money(repairPartsTotal(r)),
-  `<span class="status ${repairStatusClass(r.status)}">${esc(r.status)}</span>`,
-  `<button class="btn small" onclick="openRepair('${r.id}')">تفاصيل</button>
-   <button class="btn small ok" onclick="convertRepairToInvoice('${r.id}')">فاتورة</button>
-   <button class="btn small" onclick="whatsappReady('${r.id}')">واتساب جاهز</button>`
- ]), 'repairs');
+ const cards=rows.map(r=>`
+  <div class="repair-card" onclick="openRepairDesk('${r.id}')">
+    <div class="row"><b>${esc(vehicleName(r.vehicleId))}</b><span class="status ${repairStatusClass(r.status)}">${esc(r.status)}</span></div>
+    <div class="muted">${esc(r.complaint||r.description||'-')}</div>
+    <div class="muted">${esc(r.tech||'-')} · ${esc(r.hours||0)} س · ${money(repairPartsTotal(r))}</div>
+  </div>`).join('') || '<div class="card muted">لا أوامر بعد.</div>';
+ $('#content').innerHTML=head('أوامر الإصلاح',canEdit()?`<button class="btn primary" id="add">أمر إصلاح جديد</button>`:'')+cards+
+ (canEdit()?`<div class="bottom-action"><button class="btn primary" id="add2">+ أمر إصلاح جديد</button></div>`:'');
  if(canEdit() && $('#add')) $('#add').onclick=repairModal;
+ if(canEdit() && $('#add2')) $('#add2').onclick=repairModal;
 }
+function openRepairDesk(rid){ session.repairId=rid; session.page='repairs'; render(); }
+window.openRepairDesk=openRepairDesk;
+function repairDesk(rid){
+ const r=db.repairs.find(x=>x.id===rid);
+ if(!r){ session.repairId=null; return repairs(); }
+ const v=vehicleOf(r.vehicleId); const c=customerOfVehicle(r.vehicleId);
+ const sts=['استلام','تشخيص','انتظار قطع','قيد التنفيذ','جاهز للتسليم','مسلَّم'];
+ $('#content').innerHTML=head('بطاقة الأمر',`<button class="btn ghost" id="backRep">رجوع</button>`)+`
+ <div class="card">
+  <div class="row" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <div><b>${esc(vehicleName(r.vehicleId))}</b><div class="muted">${esc(c?.name||'')} · ${esc(c?.phone||'')}</div></div>
+    ${v&&v.photo?`<img class="car-thumb" src="${v.photo}">`:''}
+  </div>
+  <div class="steps">${sts.map(s=>`<button class="btn small ${r.status===s?'primary':''}" onclick="setRepairStatus('${r.id}','${s}')">${s}</button>`).join('')}</div>
+  <p><b>الشكوى:</b> ${esc(r.complaint||'-')}<br><b>العمل:</b> ${esc(r.description||'-')}<br>
+  <b>كم:</b> ${esc(r.km||'-')} · <b>وقود:</b> ${esc(r.fuel||'-')} · <b>فني:</b> ${esc(r.tech||'-')}</p>
+  <p><b>الأعمال</b><br>${(r.jobs||[]).map(j=>'• '+esc(j)).join('<br>')||'-'}</p>
+  <p><b>القطع</b><br>${(r.parts||[]).map(p=>esc(p.name)+' × '+(p.qty||1)+' — '+money(p.price)).join('<br>')||'-'}</p>
+  <p>أجور تقديرية: ${money(repairLaborTotal(r))} · قطع: ${money(repairPartsTotal(r))}</p>
+  <div class="toolbar">
+    <button class="btn" onclick="openRepair('${r.id}')">تعديل</button>
+    <button class="btn ok" onclick="convertRepairToInvoice('${r.id}')">تحويل لفاتورة</button>
+    <button class="btn" onclick="whatsappReady('${r.id}')">واتساب جاهز</button>
+  </div>
+ </div>`;
+ $('#backRep').onclick=()=>{session.repairId=null;render()};
+}
+window.setRepairStatus=function(rid,st){
+  const r=db.repairs.find(x=>x.id===rid); if(!r) return;
+  r.status=st; save(); audit('repair.status',st); render();
+};
+
 function repairModal(existing){
  const r=existing||{};
  const jobs=(r.jobs||[]).join('\n');
