@@ -963,7 +963,9 @@ function customers(){
   esc(c.companyName? (c.companyName+' · '+(c.contact||c.name||'')) : (c.name||'-')),
   esc(c.phone||'-'),esc(c.taxId||c.ustId||'-'),esc(c.address||'-'),
   db.vehicles.filter(v=>v.customerId===c.id).length,
-  canEdit()?`<button class="btn small" onclick="editCustomer('${c.id}')">تعديل</button>`:'—'
+  canEdit()?`<button class="btn small" onclick="editCustomer('${c.id}')">تعديل</button>
+  <button class="btn small primary" onclick="invoiceForCustomer('${c.id}')">فاتورة جديدة</button>
+  <button class="btn small" onclick="invoicesForCustomer('${c.id}')">فواتير</button>`:'—'
  ]), 'customers');
  if(canEdit() && $('#add')) $('#add').onclick=customerModal;
 }
@@ -1586,8 +1588,11 @@ function estimates(){
  $('#add').onclick=()=>financeModal('estimate');
 }
 function invoices(){
- const rows=companyRows('invoices');
- $('#content').innerHTML=head('الفواتير',`<div class="toolbar"><button class="btn primary" id="inv">+ إنشاء فاتورة</button><button class="btn" id="bar">Barverkauf</button></div>`)+
+ const filter=session.customerFilter||'';
+ let rows=companyRows('invoices');
+ if(filter) rows=rows.filter(x=>x.customerId===filter || (vehicleOf(x.vehicleId)||{}).customerId===filter);
+ const cust=filter && db.customers.find(c=>c.id===filter);
+ $('#content').innerHTML=head(cust?('فواتير · '+(cust.companyName||cust.name)): 'الفواتير',`<div class="toolbar"><button class="btn primary" id="inv">+ إنشاء فاتورة</button><button class="btn" id="bar">Barverkauf</button>${filter?`<button class="btn" id="clrCust">كل الفواتير</button>`:''}</div>`)+
  listShareBar('invoices')+
  table(['رقم','النوع','السيارة','الإجمالي','الدفع','تصميم'],rows.map(x=>[
   esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'بيع مباشر', money(x.total), esc(x.payment||'-'),
@@ -1597,10 +1602,15 @@ function invoices(){
    <button class="btn small" onclick="exportWhatsApp('invoices','${x.id}')">واتساب</button>`
  ]), 'invoices')+
  `<div class="bottom-action"><button class="btn primary" id="inv2">+ إنشاء فاتورة</button></div>`;
- $('#inv').onclick=()=>invoiceDesigner();
- if($('#inv2')) $('#inv2').onclick=()=>invoiceDesigner();
- $('#bar').onclick=()=>invoiceDesigner('bar');
+ $('#inv').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
+ if($('#inv2')) $('#inv2').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
+ $('#bar').onclick=()=>invoiceDesigner('bar', session.customerFilter||'');
+ if($('#clrCust')) $('#clrCust').onclick=()=>{session.customerFilter=''; invoices();};
 }
+function invoiceForCustomer(cid){ invoiceDesigner('invoice', cid); }
+function invoicesForCustomer(cid){ session.customerFilter=cid; session.page='invoices'; render(); }
+window.invoiceForCustomer=invoiceForCustomer;
+window.invoicesForCustomer=invoicesForCustomer;
 function workshopInfo(){
   const s=db.settings||{};
   return {
@@ -1893,11 +1903,11 @@ function numberInvoiceRows(){
     const p=tr.querySelector('.c-pos'); if(p) p.textContent=i+1;
   });
 }
-function invoiceDesigner(kind='invoice'){
+function invoiceDesigner(kind='invoice', customerId=''){
   const title = kind==='bar' ? 'Barverkauf' : 'إنشاء فاتورة';
   const rate=db.settings.hourlyRate||100;
   modal(title, `<div class="form-grid">
-    <div class="field"><label>السيارة</label><select id="fv"><option value="">بدون سيارة / بيع مباشر</option>${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+    <div class="field"><label>السيارة</label><select id="fv"><option value="">بدون سيارة / بيع مباشر</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId).map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
     <div class="field"><label>طريقة الدفع</label><select id="pay"><option>غير محدد</option><option>نقدي</option><option>بطاقة</option><option>تحويل بنكي</option></select></div>
     <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="19"></div>
     <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="0"></div>
@@ -1920,7 +1930,7 @@ function invoiceDesigner(kind='invoice'){
       </div>
       <div class="toolbar"><button type="button" class="btn" id="addRow">+ قطع غيار</button><button type="button" class="btn" id="addLabor">+ أجور عمالة</button></div>
     </div>
-    <div class="field"><label>العميل</label><select id="fcust"><option value="">اختر العميل</option>${companyRows('customers').map(c=>`<option value="${c.id}">${esc(c.kdNr||'')} · ${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>العميل</label><select id="fcust"><option value="">اختر العميل</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select></div>
   </div>`,()=>{
     const lines=collectInvoiceRows();
     if(!lines.length) return toast('أضف بند واحد على الأقل');
