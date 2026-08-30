@@ -144,7 +144,7 @@ const seed={
   {u:'warehouse',p:'1234',name:'أمين المستودع',role:'warehouse'}
  ],
  companies:[
-  {id:'de',name:'Autoservice und Autoteile, Tabah UG (haftungsbeschränkt)',country:'DE',currency:'EUR',docLang:'de'},
+  {id:'de',name:'TST — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
  customers:[
@@ -1863,10 +1863,10 @@ function invoiceDesigner(kind='invoice'){
   </div>`,()=>{
     const lines=collectInvoiceRows();
     if(!lines.length) return toast('أضف بند واحد على الأقل');
-    const parts=lines.filter(x=>!isLaborLine(x)).reduce((s,x)=>s+x.qty*x.price,0);
-    const labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
+    let parts=lines.filter(x=>!isLaborLine(x)).reduce((s,x)=>s+x.qty*x.price,0);
+    let labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
     const discount=+$('#fd').value||0, tax=+$('#ft').value||19;
-    const net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
+    let net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
     parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
     const veh=vehicleOf($('#fv').value)||{};
     const obj={id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||'',customerId:(veh.customerId||''),parts,labor,discount,tax,net,total,date:new Date().toISOString(),
@@ -2606,7 +2606,7 @@ function settings(){
  <div class="field span2"><label>عنوان الورشة على الفاتورة</label><input id="waddr" value="${esc(db.settings.workshopAddress||'')}"></div>
  <div class="field span2"><label>قالب الفاتورة</label><select id="itpl">
   <option value="werkstatt" ${(db.settings.invoiceTpl||'werkstatt')==='werkstatt'?'selected':''}>ورشة — مثل فاتورتكم الحالية</option>
-  <option value="modern" ${db.settings.invoiceTpl==='modern'?'selected':''}>حديث — شريط كحلي وذهبي</option>
+  <option value="modern" ${db.settings.invoiceTpl==='modern'?'selected':''}>حديث — شريط أسود وذهبي</option>
   <option value="classic" ${db.settings.invoiceTpl==='classic'?'selected':''}>كلاسيكي — إطار أزرق رسمي</option>
   <option value="atelier" ${db.settings.invoiceTpl==='atelier'?'selected':''}>أتيليه — عنوان عريض وBeleg بارز</option>
  </select></div>
@@ -2634,7 +2634,7 @@ function settings(){
  </div>
  </div>`;
  if($('#lang')) $('#lang').onchange=()=>{db.settings.uiLang=$('#lang').value;save();applyUiLang();render();};
- $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;if($('#itpl')) db.settings.invoiceTpl=$('#itpl').value;if($('#wbrand')) db.settings.workshopBrand=$('#wbrand').value;if($('#wname')) db.settings.workshopName=$('#wname').value;if($('#wstnr')) db.settings.workshopSteuerNr=$('#wstnr').value;if($('#wbank')) db.settings.workshopBank=$('#wbank').value;if($('#wmail')) db.settings.workshopEmail=$('#wmail').value;if($('#wcourt')) db.settings.workshopCourt=$('#wcourt').value;if($('#wowner')) db.settings.workshopOwner=$('#wowner').value;const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
+ $('#saveset').onclick=()=>{db.settings.font=+$('#font').value||16;db.settings.uiLang=$('#lang').value;db.settings.hourlyRate=+$('#hrate').value||85;db.settings.workshopPhone=$('#wphone').value;db.settings.workshopAddress=$('#waddr').value;db.settings.workshopTaxId=$('#wtax').value;db.settings.workshopIban=$('#wiban').value;if($('#itpl')) db.settings.invoiceTpl=$('#itpl').value;if($('#wbrand')) db.settings.workshopBrand=$('#wbrand').value;if($('#wname')) db.settings.workshopName=$('#wname').value;if($('#wstnr')) db.settings.workshopSteuerNr=$('#wstnr').value;if($('#wbank')) db.settings.workshopBank=$('#wbank').value;if($('#wmail')) db.settings.workshopEmail=$('#wmail').value;if($('#wcourt')) db.settings.workshopCourt=$('#wcourt').value;if($('#wowner')) db.settings.workshopOwner=$('#wowner').value;if($('#wbic')) db.settings.workshopBic=$('#wbic').value;if($('#whrb')) db.settings.workshopHrb=$('#whrb').value;if($('#wsitz')) db.settings.workshopSitz=$('#wsitz').value;if($('#pdays')) db.settings.paymentDays=+$('#pdays').value||0;const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} } save();applyUiLang();toast(t('saved'));render()};
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
   const a=document.createElement('a');
