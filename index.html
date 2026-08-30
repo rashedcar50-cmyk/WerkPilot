@@ -959,8 +959,9 @@ function customers(){
  const rows=companyRows('customers');
  $('#content').innerHTML=head('العملاء',canEdit()?`<button class="btn primary" id="add">عميل جديد</button>`:'')+
  listShareBar('customers')+
- table(['الاسم','الهاتف','الإيميل','العنوان','السيارات','إجراء'],rows.map(c=>[
-  esc(c.name),esc(c.phone||'-'),esc(c.email||'-'),esc(c.address||'-'),
+ table(['الاسم / الشركة','الهاتف','الرقم الضريبي','العنوان','السيارات','إجراء'],rows.map(c=>[
+  esc(c.companyName? (c.companyName+' · '+(c.contact||c.name||'')) : (c.name||'-')),
+  esc(c.phone||'-'),esc(c.taxId||c.ustId||'-'),esc(c.address||'-'),
   db.vehicles.filter(v=>v.customerId===c.id).length,
   canEdit()?`<button class="btn small" onclick="editCustomer('${c.id}')">تعديل</button>`:'—'
  ]), 'customers');
@@ -968,18 +969,37 @@ function customers(){
 }
 function customerModal(existing){
  const c0=existing||{};
- modal(existing?'تعديل عميل':'عميل جديد',`<div class="form-grid">
- <div class="field"><label>الاسم</label><input id="n" value="${esc(c0.name||'')}"></div>
+ modal(existing?'تعديل عميل':'عميل جديد + سيارة',`<div class="form-grid">
+ <div class="field"><label>نوع العميل</label><select id="ctype"><option value="person" ${c0.type!=='company'?'selected':''}>شخص</option><option value="company" ${c0.type==='company'?'selected':''}>شركة</option></select></div>
+ <div class="field"><label>الاسم / جهة الاتصال</label><input id="n" value="${esc(c0.name||c0.contact||'')}"></div>
+ <div class="field"><label>اسم الشركة</label><input id="cfirma" value="${esc(c0.companyName||'')}" placeholder="إذا الزبون شركة"></div>
+ <div class="field"><label>USt-IdNr. / Steuernummer</label><input id="ctax" value="${esc(c0.taxId||c0.ustId||'')}" placeholder="DE..."></div>
  <div class="field"><label>Kundennummer</label><input id="kd" value="${esc(c0.kdNr||c0.number||'')}" placeholder="تلقائي إذا فارغ"></div>
  <div class="field"><label>الهاتف</label><input id="ph" value="${esc(c0.phone||'')}"></div>
  <div class="field"><label>الإيميل</label><input id="em" value="${esc(c0.email||'')}"></div>
- <div class="field"><label>العنوان</label><input id="ad" value="${esc(c0.address||'')}"></div>
+ <div class="field span2"><label>العنوان</label><input id="ad" value="${esc(c0.address||'')}"></div>
+ <div class="field span2"><b>سيارة العميل</b></div>
+ <div class="field"><label>اللوحة</label><input id="vplate" placeholder="HH-AB 1234"></div>
+ <div class="field"><label>VIN</label><input id="vvin"></div>
+ <div class="field"><label>الماركة</label><input id="vmake"></div>
+ <div class="field"><label>الموديل</label><input id="vmodel"></div>
+ <div class="field"><label>السنة</label><input id="vyear"></div>
+ <div class="field"><label>الكيلومتر</label><input id="vkm" type="number"></div>
  </div>`,()=>{
-  const c={id:c0.id||id('c'),companyId:c0.companyId||session.company.id,cloudId:c0.cloudId,name:$('#n').value.trim(),phone:$('#ph').value,email:$('#em').value,address:$('#ad').value,kdNr:$('#kd').value.trim()};
+  const firma=$('#cfirma').value.trim();
+  const person=$('#n').value.trim();
+  const c={id:c0.id||id('c'),companyId:c0.companyId||session.company.id,cloudId:c0.cloudId,
+    type:$('#ctype').value, name:firma||person, contact:person, companyName:firma,
+    taxId:$('#ctax').value.trim(), phone:$('#ph').value, email:$('#em').value, address:$('#ad').value, kdNr:$('#kd').value.trim()};
   if(!c.kdNr) c.kdNr=nextKdNr();
-  if(!c.name)return toast('أدخل اسم العميل');
-  if(existing){ const i=db.customers.findIndex(x=>x.id===c0.id); if(i>=0) db.customers[i]=c; audit('customer.update',c.name); }
+  if(!c.name)return toast('أدخل اسم العميل أو اسم الشركة');
+  if(existing){ const i=db.customers.findIndex(x=>x.id===c0.id); if(i>=0) db.customers[i]={...db.customers[i],...c}; audit('customer.update',c.name); }
   else { db.customers.push(c); audit('customer.create',c.name); }
+  const plate=$('#vplate').value.trim(), vin=$('#vvin').value.trim();
+  if(plate||vin){
+    const v={id:id('v'),companyId:session.company.id,customerId:c.id,plate,vin,make:$('#vmake').value.trim(),model:$('#vmodel').value.trim(),year:$('#vyear').value.trim(),km:$('#vkm').value};
+    db.vehicles.push(v); if(typeof upsertVehicleCloud==='function') upsertVehicleCloud(v);
+  }
   save();upsertCustomerCloud(c);closeModal();render();
  });
 }
@@ -1602,6 +1622,19 @@ function workshopInfo(){
     paymentDays: Number(s.paymentDays||0)
   };
 }
+function customerBlock(cust){
+  const firma=cust.companyName|| (cust.type==='company'?cust.name:'');
+  const person=cust.contact|| (!firma?cust.name:'');
+  const tax=cust.taxId||cust.ustId||'';
+  return `<div class="rh-cust">
+    <div class="muted">Rechnungsempfänger</div>
+    ${firma?`<div><b>${esc(firma)}</b></div>`:''}
+    ${person?`<div>${esc(person)}</div>`:''}
+    ${cust.address?`<div>${esc(cust.address)}</div>`:''}
+    ${cust.phone?`<div>${esc(cust.phone)}</div>`:''}
+    ${tax?`<div>USt-IdNr.: ${esc(tax)}</div>`:''}
+  </div>`;
+}
 function deMoney(n){
   return Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
@@ -1722,25 +1755,25 @@ function buildWorkshopRechnung(x){
         <div style="display:block;width:100%;text-align:center;color:#d4af37;font-size:32px;font-weight:800;letter-spacing:10px">${esc(w.brand)}</div>
       </div>
       <div class="rh-sub">${esc(w.address)} · Tel. ${esc(w.phone)} · ${esc(w.email)}</div>
-      <div class="rh-grid"><div class="rh-cust"><div class="muted">Rechnungsempfänger</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
+      <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
   }
   if(tpl==='classic'){
     return `<div class="rechnung tpl-classic" dir="ltr" lang="de"><div class="rh-main">
       <div class="rh-top"><div><div class="rh-title">${esc(w.brand)}</div><div class="rh-sub">${esc(w.address)}</div></div></div>
-      <div class="rh-grid"><div class="rh-cust"><div class="muted">Kunde</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
+      <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
   }
   if(tpl==='atelier'){
     return `<div class="rechnung tpl-atelier" dir="ltr" lang="de"><div class="rh-main">
       <div class="rh-split"><div class="rh-title">${esc(w.brand)}</div><div><div class="rh-sub">Beleg ${esc(m.beleg)} · ${deDate(x.date)}</div></div></div>
-      <div class="rh-grid"><div class="rh-cust"><div class="muted">An</div><div>${esc(cust.name||'')}</div><div>${esc(cust.address||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
+      <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
   }
   return `<div class="rechnung tpl-werkstatt" dir="ltr" lang="de"><div class="rh-main">
     <div class="rh-title">${esc(w.brand)}</div>
     <div class="rh-sub">${esc(w.address)}</div>
-    <div class="rh-grid"><div class="rh-cust"><div class="muted">Firma</div><div>${esc(cust.name||'')}</div><div>${esc(cust.contact||'')}</div><div>${esc(cust.address||'')}</div><div>${esc(cust.phone||'')}</div></div><div class="rh-meta">${metaTbl(m)}</div></div>
+    <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
     
     ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
 }
