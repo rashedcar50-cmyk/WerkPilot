@@ -2127,14 +2127,17 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
     <div class="field"><label>طريقة الدفع</label><select id="pay">${['غير محدد','نقدي','بطاقة','تحويل بنكي'].map(p=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
     <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="${existing?existing.tax:19}"></div>
     <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="${existing?existing.discount||0:0}"></div>
-    <div class="field span2"><label>رقم قطعة Katy / Henry</label>
+    <div class="field span2"><label>قطع Katy / Henry</label>
       <div class="toolbar">
-        <input id="katySku" placeholder="رقم القطعة">
+        <input id="katySku" placeholder="رقم القطعة ثم Enter">
         <input id="katyQty" type="number" value="1" min="1" style="width:80px">
-        <button type="button" class="btn primary" id="katyFetch">جلب وإضافة للجدول</button>
+        <button type="button" class="btn primary" id="katyFetch">جلب</button>
         <button type="button" class="btn" id="katyOpen">فتح Katy</button>
+        <button type="button" class="btn" id="henryOpen">فتح Henry</button>
       </div>
-      <div id="katyHint" class="hint">اكتب الرقم ثم جلب — بينضاف صف بالجدول.</div>
+      <textarea id="katyPaste" rows="3" placeholder="الصق من الكتالوج سطراً لكل قطعة: رقم | وصف | عدد | سعر"></textarea>
+      <div class="toolbar"><button type="button" class="btn" id="katyPasteBtn">لصق وإضافة للجدول</button></div>
+      <div id="katyHint" class="hint">1) افتح Katy/Henry بالسيارة. 2) انسخ رقم+اسم+سعر. 3) الصق هنا أو اكتب الرقم إذا انحفظ سابقاً.</div>
     </div>
     <div class="field span2">
       <label>بنود الفاتورة</label>
@@ -2205,6 +2208,22 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
   };
   if($('#katyFetch')) $('#katyFetch').onclick=doFetch;
   if($('#katyOpen')) $('#katyOpen').onclick=()=>openKatySearch($('#katySku').value.trim());
+  if($('#henryOpen')) $('#henryOpen').onclick=()=>window.open(db.settings.henryUrl||'https://henry.matthies.de/','_blank');
+  if($('#katyPasteBtn')) $('#katyPasteBtn').onclick=()=>{
+    const raw=$('#katyPaste').value||'';
+    const rows=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+    if(!rows.length) return toast('الصق سطراً واحداً على الأقل');
+    let n=0;
+    rows.forEach(line=>{
+      const parsed=parseInvoiceLine(line.replace(/\t/g,'|').replace(/\s{2,}/g,'|'));
+      if(!parsed.name && !parsed.sku) return;
+      addInvoiceRow({sku:parsed.sku,name:parsed.name,qty:parsed.qty||1,price:parsed.price||0,tax:+$('#ft').value||19,kind:'parts'});
+      rememberKatyArticle(parsed);
+      n++;
+    });
+    $('#katyPaste').value='';
+    toast('تمت إضافة '+n+' بند من الكتالوج');
+  };
   if($('#katySku')) $('#katySku').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
 }
 function previewInvoice(iid){
