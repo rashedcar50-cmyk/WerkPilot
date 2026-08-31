@@ -139,3 +139,8 @@ th{background:#efebe3;position:sticky;top:0}
 .henry-quick-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .henry-quick-row input,.henry-quick-row select{background:#fff;min-width:90px}
 .henry-pos th{background:#e8eef6}
+
+.invoice-ltr,.invoice-ltr *{direction:ltr;text-align:left;unicode-bidi:isolate}
+.invoice-ltr input,.invoice-ltr select,.invoice-ltr textarea{font-variant-numeric:lining-nums tabular-nums;font-family:Arial,Helvetica,sans-serif}
+.invoice-ltr .henry-quick-row{flex-wrap:nowrap}
+.invoice-ltr .henry-quick-row input{width:auto;flex:1}

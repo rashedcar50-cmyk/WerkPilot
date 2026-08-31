@@ -381,7 +381,8 @@ window.exportWhatsApp = exportWhatsApp;
 
 function modal(title,body,onSave,saveText){
  saveText=saveText||t('save');
- $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal${/فاتورة|Rechnung|Barverkauf|invoice/i.test(title)?' wide':''}">
+ const invUi=/فاتورة|Rechnung|Barverkauf|invoice|Kostenvoranschlag|عرض/i.test(title);
+ $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal${invUi?' wide invoice-ltr':''}" ${invUi?'dir="ltr" lang="de"':''}>
  <div class="modal-head"><h2>${title}</h2><button class="btn ghost small" id="xmod">✕</button></div>
  ${body}<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="msave">${saveText}</button><button class="btn ghost" id="mcancel">${t('cancelBtn')}</button></div>
  </div></div>`;
