@@ -96,6 +96,7 @@ th{background:#efebe3;position:sticky;top:0}
 .alert{background:#fde8e8;border:1px solid #e8b4b4;color:#7f1d1d;border-radius:12px;padding:10px 12px;margin:8px 0}
 .okbox{background:#e7f6ec;border:1px solid #9dcfb0;color:#14532d;border-radius:12px;padding:10px 12px;margin:8px 0}
 .today-item{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.today-item.tap:hover{background:#efebe3;border-radius:10px}
 .bottom-action{margin-top:16px;padding-bottom:24px}
 .bottom-action .btn{width:100%;padding:16px}
 @media(max-width:900px){

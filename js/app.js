@@ -412,11 +412,11 @@ function dashboard(){
  </div></div>`+(stale?`<div class="alert tap" onclick="goPage('settings')">${t('backupWarn')}</div>`:'');
  })()}
  <div class="card" style="margin-top:12px"><b>${t('todayCars')}</b>
- ${inside.length?inside.map(r=>`<div class="today-item"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(dLabel(r.description||''))} · ${esc(dLabel(r.tech||''))}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(stLabel(r.status))}</span>
- <button class="btn small" onclick="openRepair('${r.id}')">${t('openBtn')}</button></div></div>`).join(''):`<p class="muted">${t('noCarsInShop')}</p>`}
+ ${inside.length?inside.map(r=>`<div class="today-item tap" onclick="openRepair('${r.id}')"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(dLabel(r.description||''))} · ${esc(dLabel(r.tech||''))}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(stLabel(r.status))}</span>
+ <button class="btn small" onclick="event.stopPropagation();openRepair('${r.id}')">${t('openBtn')}</button></div></div>`).join(''):`<p class="muted">${t('noCarsInShop')}</p>`}
  </div>
  <div class="card" style="margin-top:12px"><b>${t('todayApptsTitle')}</b>
- ${todayAp.length?todayAp.map(a=>`<div class="today-item"><div>${esc(a.time||'')} · ${esc(vehicleName(a.vehicleId))}<div class="muted">${esc(dLabel(a.note||''))} · ${esc(dLabel(a.tech||''))}</div></div><span class="status info">${esc(stLabel(a.status))}</span></div>`).join(''):`<p class="muted">${t('noApptsToday')}</p>`}
+ ${todayAp.length?todayAp.map(a=>`<div class="today-item tap" onclick="goPage('appointments')"><div>${esc(a.time||'')} · ${esc(vehicleName(a.vehicleId))}<div class="muted">${esc(dLabel(a.note||''))} · ${esc(dLabel(a.tech||''))}</div></div><span class="status info">${esc(stLabel(a.status))}</span></div>`).join(''):`<p class="muted">${t('noApptsToday')}</p>`}
  </div>`;
 }
 function showSearchResults(q){
