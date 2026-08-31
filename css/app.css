@@ -132,3 +132,10 @@ th{background:#efebe3;position:sticky;top:0}
 .dev-panel textarea{width:100%;min-height:110px;background:#F4F1EA;color:#1C212B;border:1px solid #E4DED4;border-radius:10px;padding:8px}
 .dev-req{border-top:1px solid #E4DED4;margin-top:10px;padding-top:8px;font-size:.85rem}
 @media (max-width:860px){.dev-fab{bottom:72px}.dev-panel{bottom:132px}}
+
+.henry-ui{background:#d9e2ef;border:1px solid #8aa0bd;border-radius:8px;padding:8px}
+.henry-cap{background:#c23b2a;color:#fff;font-weight:800;font-size:.82rem;padding:4px 8px;margin:0 0 6px}
+.henry-quick{background:#cfd8e6;border:1px solid #8aa0bd;padding:8px;margin-top:8px}
+.henry-quick-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.henry-quick-row input,.henry-quick-row select{background:#fff;min-width:90px}
+.henry-pos th{background:#e8eef6}

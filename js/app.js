@@ -1314,7 +1314,8 @@ function buildWorkshopRechnung(x){
   const m=invoiceModel(x);
   const tpl=workshop().invoiceTpl||db.settings.invoiceTpl||'modern';
   const {w,cust}=m;
-  const henryHead=`<div class="rh-henry-title">AUTOSERVICE UND AUTOTEILE UG<br><span>(haftungsbeschränkt)</span></div>
+  const henryHead=`<div class="rh-band"><div class="rh-title">TST</div></div>
+      <div class="rh-henry-title">AUTOSERVICE UND AUTOTEILE UG<br><span>(haftungsbeschränkt)</span></div>
       <div class="rh-sender">${esc(w.name)}, ${esc(w.address)}</div>`;
   if(tpl==='modern'){
     return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
@@ -1454,27 +1455,33 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     <div class="field"><label>${t('payMethod')}</label><select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
     <div class="field"><label>${t('taxPct')}</label><input id="ft" type="number" step=".01" value="${existing?existing.tax:19}"></div>
     <div class="field"><label>${t('discount')}</label><input id="fd" type="number" step=".01" value="${existing?existing.discount||0:0}"></div>
-    <div class="field span2"><label>${t('katyParts')}</label>
-      <div class="toolbar">
-        <input id="katySku" placeholder="${t('skuEnter')}">
-        <input id="katyQty" type="number" value="1" min="1" style="width:80px">
-        <button type="button" class="btn primary" id="katyFetch">${t('fetchBtn')}</button>
-        <button type="button" class="btn" id="katyOpen">فتح Katy</button>
-        <button type="button" class="btn" id="henryOpen">فتح Henry</button>
-      </div>
-      <textarea id="katyPaste" rows="3" placeholder="${t('pasteLines')}"></textarea>
-      <div class="toolbar"><button type="button" class="btn" id="katyPasteBtn">${t('pasteAdd')}</button></div>
-      <div id="katyHint" class="hint">${t('katyHint')}</div>
-    </div>
-    <div class="field span2">
-      <label>${t('invLinesLbl')}</label>
+    <div class="field span2 henry-ui">
+      <div class="henry-cap">Positionen</div>
       <div class="table-wrap">
-        <table class="inv-edit">
-          <thead><tr><th>#</th><th>${t('colType')}</th><th>${t('colSku')}</th><th>${t('colDesc')}</th><th>${t('colQty')}</th><th>${t('colPrice')}</th><th>${t('colSum')}</th><th>MwSt.</th><th></th></tr></thead>
+        <table class="inv-edit henry-pos">
+          <thead><tr><th>Pos</th><th>Art</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th><th></th></tr></thead>
           <tbody id="invRows"></tbody>
         </table>
       </div>
-      <div class="toolbar"><button type="button" class="btn" id="addRow">${t('addParts')}</button><button type="button" class="btn" id="addLabor">${t('addLaborBtn')}</button></div>
+      <div class="henry-quick">
+        <div class="henry-cap">Schnellerfassung</div>
+        <div class="henry-quick-row">
+          <select id="qArt"><option value="parts">Ersatzteil</option><option value="labor">Arbeitsleistung</option></select>
+          <input id="katySku" placeholder="Bestellnummer">
+          <input id="katyQty" type="number" value="1" min="0.01" step="0.01" style="width:70px" title="Menge">
+          <input id="qName" placeholder="Beschreibung">
+          <button type="button" class="btn primary" id="katyFetch">Übernehmen</button>
+        </div>
+        <div id="katyHint" class="hint">Nummer eingeben und Enter — wie in Henry.</div>
+        <div class="toolbar" style="margin-top:6px">
+          <button type="button" class="btn small" id="addRow">+ Ersatzteil</button>
+          <button type="button" class="btn small" id="addLabor">+ Arbeitsleistung</button>
+          <button type="button" class="btn small" id="katyOpen">Katy</button>
+          <button type="button" class="btn small" id="henryOpen">Henry</button>
+        </div>
+        <textarea id="katyPaste" rows="2" placeholder="Zeilen aus Henry einfügen"></textarea>
+        <button type="button" class="btn small" id="katyPasteBtn">Einfügen</button>
+      </div>
     </div>
     <div class="field"><label>${t('customer')}</label><select id="fcust"><option value="">${t('chooseCustomer')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select></div>
   </div>`,()=>{
@@ -1519,21 +1526,26 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   if($('#addLabor')) $('#addLabor').onclick=()=>addInvoiceRow({name:'Arbeitswert',qty:1,price:rate,tax:+$('#ft').value||19,kind:'labor'});
   const doFetch=()=>{
     const sku=$('#katySku').value.trim();
-    if(!sku) return toast(t('needSku'));
+    const kind=$('#qArt')?.value||'parts';
     const qty=Number($('#katyQty').value||1);
-    const hit=lookupKatyArticle(sku);
+    const typed=$('#qName')?.value.trim()||'';
+    if(!sku && !typed) return toast(t('needSku'));
+    const hit=sku?lookupKatyArticle(sku):null;
     if(hit){
-      addInvoiceRow({sku:hit.sku||sku,name:hit.name,qty,price:hit.price,tax:+$('#ft').value||19,kind:'parts'});
-      $('#katyHint').textContent=t('addedFrom')+' '+hit.source+' — '+hit.name;
+      addInvoiceRow({sku:hit.sku||sku,name:typed||hit.name,qty,price:hit.price,tax:+$('#ft').value||19,kind});
+      $('#katyHint').textContent=(hit.source||'OK')+' — '+hit.name;
       rememberKatyArticle(hit);
-      $('#katySku').value='';
     } else {
-      addInvoiceRow({sku,name:'',qty,price:0,tax:+$('#ft').value||19,kind:'parts'});
-      $('#katyHint').textContent=t('notFoundLocal');
-      openKatySearch(sku);
+      addInvoiceRow({sku,name:typed||sku,qty,price:0,tax:+$('#ft').value||19,kind});
+      $('#katyHint').textContent=sku?t('notFoundLocal'):'Position übernommen';
+      if(sku) openKatySearch(sku);
     }
+    $('#katySku').value=''; if($('#qName')) $('#qName').value=''; $('#katySku').focus();
   };
   if($('#katyFetch')) $('#katyFetch').onclick=doFetch;
+  ['katySku','katyQty','qName'].forEach(id=>{
+    const el=$('#'+id); if(el) el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
+  });
   if($('#katyOpen')) $('#katyOpen').onclick=()=>openKatySearch($('#katySku').value.trim());
   if($('#henryOpen')) $('#henryOpen').onclick=()=>window.open(db.settings.henryUrl||'https://henry.matthies.de/','_blank');
   if($('#katyPasteBtn')) $('#katyPasteBtn').onclick=()=>{
