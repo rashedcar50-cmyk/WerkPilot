@@ -1295,9 +1295,24 @@ function workshopInfo(){
     paymentDays: Number(s.paymentDays||0)
   };
 }
+function dePrintName(s){
+  s=String(s||'').trim();
+  if(!s) return '';
+  if(typeof dLabel==='function'){
+    const d=dLabel(s);
+    if(d && d!==s && !/[\u0600-\u06FF]/.test(d)) return d;
+  }
+  if(/[\u0600-\u06FF]/.test(s)){
+    const map={'أحمد الخليل':'Ahmad Al-Khalil','يوسف منصور':'Youssef Mansour','راشد':'Rashid Tabah','رشيد':'Rashid'};
+    if(map[s]) return map[s];
+  }
+  return s;
+}
 function customerBlock(cust){
-  const firma=cust.companyName|| (cust.type==='company'?cust.name:'');
-  const person=cust.contact|| (!firma?cust.name:'');
+  const rawFirma=cust.companyName|| (cust.type==='company'?cust.name:'');
+  const rawPerson=cust.contact|| (!rawFirma?cust.name:'');
+  const firma=dePrintName(rawFirma);
+  const person=dePrintName(rawPerson);
   const tax=cust.taxId||cust.ustId||'';
   return `<div class="rh-cust">
     <div class="muted">Rechnungsempfänger</div>
