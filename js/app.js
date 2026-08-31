@@ -1205,7 +1205,7 @@ function invoices(){
  $('#content').innerHTML=head(cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'),`<div class="toolbar"><button class="btn ok" id="scanInv">📷 ${t('scanSchein')}</button><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">${t('cashSale')}</button>${filter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
  listShareBar('invoices')+
  table([t('invoiceNo'),t('type'),t('vehicle'),t('total'),t('payment'),t('design')],rows.map(x=>[
-  esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(payLabel(x.payment||'-')),
+  esc(x.number||x.id)+(x.status==='storno'?' · STORNO':''), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(payLabel(x.payment||'-')),
   `<button class="btn small primary" onclick="previewInvoice('${x.id}')">${t('preview')}</button>
    <button class="btn small" onclick="editInvoice('${x.id}')">${t('edit')}</button>
    <button class="btn small bad" onclick="deleteInvoice('${x.id}')">${t('del')}</button>
@@ -1230,10 +1230,12 @@ function deleteInvoice(iid){
   if(!canEdit()) return;
   const inv=db.invoices.find(x=>x.id===iid);
   if(!inv) return;
-  if(!confirm(t('confirmDelInv')+' '+(inv.number||'')+' ?')) return;
-  db.invoices=db.invoices.filter(x=>x.id!==iid);
-  if(typeof deleteInvoiceCloud==='function') try{ deleteInvoiceCloud(inv); }catch(e){}
-  audit('invoice.delete', inv.number||iid); save(); render(); toast(t('invDeleted'));
+  if(!confirm((t('confirmDelInv')||'Storno')+' '+(inv.number||'')+' ?')) return;
+  inv.status='storno'; inv.stornoAt=new Date().toISOString();
+  if(WP.Engine) WP.Engine.touch(inv);
+  audit('invoice.storno', inv.number||iid); save();
+  if(typeof upsertInvoiceCloud==='function') try{ upsertInvoiceCloud(inv); }catch(e){}
+  render(); toast('Storno');
 }
 window.invoiceForCustomer=invoiceForCustomer;
 window.invoicesForCustomer=invoicesForCustomer;
@@ -1265,11 +1267,11 @@ function customerBlock(cust){
   const person=cust.contact|| (!firma?cust.name:'');
   const tax=cust.taxId||cust.ustId||'';
   return `<div class="rh-cust">
-    <div class="muted">Firma</div>
+    <div class="muted">Rechnungsempfänger</div>
     ${firma?`<div><b>${esc(firma)}</b></div>`:''}
-    ${person?`<div>Herrn ${esc(person)}</div>`:''}
+    ${person?`<div>${esc(person)}</div>`:''}
     ${cust.address?`<div>${esc(cust.address)}</div>`:''}
-    ${tax?`<div>USt-IdNr.: ${esc(tax)}</div>`:''}
+    ${tax?`<div>USt-IdNr. Empfänger: ${esc(tax)}</div>`:''}
   </div>`;
 }
 function deMoney(n){
@@ -1315,9 +1317,16 @@ function invoiceModel(x){
   });
   const teile=Math.round(filled.filter(l=>l.kind!=='Arbeitsleistung').reduce((s,l)=>s+l.sum,0)*100)/100;
   const leist=Math.round(filled.filter(l=>l.kind==='Arbeitsleistung').reduce((s,l)=>s+l.sum,0)*100)/100;
-  const net=Math.round((teile+leist-Number(x.discount||0))*100)/100;
-  const rate=Number(x.tax||19)/100;
-  const vat=Math.round(net*rate*100)/100;
+  const disc=Number(x.discount||0);
+  const netBefore=teile+leist;
+  const net=Math.round((netBefore-disc)*100)/100;
+  const vat19=filled.filter(l=>Number(l.tax)===19).reduce((s,l)=>s+l.sum*0.19,0);
+  const vat7=filled.filter(l=>Number(l.tax)===7).reduce((s,l)=>s+l.sum*0.07,0);
+  const vatOther=filled.filter(l=>![19,7].includes(Number(l.tax))).reduce((s,l)=>s+l.sum*(Number(l.tax)||0)/100,0);
+  const factor=netBefore>0?net/netBefore:1;
+  const vat=Math.round((vat19+vat7+vatOther)*factor*100)/100;
+  const vat19s=Math.round(vat19*factor*100)/100;
+  const vat7s=Math.round(vat7*factor*100)/100;
   const total=Math.round((net+vat)*100)/100;
   ensureKd(cust);
   const kd=cust.kdNr||cust.number||'';
@@ -1326,7 +1335,7 @@ function invoiceModel(x){
   const auftrag=x.auftrag || (repair&&repair.number) || '';
   const due=new Date(x.date||Date.now());
   due.setDate(due.getDate()+Number(w.paymentDays||0));
-  return {w,cust,veh,filled,teile,leist,net,vat,total,kd,beleg,leistDate:deDate(x.date),dueDate:deDate(due),auftrag,repair,x};
+  return {w,cust,veh,filled,teile,leist,net,vat,vat19s,vat7s,total,kd,beleg,leistDate:deDate(x.serviceDate||x.date),dueDate:deDate(due),auftrag,repair,x};
 }
 function posTable(filled){
   return `<table class="pos-tbl">
@@ -1350,8 +1359,8 @@ function totBlock(m){
     </div>
     <div>
       <div>Total EUR ohne MwSt.<span>${deMoney(m.net)}</span></div>
-      <div>19% MwSt.<span>${deMoney(m.vat)}</span></div>
-      <div>7% MwSt.<span>0,00</span></div>
+      <div>19% MwSt.<span>${deMoney(m.vat19s)}</span></div>
+      <div>7% MwSt.<span>${deMoney(m.vat7s)}</span></div>
       <div>AT-MwSt.<span>0,00</span></div>
       <div class="grand">Gesamtbetrag EUR inkl. MwSt.<span>${deMoney(m.total)}</span></div>
     </div>
@@ -1362,8 +1371,8 @@ function totBlock(m){
 function footBlock(w){
   return `<div class="rh-foot">
     <div>GF: ${esc(w.owner)}<br>${esc(w.address)}</div>
-    <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>${esc(w.court)}<br>Mobil: ${esc(w.phone)}</div>
-    <div>${esc(w.email)}<br>${esc(w.bank)}<br>IBAN: ${esc(w.iban)}</div>
+    <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>HRB ${esc(w.hrb)} · Sitz ${esc(w.sitz)}<br>${esc(w.court)}<br>Mobil: ${esc(w.phone)}</div>
+    <div>${esc(w.email)}<br>${esc(w.bank)}<br>Kontoinhaber: ${esc(w.accountHolder)}<br>IBAN: ${esc(w.iban)}<br>BIC: ${esc(w.bic)}</div>
   </div>`;
 }
 function metaTbl(m){
