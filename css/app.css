@@ -17,7 +17,9 @@ button{cursor:pointer}
 input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--text)}
 textarea{min-height:100px;resize:vertical}
 .btn{border:0;border-radius:12px;padding:11px 15px;background:#3A4250;color:white;font-weight:700}
-.btn.primary{background:var(--pri);color:#1C212B}.btn.ok{background:var(--ok)}.btn.warn{background:var(--warn)}.btn.bad{background:var(--bad)}.btn.ghost{background:#3A4250;color:#fff;border:1px solid #2c3340}
+.btn.primary{background:var(--pri);color:#1C212B}.btn.ok{background:var(--ok)}.btn.warn{background:var(--warn)}.btn.bad{background:var(--bad)}
+.btn.ghost,.btn.ghost.small,#menu,#logout,#addWorkshop{background:#2B3240;color:#fff;border:1px solid #1C212B}
+.topbar select{background:#fff;color:#1C212B;border:1px solid #2B3240;font-weight:700}
 .btn.small{padding:7px 10px;font-size:.9rem}.full{width:100%}
 .hint,.muted{color:var(--muted);font-size:.92rem}
 .shell{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
