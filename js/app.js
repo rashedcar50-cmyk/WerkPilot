@@ -229,7 +229,8 @@ function buildDocHTML(type, id){
     if(id){
       const x = rows.find(i=>i.id===id) || db.invoices.find(i=>i.id===id);
       title = '';
-      body = x ? buildWorkshopRechnung(x) : '<p>Rechnung nicht gefunden</p>';
+      try{ body = x ? buildWorkshopRechnung(x) : '<p>Rechnung nicht gefunden</p>'; }
+      catch(err){ console.error(err); body = '<p>Rechnung: '+(err&&err.message?esc(err.message):'Fehler')+'</p>'; }
     } else {
       title = L.invoices;
       body = `<table><thead><tr><th>${L.number}</th><th>${L.type}</th><th>${L.vehicle}</th><th>${L.net}</th><th>${L.tax}</th><th>${L.total}</th><th>${L.payment}</th></tr></thead><tbody>`+
@@ -1681,20 +1682,34 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   if($('#katySku')) $('#katySku').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
 }
 function previewInvoice(iid){
-  const page=printDocMarkup('invoices', iid);
-  modal(t('showDesign'), `<div id="prevHost" style="height:70vh;background:#fff;border-radius:8px;overflow:hidden"></div>
-    <div class="toolbar" style="margin-top:10px"><button class="btn primary" id="printNow">طباعة</button><button class="btn" id="pdfNow">PDF</button></div>`, null);
-  setTimeout(()=>{
+  try{
+    modal(t('showDesign')||t('preview')||'Preview',
+      `<div id="prevHost" style="height:70vh;background:#fff;border:1px solid #ccc;overflow:auto"></div>
+       <div class="toolbar" style="margin-top:10px">
+         <button type="button" class="btn primary" id="printNow">${t('print')}</button>
+         <button type="button" class="btn" id="pdfNow">${t('pdf')}</button>
+       </div>`, null);
+    let page='';
+    try{ page=printDocMarkup('invoices', iid); }
+    catch(e){
+      console.error(e);
+      const inv=(db.invoices||[]).find(x=>x.id===iid);
+      page='<pre style="padding:16px;white-space:pre-wrap">'+(inv?esc(JSON.stringify({number:inv.number,total:inv.total,lines:inv.lines},null,2)):String(e))+'</pre>';
+    }
     const host=$('#prevHost');
     if(host){
       const fr=document.createElement('iframe');
-      fr.style.cssText='width:100%;height:100%;border:0;background:#fff';
+      fr.setAttribute('title','Rechnung');
+      fr.style.cssText='width:100%;height:100%;border:0;background:#fff;min-height:70vh';
+      fr.srcdoc=page||'<p>Keine Vorschau</p>';
       host.appendChild(fr);
-      fr.contentDocument.open(); fr.contentDocument.write(page); fr.contentDocument.close();
     }
-    const b=$('#printNow'); if(b) b.onclick=()=>exportPrint('invoices', iid);
-    const p=$('#pdfNow'); if(p) p.onclick=()=>exportPDF('invoices', iid);
-  }, 30);
+    const b=$('#printNow'); if(b) b.onclick=()=>{ try{ exportPrint('invoices', iid); }catch(e){ toast(String(e.message||e)); } };
+    const p=$('#pdfNow'); if(p) p.onclick=()=>{ try{ exportPDF('invoices', iid); }catch(e){ toast(String(e.message||e)); } };
+  }catch(e){
+    console.error(e);
+    toast((e&&e.message)||t('invMissing'));
+  }
 }
 window.previewInvoice=previewInvoice;
 window.invoiceDesigner=invoiceDesigner;
