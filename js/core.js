@@ -72,7 +72,7 @@ function load(){
   if(!Array.isArray(merged.katyCache)) merged.katyCache=[];
   if(!merged.settings) merged.settings=clone(seed.settings);
   merged.settings={...clone(seed.settings),...merged.settings};
-  if(!['ar','de','en'].includes(merged.settings.uiLang)) merged.settings.uiLang='ar';
+  if(!['ar','de','en','es'].includes(merged.settings.uiLang)) merged.settings.uiLang='ar';
 
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
   if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'});

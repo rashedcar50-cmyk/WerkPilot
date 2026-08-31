@@ -5,12 +5,14 @@ window.WP_RTL = ['ar','fa','ur','he','ps','sd','ug','dv','yi'];
 window.WP_LANGS = [
   ['ar','العربية'],
   ['de','Deutsch'],
-  ['en','English']
+  ['en','English'],
+  ['es','Español']
 ];
-window.WP_ALLOWED_LANGS = ['ar','de','en'];
+window.WP_ALLOWED_LANGS = ['ar','de','en','es'];
 
 window.WP_I18N = {
-en:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
+en:{app:'BayMeister',tag:'WORKSHOP. DIGITAL. EFFICIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
+cashSale:'Cash sale',netParts:'Net parts',netLabor:'Net labor',vat19:'VAT 19%',
 dash:'Today',todayBoard:'Today',carsInShop:'Cars in shop',openJobs:'Open jobs',todayAppts:'Appointments today',lowStock:'Low stock',sales:'Sales',netApprox:'Approx. net',
 stockAlert:'Stock alert',maintDue:'Service due',
 vatReport:'VAT report (19%)',backupWarn:'No backup exported for more than a day. Settings → Export backup.',
@@ -51,6 +53,7 @@ font:'Font size',language:'Program language',hourly:'Labor hourly rate €',phon
 invoiceNote:'Invoices stay in German when the active company is in Germany.',
 saved:'Saved',backup:'Export backup',sync:'Sync from cloud',reset:'Reset demo data'},
 de:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Benutzername',pass:'Passwort',login:'Anmelden',logout:'Abmelden',
+cashSale:'Barverkauf',netParts:'Netto Teile',netLabor:'Netto Leistungen',vat19:'MwSt. 19%',
 dash:'Heute',todayBoard:'Heute',carsInShop:'Fahrzeuge in der Werkstatt',openJobs:'Offene Aufträge',todayAppts:'Termine heute',lowStock:'Lagerengpass',sales:'Umsatz',netApprox:'Näherungsweise Netto',
 stockAlert:'Lagerhinweis',maintDue:'Fällige Wartung',
 vatReport:'USt-Bericht (19%)',backupWarn:'Seit über einem Tag kein Backup. Einstellungen → Backup exportieren.',
@@ -90,17 +93,18 @@ prev:'Zurück',next:'Weiter',cancelBtn:'Abbrechen',
 font:'Schriftgröße',language:'Programmsprache',hourly:'Stundensatz €',phone:'Werkstatt / WhatsApp',
 invoiceNote:'Rechnungen bleiben auf Deutsch, wenn die aktive Firma in Deutschland ist.',
 saved:'Gespeichert',backup:'Backup exportieren',sync:'Aus Cloud synchronisieren',reset:'Demodaten löschen'},
-ar:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'اسم المستخدم',pass:'كلمة المرور',login:'دخول',logout:'خروج',
+ar:{app:'BayMeister',tag:'ورشة. رقمية. فعالة.',user:'اسم المستخدم',pass:'كلمة المرور',login:'دخول',logout:'خروج',
+cashSale:'بيع نقدي',netParts:'صافي القطع',netLabor:'صافي الأجور',vat19:'الضريبة 19%',
 dash:'الرئيسية',todayBoard:'لوحة اليوم',carsInShop:'سيارات داخل الورشة',openJobs:'أوامر مفتوحة',todayAppts:'مواعيد اليوم',lowStock:'نقص مخزون',sales:'المبيعات',netApprox:'صافي تقريبي',
 stockAlert:'تنبيه مخزون',maintDue:'صيانة مستحقة',
-vatReport:'تقرير الضريبة (USt 19%)',backupWarn:'لم يتم تصدير البيانات منذ أكثر من يوم. من الإعدادات → نسخ احتياطي.',
+vatReport:'تقرير الضريبة (19%)',backupWarn:'لم يتم تصدير البيانات منذ أكثر من يوم. من الإعدادات → نسخ احتياطي.',
 todayCars:'سيارات اليوم / الأوامر النشطة',todayApptsTitle:'مواعيد اليوم',
 noCarsInShop:'لا توجد سيارات داخل الورشة الآن.',noApptsToday:'لا مواعيد اليوم.',
 openBtn:'فتح',stInProgress:'قيد التنفيذ',stWaitParts:'انتظار قطع',
 stConfirmed:'مؤكد',stIntake:'استلام',stDiag:'تشخيص',stWorking:'جاري العمل',
 stDone:'منجز',stClosed:'مغلق',
 customers:'العملاء',vehicles:'السيارات',repairs:'أوامر الإصلاح',appointments:'المواعيد',
-estimates:'Kostenvoranschlag',invoices:'الفواتير و Barverkauf',purchases:'المشتريات',inventory:'المخزون وقطع الغيار',
+estimates:'عروض الأسعار',invoices:'الفواتير والبيع النقدي',purchases:'المشتريات',inventory:'المخزون وقطع الغيار',
 employees:'الموظفون والرواتب',expenses:'المصاريف',journal:'دفتر اليومية',reports:'التقارير',integrations:'التكاملات',
 audit:'سجل النشاط',settings:'الإعدادات',search:'بحث: لوحة / زبون / قطعة / أمر',
 save:'حفظ',cancel:'إلغاء',print:'طباعة',pdf:'PDF',email:'إيميل',whatsapp:'واتساب',
@@ -134,7 +138,49 @@ saved:'تم الحفظ',backup:'تصدير نسخة احتياطية',sync:'مز
 ['es','fr','tr','ru','pl','it','nl','pt','uk','fa','hi','zh','ja','ko'].forEach(code=>{
   if(!window.WP_I18N[code]) window.WP_I18N[code]=Object.assign({}, window.WP_I18N.en);
 });
-Object.assign(window.WP_I18N.es,{dash:'Hoy',customers:'Clientes',vehicles:'Vehículos',repairs:'Órdenes',appointments:'Citas',invoices:'Facturas',purchases:'Compras',inventory:'Inventario',settings:'Ajustes',login:'Entrar',logout:'Salir',language:'Idioma del programa',invoiceNote:'Las facturas permanecen en alemán si la empresa activa está en Alemania.'});
+Object.assign(window.WP_I18N.es,{
+app:'BayMeister',tag:'TALLER. DIGITAL. EFICIENTE.',user:'Usuario',pass:'Contraseña',login:'Entrar',logout:'Salir',
+cashSale:'Venta al contado',netParts:'Neto recambios',netLabor:'Neto mano de obra',vat19:'IVA 19%',
+dash:'Hoy',todayBoard:'Hoy',carsInShop:'Coches en el taller',openJobs:'Órdenes abiertas',todayAppts:'Citas hoy',lowStock:'Stock bajo',sales:'Ventas',netApprox:'Neto aprox.',
+stockAlert:'Aviso de stock',maintDue:'Mantenimiento pendiente',
+vatReport:'Informe de IVA (19%)',backupWarn:'Sin copia de seguridad desde hace más de un día. Ajustes → Exportar copia.',
+todayCars:'Hoy / órdenes activas',todayApptsTitle:'Citas de hoy',
+noCarsInShop:'No hay vehículos en el taller.',noApptsToday:'No hay citas hoy.',
+openBtn:'Abrir',stInProgress:'En curso',stWaitParts:'Esperando piezas',
+stConfirmed:'Confirmado',stIntake:'Recepción',stDiag:'Diagnóstico',stWorking:'En trabajo',
+stDone:'Terminado',stClosed:'Cerrado',stReady:'Listo para entrega',stDelivered:'Entregado',
+customers:'Clientes',vehicles:'Vehículos',repairs:'Órdenes de reparación',appointments:'Citas',
+estimates:'Presupuestos',invoices:'Facturas y venta al contado',purchases:'Compras',inventory:'Almacén y piezas',
+employees:'Personal y nómina',expenses:'Gastos',journal:'Diario',reports:'Informes',integrations:'Integraciones',
+audit:'Registro',settings:'Ajustes',search:'Buscar: matrícula / cliente / pieza / orden',
+save:'Guardar',cancel:'Cancelar',print:'Imprimir',pdf:'PDF',email:'Correo',whatsapp:'WhatsApp',
+printList:'Imprimir lista',pdfList:'Lista PDF',
+name:'Nombre / empresa',phone:'Teléfono',taxId:'NIF / IVA',address:'Dirección',cars:'Vehículos',action:'Acción',
+edit:'Editar',newInvoice:'Nueva factura',invoicesOf:'Facturas',preview:'Vista previa',del:'Eliminar',
+invoiceNo:'Número',type:'Tipo',vehicle:'Vehículo',total:'Total',payment:'Pago',design:'Acciones',
+newCustomer:'Nuevo cliente',newVehicle:'Añadir vehículo',newRepair:'Nueva orden',newAppt:'Nueva cita',
+studio:'Estudio de desarrollo',todayShort:'Hoy',ordersShort:'Órdenes',carsShort:'Coches',apptShort:'Citas',invShort:'Facturas',
+confirmDelInv:'Eliminar factura',invDeleted:'Factura eliminada',invMissing:'Factura no encontrada',
+allInvoices:'Todas las facturas',createInvoice:'+ Nueva factura',
+editCustomer:'Editar cliente',customerType:'Tipo de cliente',person:'Particular',company:'Empresa',
+contact:'Nombre / contacto',companyName:'Nombre de empresa',custNo:'N.º cliente',
+custVehicle:'Vehículo del cliente',plate:'Matrícula',vinLbl:'VIN (Enter carga datos)',
+kbaKey:'Clave KBA',make:'Marca',model:'Modelo',year:'Año',km:'Kilometraje',
+needName:'Introduzca nombre o empresa',noPhoto:'Sin foto',openCam:'Abrir cámara',
+savePhoto:'Guardar foto',pickPhoto:'Elija una foto primero',photoSaved:'Foto del vehículo guardada',
+addVehicle:'Añadir vehículo',customer:'Cliente',displacement:'Cilindrada (cm³)',
+fuel:'Combustible',powerKw:'Potencia (kW)',engineCode:'Código motor',paintCode:'Código color',
+nextService:'Próximo servicio a km',partsCat:'Catálogo de piezas',
+editInvoice:'Editar factura',createInv:'Nueva factura',payMethod:'Forma de pago',
+payOpen:'Pendiente',payCash:'Efectivo',payCard:'Tarjeta',payBank:'Transferencia',
+taxPct:'IVA %',discount:'Descuento €',invLines:'Líneas de factura',
+kindParts:'Recambios',kindLabor:'Mano de obra',sku:'N.º art.',desc:'Descripción',
+qty:'Cant.',price:'Precio',noVehicle:'Sin vehículo / venta directa',
+prev:'Anterior',next:'Siguiente',cancelBtn:'Cancelar',
+font:'Tamaño de fuente',language:'Idioma del programa',hourly:'Tarifa horaria €',
+invoiceNote:'Las facturas legales de Alemania permanecen en alemán.',
+saved:'Guardado',backup:'Exportar copia',sync:'Sincronizar nube',reset:'Borrar datos demo'
+});
 Object.assign(window.WP_I18N.fr,{dash:'Aujourd’hui',customers:'Clients',vehicles:'Véhicules',repairs:'Ordres',appointments:'Rendez-vous',invoices:'Factures',purchases:'Achats',inventory:'Stock',settings:'Paramètres',login:'Connexion',logout:'Déconnexion',language:'Langue du logiciel',invoiceNote:'Les factures restent en allemand si l’entreprise active est en Allemagne.'});
 Object.assign(window.WP_I18N.tr,{dash:'Bugün',customers:'Müşteriler',vehicles:'Araçlar',repairs:'İş emirleri',appointments:'Randevular',invoices:'Faturalar',purchases:'Alımlar',inventory:'Stok',settings:'Ayarlar',login:'Giriş',logout:'Çıkış',language:'Program dili',invoiceNote:'Aktif firma Almanya’daysa faturalar Almanca kalır.'});
 Object.assign(window.WP_I18N.ru,{dash:'Сегодня',customers:'Клиенты',vehicles:'Авто',repairs:'Заказы',appointments:'Записи',invoices:'Счета',purchases:'Закупки',inventory:'Склад',settings:'Настройки',login:'Вход',logout:'Выход',language:'Язык программы',invoiceNote:'Счета остаются на немецком, если активная фирма в Германии.'});
@@ -363,61 +409,87 @@ window.stLabel = function(s){
 window.dLabel = function(s){
   if(!s) return '';
   const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'ar');
-  if(lang==='ar') return s;
   const map={
-    'تغيير زيت + فلتر':{de:'Ölwechsel + Filter',en:'Oil change + filter'},
-    'صوت من المحرك عند التشغيل':{de:'Geräusch beim Start',en:'Noise at start'},
-    'تغيير زيت':{de:'Ölwechsel',en:'Oil change'},
-    'تغيير فلتر زيت':{de:'Ölfilterwechsel',en:'Oil filter change'},
-    'فحص فرامل أمامية':{de:'Vorderbremsen prüfen',en:'Front brake check'},
-    'صرير عند الفرملة':{de:'Quietschen beim Bremsen',en:'Squeal when braking'},
-    'فحص فرامل':{de:'Bremsen prüfen',en:'Brake check'},
-    'تغيير فحمات إن لزم':{de:'Beläge wechseln falls nötig',en:'Replace pads if needed'},
-    'تسليم بعد تغيير الزيت':{de:'Abholung nach Ölwechsel',en:'Pickup after oil change'},
-    'الميكانيكي':{de:'Mechaniker',en:'Mechanic'},
-    'المدير':{de:'Manager',en:'Manager'},
-    'أمين المستودع':{de:'Lagerist',en:'Warehouse'},
-    'صاحب الورشة / تطوير':{de:'Inhaber / Entwicklung',en:'Owner / development'},
-    'المحاسب':{de:'Buchhaltung',en:'Accountant'},
-    'إيجار الورشة':{de:'Werkstattmiete',en:'Shop rent'},
-    'تشغيل':{de:'Betrieb',en:'Operations'},
-    'فني':{de:'Techniker',en:'Technician'},
-    'مستودع':{de:'Lager',en:'Warehouse'},
-    'زيت محرك 5W30 5L':{de:'Motoröl 5W30 5L',en:'Engine oil 5W30 5L'},
-    'فلتر زيت VW':{de:'Ölfilter VW',en:'VW oil filter'},
-    'فحمات فرامل أمامية':{de:'Vorderbremsbeläge',en:'Front brake pads'},
-    'بطارية 12V 70Ah':{de:'Batterie 12V 70Ah',en:'Battery 12V 70Ah'},
-    'طلب تجريبي':{de:'Testdatensatz',en:'Demo record'},
-    'أحمد الخليل':{de:'Ahmad Al-Khalil',en:'Ahmad Al-Khalil'},
-    'يوسف منصور':{de:'Youssef Mansour',en:'Youssef Mansour'},
-    'فاتورة':{de:'Rechnung',en:'Invoice'},
-    'مبيعات':{de:'Umsatz',en:'Sales'},
-    'مصروف':{de:'Ausgabe',en:'Expense'},
-    'قطع':{de:'Teile',en:'Parts'},
-    'أجور':{de:'Lohn',en:'Labor'},
-    'أجر':{de:'Lohn',en:'Labor'},
-    'قطعة':{de:'Teil',en:'Part'},
-    'نصف':{de:'halb',en:'half'},
-    'ربع':{de:'viertel',en:'quarter'},
-    'فارغ':{de:'leer',en:'empty'},
-    'ممتلئ':{de:'voll',en:'full'},
-    'نقدي':{de:'Bar',en:'Cash'},
-    'بطاقة':{de:'Karte',en:'Card'},
-    'تحويل بنكي':{de:'Überweisung',en:'Bank transfer'},
-    'غير محدد':{de:'offen',en:'open'},
-    'مدفوع':{de:'bezahlt',en:'paid'},
-    'معلق':{de:'offen',en:'pending'},
-    'زيت محرك':{de:'Motoröl',en:'Engine oil'},
-    'فلتر زيت':{de:'Ölfilter',en:'Oil filter'},
-    'فحمات فرامل':{de:'Bremsbeläge',en:'Brake pads'}
+    'تغيير زيت + فلتر':{de:'Ölwechsel + Filter',en:'Oil change + filter',es:'Cambio de aceite + filtro'},
+    'صوت من المحرك عند التشغيل':{de:'Geräusch beim Start',en:'Noise at start',es:'Ruido al arrancar'},
+    'تغيير زيت':{de:'Ölwechsel',en:'Oil change',es:'Cambio de aceite'},
+    'تغيير فلتر زيت':{de:'Ölfilterwechsel',en:'Oil filter change',es:'Cambio de filtro de aceite'},
+    'فحص فرامل أمامية':{de:'Vorderbremsen prüfen',en:'Front brake check',es:'Revisión de frenos delanteros'},
+    'صرير عند الفرملة':{de:'Quietschen beim Bremsen',en:'Squeal when braking',es:'Chirrido al frenar'},
+    'فحص فرامل':{de:'Bremsen prüfen',en:'Brake check',es:'Revisión de frenos'},
+    'تغيير فحمات إن لزم':{de:'Beläge wechseln falls nötig',en:'Replace pads if needed',es:'Cambiar pastillas si hace falta'},
+    'تسليم بعد تغيير الزيت':{de:'Abholung nach Ölwechsel',en:'Pickup after oil change',es:'Entrega tras el cambio de aceite'},
+    'الميكانيكي':{de:'Mechaniker',en:'Mechanic',es:'Mecánico'},
+    'المدير':{de:'Manager',en:'Manager',es:'Gerente'},
+    'أمين المستودع':{de:'Lagerist',en:'Warehouse',es:'Almacenero'},
+    'صاحب الورشة / تطوير':{de:'Inhaber / Entwicklung',en:'Owner / development',es:'Propietario / desarrollo'},
+    'المحاسب':{de:'Buchhaltung',en:'Accountant',es:'Contable'},
+    'إيجار الورشة':{de:'Werkstattmiete',en:'Shop rent',es:'Alquiler del taller'},
+    'تشغيل':{de:'Betrieb',en:'Operations',es:'Operación'},
+    'فني':{de:'Techniker',en:'Technician',es:'Técnico'},
+    'مستودع':{de:'Lager',en:'Warehouse',es:'Almacén'},
+    'زيت محرك 5W30 5L':{de:'Motoröl 5W30 5L',en:'Engine oil 5W30 5L',es:'Aceite 5W30 5L'},
+    'فلتر زيت VW':{de:'Ölfilter VW',en:'VW oil filter',es:'Filtro de aceite VW'},
+    'فحمات فرامل أمامية':{de:'Vorderbremsbeläge',en:'Front brake pads',es:'Pastillas delanteras'},
+    'بطارية 12V 70Ah':{de:'Batterie 12V 70Ah',en:'Battery 12V 70Ah',es:'Batería 12V 70Ah'},
+    'طلب تجريبي':{de:'Testdatensatz',en:'Demo record',es:'Registro de prueba'},
+    'أحمد الخليل':{de:'Ahmad Al-Khalil',en:'Ahmad Al-Khalil',es:'Ahmad Al-Khalil'},
+    'يوسف منصور':{de:'Youssef Mansour',en:'Youssef Mansour',es:'Youssef Mansour'},
+    'فاتورة':{de:'Rechnung',en:'Invoice',es:'Factura'},
+    'مبيعات':{de:'Umsatz',en:'Sales',es:'Ventas'},
+    'مصروف':{de:'Ausgabe',en:'Expense',es:'Gasto'},
+    'قطع':{de:'Teile',en:'Parts',es:'Piezas'},
+    'أجور':{de:'Lohn',en:'Labor',es:'Mano de obra'},
+    'أجر':{de:'Lohn',en:'Labor',es:'Mano de obra'},
+    'قطعة':{de:'Teil',en:'Part',es:'Pieza'},
+    'نصف':{de:'halb',en:'half',es:'medio'},
+    'ربع':{de:'viertel',en:'quarter',es:'cuarto'},
+    'فارغ':{de:'leer',en:'empty',es:'vacío'},
+    'ممتلئ':{de:'voll',en:'full',es:'lleno'},
+    'نقدي':{de:'Bar',en:'Cash',es:'Efectivo'},
+    'بطاقة':{de:'Karte',en:'Card',es:'Tarjeta'},
+    'تحويل بنكي':{de:'Überweisung',en:'Bank transfer',es:'Transferencia'},
+    'غير محدد':{de:'offen',en:'open',es:'pendiente'},
+    'مدفوع':{de:'bezahlt',en:'paid',es:'pagado'},
+    'معلق':{de:'offen',en:'pending',es:'pendiente'},
+    'زيت محرك':{de:'Motoröl',en:'Engine oil',es:'Aceite de motor'},
+    'فلتر زيت':{de:'Ölfilter',en:'Oil filter',es:'Filtro de aceite'},
+    'فحمات فرامل':{de:'Bremsbeläge',en:'Brake pads',es:'Pastillas de freno'},
+    'بيع نقدي':{de:'Barverkauf',en:'Cash sale',es:'Venta al contado'}
   };
-  return (map[s] && map[s][lang]) || s;
+  if(map[s]) return lang==='ar' ? s : (map[s][lang]||s);
+  for(const [ar,locs] of Object.entries(map)){
+    if(locs.de===s || locs.en===s || locs.es===s || s==='Barverkauf' || s==='Rechnung'){
+      if(s==='Barverkauf' || locs.de===s || locs.en===s || locs.es===s){
+        if(lang==='ar') return ar;
+        return locs[lang]||ar;
+      }
+    }
+  }
+  if(s==='Barverkauf') return t('cashSale');
+  if(s==='Rechnung' || s==='فاتورة') return t('createInv')==='إنشاء فاتورة' && lang==='ar' ? 'فاتورة' : (lang==='de'?'Rechnung':lang==='es'?'Factura':'Invoice');
+  return s;
 };
 window.L = function(s){
   if(s==null) return '';
   s=String(s);
   const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'ar');
-  if(lang==='ar' || !/[\u0600-\u06FF]/.test(s)) return s;
+  const exact=window.dLabel(s);
+  if(exact && exact!==s) return exact;
+  const phrases={
+    'WERKSTATT. DIGITAL. EFFIZIENT.':{ar:'ورشة. رقمية. فعالة.',en:'WORKSHOP. DIGITAL. EFFICIENT.',es:'TALLER. DIGITAL. EFICIENTE.',de:'WERKSTATT. DIGITAL. EFFIZIENT.'},
+    'WERKSTATT. DIGITAL.':{ar:'ورشة. رقمية.',en:'WORKSHOP. DIGITAL.',es:'TALLER. DIGITAL.',de:'WERKSTATT. DIGITAL.'},
+    'Netto Teile':{ar:'صافي القطع',en:'Net parts',es:'Neto recambios',de:'Netto Teile'},
+    'Netto Leistungen':{ar:'صافي الأجور',en:'Net labor',es:'Neto mano de obra',de:'Netto Leistungen'},
+    'MwSt 19%':{ar:'الضريبة 19%',en:'VAT 19%',es:'IVA 19%',de:'MwSt. 19%'},
+    'Barverkauf':{ar:'بيع نقدي',en:'Cash sale',es:'Venta al contado',de:'Barverkauf'}
+  };
+  if(phrases[s.trim()] && phrases[s.trim()][lang]) return phrases[s.trim()][lang];
+  if(lang==='ar'){
+    if(!/[A-Za-zÄÖÜäöüß]/.test(s)) return s;
+    return s.split(/(\s+|·|,|\(|\)|\/)/).map(p=>phrases[p]?phrases[p].ar:(window.dLabel(p)||p)).join('');
+  }
+  if(!/[\u0600-\u06FF]/.test(s)) return exact||s;
   const parts=s.split(/(\s+|·|,|\(|\)|\/|\+|—|-)/);
   return parts.map(p=>{
     if(!/[\u0600-\u06FF]/.test(p)) return p;
@@ -427,24 +499,30 @@ window.L = function(s){
     if(st && !/[\u0600-\u06FF]/.test(st)) return st;
     const fl=window.fuelLabel(p);
     if(fl && !/[\u0600-\u06FF]/.test(fl)) return fl;
-    return lang==='de'?'—':(lang==='en'?'—':p);
+    return '—';
   }).join('');
 };
 window.scrubUiLang = function(root){
-  const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'ar');
-  if(lang==='ar' || !root) return;
+  if(!root) return;
   const skip=/^(INPUT|TEXTAREA|SCRIPT|STYLE)$/;
   const walk=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(n){
-      const pe=n.parentElement; if(!pe || skip.test(pe.tagName)) return NodeFilter.FILTER_REJECT;
-      return /[\u0600-\u06FF]/.test(n.nodeValue||'') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      const pe=n.parentElement;
+      if(!pe || skip.test(pe.tagName)) return NodeFilter.FILTER_REJECT;
+      if(pe.closest && (pe.closest('.print-doc') || pe.closest('#prevHost') || pe.closest('.rh-sheet') || pe.closest('.rechnung'))) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
     }
   });
   const nodes=[];
   while(walk.nextNode()) nodes.push(walk.currentNode);
-  nodes.forEach(n=>{ n.nodeValue=window.L(n.nodeValue); });
+  nodes.forEach(n=>{
+    const nv=window.L(n.nodeValue);
+    if(nv!==n.nodeValue) n.nodeValue=nv;
+  });
   root.querySelectorAll('option').forEach(o=>{
-    if(/[\u0600-\u06FF]/.test(o.textContent||'')) o.textContent=window.L(o.textContent);
+    if(o.closest && (o.closest('.print-doc')||o.closest('#prevHost'))) return;
+    const nv=window.L(o.textContent);
+    if(nv!==o.textContent) o.textContent=nv;
   });
 };
 window.fuelLabel = function(s){

@@ -13,7 +13,7 @@ if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catc
 function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
- <div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="tag">WERKSTATT. DIGITAL. EFFIZIENT.</div>
+ <div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="tag">${t('tag')}</div>
  <div class="field"><label>${t('user')}</label><input id="lu" autocomplete="username"></div>
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'ar')}</select></div>
@@ -41,7 +41,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell">
- <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">WERKSTATT. DIGITAL.</div></div><div class="nav">
+ <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
  ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </div></aside>
  <main class="main">
@@ -405,9 +405,9 @@ function dashboard(){
  ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
  return `<div class="card" style="margin-top:12px"><b>${t('vatReport')}</b>
  <div class="grid" style="margin-top:8px">
-  <div class="card"><div class="muted">Netto Teile</div><div class="metric">${money(teile)}</div></div>
-  <div class="card"><div class="muted">Netto Leistungen</div><div class="metric">${money(leist)}</div></div>
-  <div class="card"><div class="muted">MwSt 19%</div><div class="metric">${money(vat)}</div></div>
+  <div class="card"><div class="muted">${t('netParts')}</div><div class="metric">${money(teile)}</div></div>
+  <div class="card"><div class="muted">${t('netLabor')}</div><div class="metric">${money(leist)}</div></div>
+  <div class="card"><div class="muted">${t('vat19')}</div><div class="metric">${money(vat)}</div></div>
  </div></div>`+(stale?`<div class="alert">${t('backupWarn')}</div>`:'');
  })()}
  <div class="card" style="margin-top:12px"><b>${t('todayCars')}</b>
@@ -1096,7 +1096,7 @@ function invoices(){
  let rows=companyRows('invoices');
  if(filter) rows=rows.filter(x=>x.customerId===filter || (vehicleOf(x.vehicleId)||{}).customerId===filter);
  const cust=filter && db.customers.find(c=>c.id===filter);
- $('#content').innerHTML=head(cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'),`<div class="toolbar"><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">Barverkauf</button>${filter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
+ $('#content').innerHTML=head(cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'),`<div class="toolbar"><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">${t('cashSale')}</button>${filter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
  listShareBar('invoices')+
  table([t('invoiceNo'),t('type'),t('vehicle'),t('total'),t('payment'),t('design')],rows.map(x=>[
   esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(payLabel(x.payment||'-')),
@@ -1425,7 +1425,7 @@ function numberInvoiceRows(){
   });
 }
 function invoiceDesigner(kind='invoice', customerId='', existing=null){
-  const title = existing ? (t('editInvoice')+' '+(existing.number||'')) : (kind==='bar' ? 'Barverkauf' : t('createInv'));
+  const title = existing ? (t('editInvoice')+' '+(existing.number||'')) : (kind==='bar' ? t('cashSale') : t('createInv'));
   const rate=workshop().hourlyRate||db.settings.hourlyRate||100;
   if(existing){ customerId=customerId||existing.customerId||''; }
   modal(title, `<div class="form-grid">
@@ -1552,7 +1552,7 @@ window.previewInvoice=previewInvoice;
 window.invoiceDesigner=invoiceDesigner;
 
 function financeModal(type){
- const title=type==='estimate'?t('quotes'):type==='bar'?'Barverkauf':t('newInv');
+ const title=type==='estimate'?t('estimates'):type==='bar'?t('cashSale'):t('newInv');
  modal(title,`<div class="form-grid">
  <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noCar')}</option>${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
  <div class="field"><label>${t('partsEuro')}</label><input id="fp" type="number" step=".01" value="0"></div>
