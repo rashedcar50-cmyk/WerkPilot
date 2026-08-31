@@ -40,16 +40,19 @@ function render(){
  applyUiLang();
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
- $('#app').innerHTML=`<div class="shell">
- <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
+ $('#app').innerHTML=`<div class="shell henry-skin">
+ <div class="henry-top">Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+  <span class="henry-top-right"><button class="btn ghost small" id="backBtn">${t('prev')}</button><button class="btn ghost small" id="logout">${t('logout')}</button></span>
+ </div>
+ <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-b">T</div><div>TST</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
  ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </div></aside>
  <main class="main">
   <div class="topbar">
-   <div class="top-actions"><button class="btn ghost" id="backBtn">${t('prev')}</button><button class="btn ghost mobile-menu" id="menu">☰</button>
+   <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
    <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="ورشة جديدة">＋</button>`:''}
    <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
-   <div class="top-actions"><select id="uiLangTop" title="لغة البرنامج">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span><button class="btn ghost small" id="logout">${t('logout')}</button></div>
+   <div class="top-actions"><select id="uiLangTop" title="لغة البرنامج">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span></div>
   </div>
   <div class="content" id="content"></div>
  </main>
