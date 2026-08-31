@@ -1,5 +1,14 @@
 /* BayMeister VIN / KBA / DistriAuto */
-function vehicleOf(vid){return db.vehicles.find(x=>x.id===vid)}
+function vehicleOf(vid){return (db.vehicles||[]).find(x=>x.id===vid)}
+function customerOf(cid){return (db.customers||[]).find(c=>c.id===cid)}
+function customerOfVehicle(vid){
+  const v=vehicleOf(vid);
+  if(v && v.customerId) return customerOf(v.customerId);
+  return null;
+}
+window.vehicleOf=vehicleOf;
+window.customerOf=customerOf;
+window.customerOfVehicle=customerOfVehicle;
 function cleanVin(v){return String(v||'').replace(/[^A-HJ-NPR-Z0-9]/gi,'').toUpperCase()}
 function vinModelYear(vin){
   const c=(vin||'')[9];
@@ -416,8 +425,16 @@ window.openPartsLink=openPartsLink;
 window.openRepair=function(rid){ repairEditModal(rid); };
 
 
-function customerName(cid){return db.customers.find(c=>c.id===cid)?.name||'-'}
-function vehicleName(vid){const v=db.vehicles.find(x=>x.id===vid);return v?`${v.plate||v.vin||'-'} · ${v.make||''} ${v.model||''}`:'-'}
+function customerName(cid){
+  const c=customerOf(cid);
+  return (c && (c.companyName||c.name)) || '-';
+}
+function vehicleName(vid){
+  const v=vehicleOf(vid);
+  return v?`${v.plate||v.vin||'-'} · ${v.make||''} ${v.model||''}`:'-';
+}
+window.customerName=customerName;
+window.vehicleName=vehicleName;
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function isDev(){return session?.user?.role==='developer'}
 function canEdit(){return ['manager','developer'].includes(session?.user?.role)}

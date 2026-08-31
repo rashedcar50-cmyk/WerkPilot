@@ -1546,6 +1546,24 @@ function addInvoiceRow(data){
   tb.appendChild(tr);
   tr.querySelector('.c-del').onclick=()=>{tr.remove(); numberInvoiceRows(); refreshInvoiceSums();};
   tr.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',refreshInvoiceSums));
+  const order=['.c-sku','.c-name','.c-qty','.c-price','.c-tax'];
+  tr.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('keydown',e=>{
+      if(e.key!=='Enter') return;
+      e.preventDefault();
+      const i=order.findIndex(sel=>tr.querySelector(sel)===inp);
+      if(i>=0 && i<order.length-1){
+        const next=tr.querySelector(order[i+1]);
+        if(next){ next.focus(); next.select&&next.select(); }
+        return;
+      }
+      addInvoiceRow({tax:latNum($('#ft')?.value||19),kind:'parts'});
+      const rows=document.querySelectorAll('#invRows tr');
+      const last=rows[rows.length-1];
+      const sku=last&&last.querySelector('.c-sku');
+      if(sku) sku.focus();
+    });
+  });
   numberInvoiceRows();
 }
 function numberInvoiceRows(){
