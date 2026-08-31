@@ -333,25 +333,36 @@ function getPrintFrame(){
   return f;
 }
 function exportPrint(type, id){
+  const live=document.querySelector('#prevHost iframe');
+  if(live && live.contentWindow){
+    try{ live.contentWindow.focus(); live.contentWindow.print(); return; }
+    catch(e){}
+  }
   let page='';
   try{ page=printDocMarkup(type,id); }
   catch(e){ console.error(e); return toast((e&&e.message)||t('printFail')); }
-  const blob=new Blob([page],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const w=window.open(url,'_blank');
-  if(w){
-    const go=()=>{ try{ w.focus(); w.print(); }catch(e){} };
-    w.addEventListener('load', go);
-    setTimeout(go, 500);
-    setTimeout(()=>URL.revokeObjectURL(url), 120000);
-    return;
-  }
   const iframe=getPrintFrame();
-  iframe.onload=()=>{
+  let done=false;
+  const go=()=>{
+    if(done) return; done=true;
     try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }
     catch(e){ toast(t('printFail')); }
   };
+  iframe.onload=go;
   iframe.srcdoc=page;
+  setTimeout(go, 700);
+}
+function downloadInvoiceFile(iid){
+  try{
+    const page=printDocMarkup('invoices', iid);
+    const inv=(db.invoices||[]).find(x=>x.id===iid);
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([page],{type:'text/html;charset=utf-8'}));
+    a.download=((inv&&inv.number)||'Rechnung').replace(/[^\w.-]+/g,'_')+'.html';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    toast(t('saved'));
+  }catch(e){ toast(e.message||t('pdfFail')); }
 }
 
 async function exportPDF(type, id){
@@ -1766,11 +1777,15 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
 function previewInvoice(iid){
   try{
     modal(t('showDesign')||t('preview')||'Preview',
-      `<div id="prevHost" style="height:70vh;background:#fff;border:1px solid #ccc;overflow:auto"></div>
-       <div class="toolbar" style="margin-top:10px">
+      `<div id="prevHost" class="prev-full"></div>
+       <div class="toolbar prev-actions">
          <button type="button" class="btn primary" id="printNow">${t('print')}</button>
          <button type="button" class="btn" id="pdfNow">${t('pdf')}</button>
+         <button type="button" class="btn" id="dlNow">${t('download')||'Download'}</button>
+         <button type="button" class="btn" id="mailNow">${t('email')}</button>
        </div>`, null);
+    const box=document.querySelector('#modalRoot .modal');
+    if(box) box.classList.add('full');
     let page='';
     try{ page=printDocMarkup('invoices', iid); }
     catch(e){
@@ -1788,6 +1803,8 @@ function previewInvoice(iid){
     }
     const b=$('#printNow'); if(b) b.onclick=()=>{ try{ exportPrint('invoices', iid); }catch(e){ toast(String(e.message||e)); } };
     const p=$('#pdfNow'); if(p) p.onclick=()=>{ try{ exportPDF('invoices', iid); }catch(e){ toast(String(e.message||e)); } };
+    const d=$('#dlNow'); if(d) d.onclick=()=>downloadInvoiceFile(iid);
+    const m=$('#mailNow'); if(m) m.onclick=()=>{ try{ exportEmail('invoices', iid); }catch(e){ toast(String(e.message||e)); } };
   }catch(e){
     console.error(e);
     toast((e&&e.message)||t('invMissing'));
