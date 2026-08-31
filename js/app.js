@@ -1695,7 +1695,11 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   if(existing && existing.lines && existing.lines.length){
     existing.lines.forEach(l=>addInvoiceRow(l));
   } else if(!existing){
-    setTimeout(()=>$('#katySku')?.focus(), 50);
+    addInvoiceRow({sku:'',name:'',qty:1,price:0,tax:19,kind:'parts'});
+    setTimeout(()=>{
+      const sku=document.querySelector('#invRows tr .c-sku');
+      if(sku){ sku.focus(); if(sku.select) sku.select(); }
+    }, 40);
   }
   ['fd','ft'].forEach(id=>{ const el=$('#'+id); if(el) el.addEventListener('input',refreshInvoiceSums); });
   if($('#fv')) $('#fv').onchange=()=>{
