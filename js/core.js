@@ -4,11 +4,11 @@ const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const storeKey='baymeister_v1';
 const seed={
  users:[
-  {u:'admin',p:'1234',name:'المدير',role:'manager'},
+  {u:'admin',p:'1980D',name:'المدير',role:'manager'},
   {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'},
-  {u:'accountant',p:'1234',name:'المحاسب',role:'accountant'},
+  {u:'accountant',p:'1978B',name:'المحاسب',role:'accountant'},
   {u:'ismail',p:'1977A',name:'Ismail',role:'mechanic'},
-  {u:'warehouse',p:'1234',name:'أمين المستودع',role:'warehouse'}
+  {u:'warehouse',p:'1979C',name:'أمين المستودع',role:'warehouse'}
  ],
  companies:[
   {id:'de',name:'TST — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
@@ -80,9 +80,12 @@ function load(){
     if(u.role==='developer' && (u.u==='owner' || u.u==='Rashid' || u.p==='bm-dev-2026')){
       u.u='Rashid'; u.p='1976R'; u.name=u.name&&u.name!=='صاحب الورشة / تطوير'?u.name:'Rashid Tabah';
     }
-    if(u.role==='mechanic' && (u.u==='mechanic' || u.u==='ismail' || u.p==='1234')){
+    if(u.role==='mechanic' && (u.u==='mechanic' || u.u==='ismail')){
       u.u='ismail'; u.p='1977A'; u.name='Ismail';
     }
+    if(u.role==='accountant'){ u.p='1978B'; }
+    if(u.role==='warehouse'){ u.p='1979C'; }
+    if(u.role==='manager' && (u.u==='admin' || u.p==='1234')){ u.p='1980D'; }
   });
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
   ensureCompanyProfiles(merged);
