@@ -1,7 +1,7 @@
 {
   "id": "/WerkPilot/",
-  "name": "BayMeister",
-  "short_name": "BayMeister",
+  "name": "Werkivo",
+  "short_name": "Werkivo",
   "description": "Werkstattverwaltung für Autoservice: Aufträge, Fahrzeuge, Rechnungen.",
   "start_url": "./index.html?source=pwa",
   "scope": "./",

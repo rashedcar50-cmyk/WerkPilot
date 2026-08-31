@@ -158,3 +158,6 @@ th{background:#efebe3;position:sticky;top:0}
 .henry-skin .brand-b{background:#E8A54B;color:#fff;border-radius:2px}
 .henry-skin input,.henry-skin select,.henry-skin textarea{border-radius:2px;border-color:#8aa0bd}
 .login-screen{background:#c5d0de}
+
+.brand-word{font-size:1.6rem;font-weight:800;letter-spacing:.5px;color:#1a2330}
+.henry-skin .brand-word{color:#1a2330}

@@ -13,7 +13,7 @@ if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catc
 function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
- <div class="brand-mark"><div class="brand-b">B</div><div>BayMeister</div></div><div class="tag">${t('tag')}</div>
+ <div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="tag">${t('tag')}</div>
  <div class="field"><label>${t('user')}</label><input id="lu" autocomplete="username"></div>
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'ar')}</select></div>
@@ -44,7 +44,7 @@ function render(){
  <div class="henry-top">Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="backBtn">${t('prev')}</button><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
- <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-b">T</div><div>TST</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
+ <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
  ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </div></aside>
  <main class="main">
@@ -367,7 +367,7 @@ async function exportInvoicePDF(iid){
 window.exportInvoicePDF=exportInvoicePDF;
 
 function exportEmail(type, id){
-  const subject = encodeURIComponent('WerkPilot - ' + (type || 'تقرير'));
+  const subject = encodeURIComponent('Werkivo - ' + (type || 'تقرير'));
   const body = encodeURIComponent(plainTextDoc(type, id).slice(0, 1800));
   window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }

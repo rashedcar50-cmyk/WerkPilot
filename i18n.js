@@ -15,7 +15,7 @@ window.WP_LANGS = [
 window.WP_ALLOWED_LANGS = ['de','ar','en','tr','sr','ru','pl','es'];
 
 window.WP_I18N = {
-en:{app:'BayMeister',tag:'WORKSHOP. DIGITAL. EFFICIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
+en:{app:'Werkivo',tag:'WORKSHOP. DIGITAL. EFFICIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
 cashSale:'Cash sale',netParts:'Net parts',netLabor:'Net labor',vat19:'VAT 19%',
 dash:'Today',todayBoard:'Today',carsInShop:'Cars in shop',openJobs:'Open jobs',todayAppts:'Appointments today',lowStock:'Low stock',sales:'Sales',netApprox:'Approx. net',
 stockAlert:'Stock alert',maintDue:'Service due',
@@ -56,7 +56,7 @@ prev:'Previous',next:'Next',cancelBtn:'Cancel',
 font:'Font size',language:'Program language',hourly:'Labor hourly rate €',phone:'Workshop / WhatsApp phone',
 invoiceNote:'Invoices stay in German when the active company is in Germany.',
 saved:'Saved',backup:'Export backup',sync:'Sync from cloud',reset:'Reset demo data'},
-de:{app:'BayMeister',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Benutzername',pass:'Passwort',login:'Anmelden',logout:'Abmelden',
+de:{app:'Werkivo',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Benutzername',pass:'Passwort',login:'Anmelden',logout:'Abmelden',
 cashSale:'Barverkauf',netParts:'Netto Teile',netLabor:'Netto Leistungen',vat19:'MwSt. 19%',
 dash:'Heute',todayBoard:'Heute',carsInShop:'Fahrzeuge in der Werkstatt',openJobs:'Offene Aufträge',todayAppts:'Termine heute',lowStock:'Lagerengpass',sales:'Umsatz',netApprox:'Näherungsweise Netto',
 stockAlert:'Lagerhinweis',maintDue:'Fällige Wartung',
@@ -97,7 +97,7 @@ prev:'Zurück',next:'Weiter',cancelBtn:'Abbrechen',
 font:'Schriftgröße',language:'Programmsprache',hourly:'Stundensatz €',phone:'Werkstatt / WhatsApp',
 invoiceNote:'Rechnungen bleiben auf Deutsch, wenn die aktive Firma in Deutschland ist.',
 saved:'Gespeichert',backup:'Backup exportieren',sync:'Aus Cloud synchronisieren',reset:'Demodaten löschen'},
-ar:{app:'BayMeister',tag:'ورشة. رقمية. فعالة.',user:'اسم المستخدم',pass:'كلمة المرور',login:'دخول',logout:'خروج',
+ar:{app:'Werkivo',tag:'ورشة. رقمية. فعالة.',user:'اسم المستخدم',pass:'كلمة المرور',login:'دخول',logout:'خروج',
 cashSale:'بيع نقدي',netParts:'صافي القطع',netLabor:'صافي الأجور',vat19:'الضريبة 19%',
 dash:'الرئيسية',todayBoard:'لوحة اليوم',carsInShop:'سيارات داخل الورشة',openJobs:'أوامر مفتوحة',todayAppts:'مواعيد اليوم',lowStock:'نقص مخزون',sales:'المبيعات',netApprox:'صافي تقريبي',
 stockAlert:'تنبيه مخزون',maintDue:'صيانة مستحقة',
@@ -143,7 +143,7 @@ saved:'تم الحفظ',backup:'تصدير نسخة احتياطية',sync:'مز
   if(!window.WP_I18N[code]) window.WP_I18N[code]=Object.assign({}, window.WP_I18N.en);
 });
 Object.assign(window.WP_I18N.es,{
-app:'BayMeister',tag:'TALLER. DIGITAL. EFICIENTE.',user:'Usuario',pass:'Contraseña',login:'Entrar',logout:'Salir',
+app:'Werkivo',tag:'TALLER. DIGITAL. EFICIENTE.',user:'Usuario',pass:'Contraseña',login:'Entrar',logout:'Salir',
 cashSale:'Venta al contado',netParts:'Neto recambios',netLabor:'Neto mano de obra',vat19:'IVA 19%',
 dash:'Hoy',todayBoard:'Hoy',carsInShop:'Coches en el taller',openJobs:'Órdenes abiertas',todayAppts:'Citas hoy',lowStock:'Stock bajo',sales:'Ventas',netApprox:'Neto aprox.',
 stockAlert:'Aviso de stock',maintDue:'Mantenimiento pendiente',
