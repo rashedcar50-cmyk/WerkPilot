@@ -316,18 +316,31 @@ function getPrintFrame(){
     f=document.createElement('iframe');
     f.id='printFrame';
     f.setAttribute('aria-hidden','true');
-    f.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;border:0;pointer-events:none';
+    f.style.cssText='position:fixed;right:0;bottom:0;width:210mm;height:297mm;opacity:0;border:0;z-index:-1';
     document.body.appendChild(f);
   }
   return f;
 }
 function exportPrint(type, id){
-  const page=printDocMarkup(type,id);
+  let page='';
+  try{ page=printDocMarkup(type,id); }
+  catch(e){ console.error(e); return toast((e&&e.message)||t('printFail')); }
+  const blob=new Blob([page],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  if(w){
+    const go=()=>{ try{ w.focus(); w.print(); }catch(e){} };
+    w.addEventListener('load', go);
+    setTimeout(go, 500);
+    setTimeout(()=>URL.revokeObjectURL(url), 120000);
+    return;
+  }
   const iframe=getPrintFrame();
-  const doc=iframe.contentDocument;
-  doc.open(); doc.write(page); doc.close();
-  const run=()=>{ try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){ toast(t('printFail')); } };
-  requestAnimationFrame(()=>requestAnimationFrame(run));
+  iframe.onload=()=>{
+    try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch(e){ toast(t('printFail')); }
+  };
+  iframe.srcdoc=page;
 }
 
 async function exportPDF(type, id){
