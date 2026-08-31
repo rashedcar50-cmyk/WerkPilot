@@ -250,7 +250,11 @@ function printDocMarkup(type, id){
       .pos-tbl{width:100%;border-collapse:collapse;margin-top:4px}
       .pos-tbl th{text-align:left;border-bottom:1px solid #111;padding:3px 5px;font-size:11px;background:transparent}
       .pos-tbl td{border:0;border-bottom:1px solid #eee;padding:3px 5px;text-align:left}
-      .pos-tbl td:nth-child(5),.pos-tbl td:nth-child(6),.pos-tbl td:nth-child(7),.pos-tbl td:nth-child(8){text-align:right}
+      .pos-tbl td:nth-child(4),.pos-tbl td:nth-child(5),.pos-tbl td:nth-child(6),.pos-tbl td:nth-child(7){text-align:right}
+      .rh-henry-title{text-align:center;font-size:20px;font-weight:800;letter-spacing:.4px;margin:0 0 6px;line-height:1.15}
+      .rh-henry-title span{font-size:16px;font-weight:700}
+      .rh-sender{font-size:8px;text-decoration:underline;margin:0 0 14px}
+      .rh-docname{font-size:18px;font-weight:800;margin:8px 0 6px}
       .rh-tot{display:flex;justify-content:space-between;gap:20px;margin-top:12px;font-size:11.5px}
       .rh-tot>div{min-width:46%}
       .rh-tot div div{display:flex;justify-content:space-between;padding:1px 0}
@@ -264,7 +268,7 @@ function printDocMarkup(type, id){
       .rh-band .rh-title,.rh-band td{color:#d4af37;text-align:center!important;font-size:28px;letter-spacing:6px;width:100%}
       .rh-band .rh-doc{color:#fff}
       .rh-doc{font-size:26px;font-weight:800;letter-spacing:1px}
-      .tpl-classic{border-left:6px solid #1f3a5f;padding-left:12px}
+      .tpl-classic{padding:0}
       .tpl-classic .rh-top{display:block;text-align:center;margin-bottom:12px}
       
       .tpl-atelier .rh-split{display:block;text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px}
@@ -1190,11 +1194,10 @@ function customerBlock(cust){
   const person=cust.contact|| (!firma?cust.name:'');
   const tax=cust.taxId||cust.ustId||'';
   return `<div class="rh-cust">
-    <div class="muted">Rechnungsempfänger</div>
+    <div class="muted">Firma</div>
     ${firma?`<div><b>${esc(firma)}</b></div>`:''}
-    ${person?`<div>${esc(person)}</div>`:''}
+    ${person?`<div>Herrn ${esc(person)}</div>`:''}
     ${cust.address?`<div>${esc(cust.address)}</div>`:''}
-    ${cust.phone?`<div>${esc(cust.phone)}</div>`:''}
     ${tax?`<div>USt-IdNr.: ${esc(tax)}</div>`:''}
   </div>`;
 }
@@ -1251,9 +1254,9 @@ function invoiceModel(x){
 }
 function posTable(filled){
   return `<table class="pos-tbl">
-    <thead><tr><th>Pos.</th><th>Art</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th></tr></thead>
+    <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th></tr></thead>
     <tbody>${filled.map(l=>`<tr>
-      <td>${l.pos}</td><td>${esc(l.kind||'')}</td><td>${esc(l.sku)}</td><td>${esc(l.name)}</td>
+      <td>${l.pos}</td><td>${esc(l.sku)}</td><td>${esc(l.name)}</td>
       <td>${deMoney(l.qty)}</td>
       <td>${deMoney(l.price)}</td>
       <td>${deMoney(l.sum)}</td>
@@ -1277,15 +1280,14 @@ function totBlock(m){
       <div class="grand">Gesamtbetrag EUR inkl. MwSt.<span>${deMoney(m.total)}</span></div>
     </div>
   </div>
-  <p class="rh-thanks">Vielen Dank für Ihr Vertrauen — wir wünschen eine sichere Fahrt.</p>
-  <p class="rh-pay">Bei Zahlung bitte Kd-Nr und Beleg-Nr angeben. Zahlbar bis ${m.dueDate} ohne Abzug.</p>
+  <p class="rh-pay">Bei Zahlung bitte Kd-Nr und Beleg-Nr angeben. Zahlbar sofort und ohne Abzug.</p>
   <p class="rh-legalhint">Eigentumsvorbehalt: Gelieferte Teile bleiben bis zur vollständigen Bezahlung unser Eigentum. Es gelten unsere AGB.</p>`;
 }
 function footBlock(w){
   return `<div class="rh-foot">
-    <div>${esc(w.name)}<br>Sitz: ${esc(w.sitz)}<br>Geschäftsführer: ${esc(w.owner)}<br>${esc(w.address)}</div>
-    <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>${esc(w.court)}${w.hrb?' / HRB '+esc(w.hrb):''}<br>Tel.: ${esc(w.phone)}</div>
-    <div>${esc(w.email)}<br>${esc(w.bank)}<br>Kto.-Inh.: ${esc(w.accountHolder)}<br>IBAN: ${esc(w.iban)}${w.bic?'<br>BIC: '+esc(w.bic):''}</div>
+    <div>GF: ${esc(w.owner)}<br>${esc(w.address)}</div>
+    <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>${esc(w.court)}<br>Mobil: ${esc(w.phone)}</div>
+    <div>${esc(w.email)}<br>${esc(w.bank)}<br>IBAN: ${esc(w.iban)}</div>
   </div>`;
 }
 function metaTbl(m){
@@ -1312,33 +1314,20 @@ function buildWorkshopRechnung(x){
   const m=invoiceModel(x);
   const tpl=workshop().invoiceTpl||db.settings.invoiceTpl||'modern';
   const {w,cust}=m;
+  const henryHead=`<div class="rh-henry-title">AUTOSERVICE UND AUTOTEILE UG<br><span>(haftungsbeschränkt)</span></div>
+      <div class="rh-sender">${esc(w.name)}, ${esc(w.address)}</div>`;
   if(tpl==='modern'){
     return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
-      <div class="rh-band" style="display:block;width:100%;text-align:center;background:#111;padding:16px 0;margin:0 0 10px;border-bottom:3px solid #d4af37">
-        <div style="display:block;width:100%;text-align:center;color:#d4af37;font-size:32px;font-weight:800;letter-spacing:10px">${esc(w.brand)}</div>
-      </div>
-      <div class="rh-sub">${esc(w.address)} · Tel. ${esc(w.phone)} · ${esc(w.email)}</div>
+      ${henryHead}
       <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
+      <div class="rh-docname">Rechnung</div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
   }
-  if(tpl==='classic'){
-    return `<div class="rechnung tpl-classic" dir="ltr" lang="de"><div class="rh-main">
-      <div class="rh-top"><div><div class="rh-title">${esc(w.brand)}</div><div class="rh-sub">${esc(w.address)}</div></div></div>
+  return `<div class="rechnung tpl-classic" dir="ltr" lang="de"><div class="rh-main">
+      ${henryHead}
       <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
+      <div class="rh-docname">Rechnung</div>
       ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
-  }
-  if(tpl==='atelier'){
-    return `<div class="rechnung tpl-atelier" dir="ltr" lang="de"><div class="rh-main">
-      <div class="rh-split"><div class="rh-title">${esc(w.brand)}</div><div><div class="rh-sub">Beleg ${esc(m.beleg)} · ${deDate(x.date)}</div></div></div>
-      <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
-      ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
-  }
-  return `<div class="rechnung tpl-werkstatt" dir="ltr" lang="de"><div class="rh-main">
-    <div class="rh-title">${esc(w.brand)}</div>
-    <div class="rh-sub">${esc(w.address)}</div>
-    <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
-    
-    ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
 }
 
 
