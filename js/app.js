@@ -129,13 +129,17 @@ function page(){
 function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>${action}</div>`}
 function archiveBeleg(inv){
   if(!inv) return;
-  db.archive=db.archive||[];
-  const existing=db.archive.find(x=>x.invoiceId===inv.id && x.locked);
-  if(existing) return existing;
-  const snap={id:id('a'),invoiceId:inv.id,number:inv.number,total:inv.total,date:inv.date,html:typeof buildWorkshopRechnung==='function'?buildWorkshopRechnung(inv):'',ts:new Date().toISOString(),companyId:session.company.id,locked:true};
-  const i=db.archive.findIndex(x=>x.invoiceId===inv.id);
-  if(i>=0) db.archive[i]=snap; else db.archive.unshift(snap);
-  db.archive=db.archive.slice(0,250);
+  try{
+    db.archive=db.archive||[];
+    const existing=db.archive.find(x=>x.invoiceId===inv.id && x.locked);
+    if(existing) return existing;
+    let html='';
+    try{ html=typeof buildWorkshopRechnung==='function'?buildWorkshopRechnung(inv):''; }catch(e){ html=''; }
+    const snap={id:id('a'),invoiceId:inv.id,number:inv.number,total:inv.total,date:inv.date,html,ts:new Date().toISOString(),companyId:session&&session.company&&session.company.id,locked:true};
+    const i=db.archive.findIndex(x=>x.invoiceId===inv.id);
+    if(i>=0) db.archive[i]=snap; else db.archive.unshift(snap);
+    db.archive=db.archive.slice(0,250);
+  }catch(e){ console.warn('archive',e); }
 }
 function helpPage(){
   $('#content').innerHTML=head(t('help')||'Hilfe')+`<div class="card" dir="ltr" lang="de">
@@ -409,13 +413,17 @@ window.exportWhatsApp = exportWhatsApp;
 
 function modal(title,body,onSave,saveText){
  saveText=saveText||t('save');
- const invUi=/فاتورة|Rechnung|Barverkauf|invoice|Kostenvoranschlag|عرض/i.test(title);
- $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal${invUi?' wide invoice-ltr':''}" ${invUi?'dir="ltr" lang="de"':''}>
+ const preview=/معاينة|Vorschau|preview|design/i.test(title);
+ $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal wide">
  <div class="modal-head"><h2>${title}</h2><button class="btn ghost small" id="xmod">✕</button></div>
- ${body}<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="msave">${saveText}</button><button class="btn ghost" id="mcancel">${t('cancelBtn')}</button></div>
+ ${body}${onSave?`<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="msave">${saveText}</button><button class="btn ghost" id="mcancel">${t('cancelBtn')}</button></div>`:`<div class="toolbar" style="margin-top:14px"><button class="btn ghost" id="mcancel">${t('cancelBtn')}</button></div>`}
  </div></div>`;
- $('#xmod').onclick=closeModal;$('#mcancel').onclick=closeModal;$('#msave').onclick=onSave;
- if(typeof scrubUiLang==='function') scrubUiLang($('#modalRoot'));
+ if(typeof scrubUiLang==='function') try{ scrubUiLang($('#modalRoot')); }catch(e){}
+ $('#xmod').onclick=closeModal;
+ if($('#mcancel')) $('#mcancel').onclick=closeModal;
+ if($('#msave')) $('#msave').onclick=()=>{
+   try{ onSave && onSave(); }catch(e){ console.error(e); toast((e&&e.message)||'Save'); }
+ };
 }
 function closeModal(){$('#modalRoot').innerHTML=''}
 window.goPage=function(p){
