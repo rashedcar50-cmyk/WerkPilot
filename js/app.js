@@ -411,7 +411,7 @@ function dashboard(){
  const sales=inv.reduce((a,x)=>a+Number(x.total||0),0),costs=exp.reduce((a,x)=>a+Number(x.amount||0),0);
  const low=lowStock(), due=maintenanceDue();
  const todayAp=companyRows('appointments').filter(a=>a.date===todayISO());
- const inside=rep.filter(r=>['قيد التنفيذ','جاري العمل','استلام','تشخيص','انتظار قطع'].includes(r.status));
+ const inside=rep.filter(r=>isOpenStatus(r.status));
  $('#content').innerHTML=head(t('todayBoard'))+`
  <div class="grid">
   <div class="card tap" onclick="goPage('repairs')"><div class="muted">${t('carsInShop')}</div><div class="metric">${inside.length}</div><div class="hint">${t('openBtn')}</div></div>
@@ -784,6 +784,9 @@ function mergeSchein(ai, local){
   };
 }
 async function readScheinAI(file){
+  if(window.WP && WP.OCR && WP.OCR.read){
+    return WP.OCR.read(file);
+  }
   const imageData = await preprocessSchein(file);
   let ai={};
   try{
@@ -808,7 +811,7 @@ async function readScheinAI(file){
   try{
     try{ await WP.loadOcr(); }catch(e){}
     if(window.Tesseract){
-      const res=await Tesseract.recognize(imageData,'deu');
+      const res=await Tesseract.recognize(imageData,'deu+eng');
       local=parseVehicleOCR(res&&res.data&&res.data.text||'');
     }
   }catch(e){ console.warn('tesseract', e); }
@@ -971,9 +974,10 @@ function scanScheinStartRepair(mode){
 }
 window.scanScheinStartRepair=scanScheinStartRepair;
 function repairStatusClass(st){
-  if(['مكتمل','مسلَّم','مسلم','جاهز للتسليم'].includes(st)) return 'ok';
-  if(['انتظار قطع','تشخيص'].includes(st)) return 'warn';
-  if(['قيد التنفيذ','جاري العمل'].includes(st)) return 'info';
+  const c=normStatus(st);
+  if(['done','closed','delivered','ready'].includes(c)) return 'ok';
+  if(['wait_parts','diag'].includes(c)) return 'warn';
+  if(['working','intake'].includes(c)) return 'info';
   return '';
 }
 function repairs(){
