@@ -410,3 +410,84 @@ window.applyUiLang = function(){
 window.langOptions = function(selected){
   return window.WP_LANGS.map(([code,name])=>`<option value="${code}" ${code===selected?'selected':''}>${name} (${code})</option>`).join('');
 };
+(function(){
+  const more={
+    en:{
+      purchasesTitle:'Purchases',scanPurchase:'Scan / upload invoice',manualBuy:'+ Manual purchase',
+      invCount:'Invoice count',purchaseTotal:'Purchase total',paid:'Paid',pending:'Pending',
+      document:'Document',send:'Send',viewDoc:'View',deleteBtn:'Delete',
+      pickCustomerFirst:'Select a customer first',scanScheinTitle:'Scan vehicle registration',
+      pickSchein:'Choose a Fahrzeugschein / Zulassungsbescheinigung photo',
+      ocrHint:'The image is read in the browser. Check data before saving.',
+      readingSchein:'Reading registration...',ocrFail:'Could not read the document',
+      ocrManual:'Automatic read failed. Enter data manually.',readData:'Read data',
+      pickScheinFirst:'Choose or photograph the document first',
+      katyParts:'Katy / Henry parts',skuEnter:'Part number then Enter',fetchBtn:'Fetch',
+      pasteLines:'Paste one part per line: no. | desc | qty | price',pasteAdd:'Paste and add',
+      katyHint:'1) Open Katy/Henry for the car. 2) Copy number+name+price. 3) Paste here.',
+      invLinesLbl:'Invoice lines',colType:'Type',colSku:'Item',colDesc:'Description',
+      colQty:'Qty',colPrice:'Price',colSum:'Sum',addParts:'+ Parts',addLaborBtn:'+ Labor',
+      chooseCustomer:'Select customer',needLine:'Add at least one line',
+      needDesc:'Every line needs a description',needQtyPrice:'Qty and price must be over zero',
+      needCustomer:'Select a customer or a vehicle linked to a customer',
+      saveShowDesign:'Save and preview',addedFrom:'Added from',
+      notFoundLocal:'Not found locally. Complete name and price or open Katy.',
+      needSku:'Enter a part number',maxWeight:'Max weight (kg)',seats:'Seats',vClass:'Vehicle class'
+    },
+    de:{
+      purchasesTitle:'Einkäufe',scanPurchase:'Beleg scannen / laden',manualBuy:'+ Manueller Einkauf',
+      invCount:'Anzahl Belege',purchaseTotal:'Einkaufssumme',paid:'Bezahlt',pending:'Offen',
+      document:'Beleg',send:'Senden',viewDoc:'Anzeigen',deleteBtn:'Löschen',
+      pickCustomerFirst:'Zuerst einen Kunden wählen',scanScheinTitle:'Fahrzeugschein scannen',
+      pickSchein:'Foto vom Fahrzeugschein / Zulassungsbescheinigung wählen',
+      ocrHint:'Das Bild wird im Browser gelesen. Daten vor dem Speichern prüfen.',
+      readingSchein:'Schein wird gelesen...',ocrFail:'Dokument konnte nicht gelesen werden',
+      ocrManual:'Automatik fehlgeschlagen. Daten manuell eingeben.',readData:'Daten lesen',
+      pickScheinFirst:'Zuerst Dokument wählen oder fotografieren',
+      katyParts:'Katy- / Henry-Teile',skuEnter:'Teilenummer dann Enter',fetchBtn:'Abrufen',
+      pasteLines:'Eine Position je Zeile: Nr. | Text | Menge | Preis',pasteAdd:'Einfügen und hinzufügen',
+      katyHint:'1) Katy/Henry zum Fahrzeug öffnen. 2) Nr.+Name+Preis kopieren. 3) Hier einfügen.',
+      invLinesLbl:'Rechnungspositionen',colType:'Art',colSku:'Pos.',colDesc:'Bezeichnung',
+      colQty:'Menge',colPrice:'Preis',colSum:'Summe',addParts:'+ Teile',addLaborBtn:'+ Lohn',
+      chooseCustomer:'Kunde wählen',needLine:'Mindestens eine Position',
+      needDesc:'Jede Position braucht eine Bezeichnung',needQtyPrice:'Menge und Preis größer null',
+      needCustomer:'Kunde oder zugeordnetes Fahrzeug wählen',
+      saveShowDesign:'Speichern und Vorschau',addedFrom:'Übernommen aus',
+      notFoundLocal:'Lokal nicht gefunden. Name und Preis ergänzen oder Katy öffnen.',
+      needSku:'Teilenummer eingeben',maxWeight:'Zul. Gesamtmasse (kg)',seats:'Sitze',vClass:'Fahrzeugklasse'
+    },
+    ar:{
+      purchasesTitle:'المشتريات',scanPurchase:'تصوير / رفع فاتورة',manualBuy:'+ شراء يدوي',
+      invCount:'عدد الفواتير',purchaseTotal:'إجمالي المشتريات',paid:'مدفوع',pending:'معلق',
+      document:'المستند',send:'إرسال',viewDoc:'عرض',deleteBtn:'حذف',
+      pickCustomerFirst:'اختر عميلاً أولاً',scanScheinTitle:'تصوير/رفع ورقة السيارة',
+      pickSchein:'اختر صورة Fahrzeugschein / Zulassungsbescheinigung',
+      ocrHint:'تتم قراءة الصورة في المتصفح. راجع البيانات قبل الحفظ.',
+      readingSchein:'جارٍ قراءة ورقة السيارة...',ocrFail:'تعذرت قراءة ورقة السيارة',
+      ocrManual:'تعذرت القراءة التلقائية. أدخل البيانات يدوياً.',readData:'قراءة البيانات',
+      pickScheinFirst:'اختر أو صوّر الورقة أولاً',
+      katyParts:'قطع Katy / Henry',skuEnter:'رقم القطعة ثم Enter',fetchBtn:'جلب',
+      pasteLines:'الصق سطراً لكل قطعة: رقم | وصف | عدد | سعر',pasteAdd:'لصق وإضافة للجدول',
+      katyHint:'1) افتح Katy/Henry بالسيارة. 2) انسخ رقم+اسم+سعر. 3) الصق هنا.',
+      invLinesLbl:'بنود الفاتورة',colType:'النوع',colSku:'البند',colDesc:'الوصف',
+      colQty:'العدد',colPrice:'السعر',colSum:'المجموع',addParts:'+ قطع غيار',addLaborBtn:'+ أجور عمالة',
+      chooseCustomer:'اختر العميل',needLine:'أضف بند واحد على الأقل',
+      needDesc:'كل بند يحتاج وصف',needQtyPrice:'العدد والسعر لازم أكبر من صفر',
+      needCustomer:'اختر العميل أو سيارة مربوطة بعميل',
+      saveShowDesign:'حفظ وعرض التصميم',addedFrom:'تمت الإضافة من',
+      notFoundLocal:'ما انوجدت محلياً. كمّل الاسم والسعر أو افتح Katy.',
+      needSku:'أدخل رقم القطعة',maxWeight:'الوزن الأقصى (kg)',seats:'عدد المقاعد',vClass:'فئة المركبة'
+    }
+  };
+  ['en','de','ar'].forEach(c=>{ if(WP_I18N[c]) Object.assign(WP_I18N[c], more[c]); });
+})();
+window.payLabel=function(p){
+  const m={'open':'payOpen','offen':'payOpen','غير محدد':'payOpen','cash':'payCash','نقدي':'payCash','Bar':'payCash','card':'payCard','بطاقة':'payCard','bank':'payBank','تحويل بنكي':'payBank'};
+  return m[p]?t(m[p]):(p||'');
+};
+window.payCode=function(p){
+  if(['cash','نقدي',t('payCash')].includes(p)) return 'cash';
+  if(['card','بطاقة',t('payCard')].includes(p)) return 'card';
+  if(['bank','تحويل بنكي',t('payBank')].includes(p)) return 'bank';
+  return 'open';
+};

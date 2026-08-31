@@ -580,7 +580,7 @@ function vehicleModal(prefill={}){
  <div class="field"><label>${t('km')}</label><input id="vkm" type="number" value="${esc(prefill.km||'')}"></div>
  <div class="field"><label>${t('nextService')}</label><input id="vnext" type="number" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
-  if(!$('#cu').value)return toast('اختر عميلاً أو أضف عميلاً أولاً');
+  if(!$('#cu').value)return toast(t('pickCustomerFirst'));
   const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
   else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
@@ -591,7 +591,7 @@ function vehicleModal(prefill={}){
   bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',year:'#yr',kw:'#kw',cc:'#cc',fuel:'#fuel',seats:'#vseats',weight:'#vmaxw',klass:'#vklass'});
 }
 function scanVehicleDocument(){
- modal('تصوير/رفع ورقة السيارة',`<div class="field">
+ modal(t('scanScheinTitle'),`<div class="field">
  <label>اختر صورة Fahrzeugschein / Zulassungsbescheinigung</label>
  <input id="doc" type="file" accept="image/*">
  <button type="button" id="camOpen" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
@@ -1096,7 +1096,7 @@ function invoices(){
  $('#content').innerHTML=head(cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'),`<div class="toolbar"><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">Barverkauf</button>${filter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
  listShareBar('invoices')+
  table([t('invoiceNo'),t('type'),t('vehicle'),t('total'),t('payment'),t('design')],rows.map(x=>[
-  esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(x.payment||'-'),
+  esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(payLabel(x.payment||'-')),
   `<button class="btn small primary" onclick="previewInvoice('${x.id}')">${t('preview')}</button>
    <button class="btn small" onclick="editInvoice('${x.id}')">${t('edit')}</button>
    <button class="btn small bad" onclick="deleteInvoice('${x.id}')">${t('del')}</button>
@@ -1117,6 +1117,7 @@ function editInvoice(iid){
   invoiceDesigner(inv.type==='Barverkauf'?'bar':'invoice', inv.customerId||'', inv);
 }
 function deleteInvoice(iid){
+  if(!canEdit()) return;
   const inv=db.invoices.find(x=>x.id===iid);
   if(!inv) return;
   if(!confirm(t('confirmDelInv')+' '+(inv.number||'')+' ?')) return;
@@ -1429,44 +1430,44 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
     <div class="field"><label>${t('payMethod')}</label><select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
     <div class="field"><label>${t('taxPct')}</label><input id="ft" type="number" step=".01" value="${existing?existing.tax:19}"></div>
     <div class="field"><label>${t('discount')}</label><input id="fd" type="number" step=".01" value="${existing?existing.discount||0:0}"></div>
-    <div class="field span2"><label>قطع Katy / Henry</label>
+    <div class="field span2"><label>${t('katyParts')}</label>
       <div class="toolbar">
-        <input id="katySku" placeholder="رقم القطعة ثم Enter">
+        <input id="katySku" placeholder="${t('skuEnter')}">
         <input id="katyQty" type="number" value="1" min="1" style="width:80px">
-        <button type="button" class="btn primary" id="katyFetch">جلب</button>
+        <button type="button" class="btn primary" id="katyFetch">${t('fetchBtn')}</button>
         <button type="button" class="btn" id="katyOpen">فتح Katy</button>
         <button type="button" class="btn" id="henryOpen">فتح Henry</button>
       </div>
-      <textarea id="katyPaste" rows="3" placeholder="الصق من الكتالوج سطراً لكل قطعة: رقم | وصف | عدد | سعر"></textarea>
-      <div class="toolbar"><button type="button" class="btn" id="katyPasteBtn">لصق وإضافة للجدول</button></div>
-      <div id="katyHint" class="hint">1) افتح Katy/Henry بالسيارة. 2) انسخ رقم+اسم+سعر. 3) الصق هنا أو اكتب الرقم إذا انحفظ سابقاً.</div>
+      <textarea id="katyPaste" rows="3" placeholder="${t('pasteLines')}"></textarea>
+      <div class="toolbar"><button type="button" class="btn" id="katyPasteBtn">${t('pasteAdd')}</button></div>
+      <div id="katyHint" class="hint">${t('katyHint')}</div>
     </div>
     <div class="field span2">
-      <label>بنود الفاتورة</label>
+      <label>${t('invLinesLbl')}</label>
       <div class="table-wrap">
         <table class="inv-edit">
-          <thead><tr><th>#</th><th>النوع</th><th>البند</th><th>الوصف</th><th>العدد</th><th>السعر</th><th>المجموع</th><th>MwSt.</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>${t('colType')}</th><th>${t('colSku')}</th><th>${t('colDesc')}</th><th>${t('colQty')}</th><th>${t('colPrice')}</th><th>${t('colSum')}</th><th>MwSt.</th><th></th></tr></thead>
           <tbody id="invRows"></tbody>
         </table>
       </div>
-      <div class="toolbar"><button type="button" class="btn" id="addRow">+ قطع غيار</button><button type="button" class="btn" id="addLabor">+ أجور عمالة</button></div>
+      <div class="toolbar"><button type="button" class="btn" id="addRow">${t('addParts')}</button><button type="button" class="btn" id="addLabor">${t('addLaborBtn')}</button></div>
     </div>
-    <div class="field"><label>العميل</label><select id="fcust"><option value="">اختر العميل</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>${t('customer')}</label><select id="fcust"><option value="">${t('chooseCustomer')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select></div>
   </div>`,()=>{
     const lines=collectInvoiceRows();
-    if(!lines.length) return toast('أضف بند واحد على الأقل');
-    if(lines.some(l=>!l.name)) return toast('كل بند يحتاج وصف');
-    if(lines.some(l=>!(l.qty>0) || !(l.price>0))) return toast('العدد والسعر لازم أكبر من صفر');
+    if(!lines.length) return toast(t('needLine'));
+    if(lines.some(l=>!l.name)) return toast(t('needDesc'));
+    if(lines.some(l=>!(l.qty>0) || !(l.price>0))) return toast(t('needQtyPrice'));
     const custId=$('#fcust')?.value||'';
     const veh=vehicleOf($('#fv').value)||{};
-    if(!custId && !veh.customerId) return toast('اختر العميل أو سيارة مربوطة بعميل');
+    if(!custId && !veh.customerId) return toast(t('needCustomer'));
     let parts=lines.filter(x=>!isLaborLine(x)).reduce((s,x)=>s+x.qty*x.price,0);
     let labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
     const discount=+$('#fd').value||0, tax=+$('#ft').value||19;
     let net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
     parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
     const obj={id:existing?existing.id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custId||veh.customerId||'',parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
-      type:kind==='bar'?'Barverkauf':'فاتورة', payment:$('#pay').value, paid:['نقدي','بطاقة'].includes($('#pay').value),
+      type:kind==='bar'?'Barverkauf':'Rechnung', payment:payCode($('#pay').value), paid:['cash','card'].includes(payCode($('#pay').value)),
       number:existing?existing.number:nextInvoiceNumber(), lines, repairId:existing&&existing.repairId, auftrag:existing&&existing.auftrag};
     lines.forEach(rememberKatyArticle);
     if(existing){
@@ -1480,7 +1481,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
     }
     save(); closeModal(); render();
     setTimeout(()=>previewInvoice(obj.id), 200);
-  }, existing?'حفظ التعديل':'حفظ وعرض التصميم');
+  }, existing?t('saveEdit'):t('saveShowDesign'));
   if(existing && existing.lines && existing.lines.length){
     existing.lines.forEach(l=>addInvoiceRow(l));
   } else if(!existing){
@@ -1494,7 +1495,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
   if($('#addLabor')) $('#addLabor').onclick=()=>addInvoiceRow({name:'Arbeitswert',qty:1,price:rate,tax:+$('#ft').value||19,kind:'labor'});
   const doFetch=()=>{
     const sku=$('#katySku').value.trim();
-    if(!sku) return toast('أدخل رقم القطعة');
+    if(!sku) return toast(t('needSku'));
     const qty=Number($('#katyQty').value||1);
     const hit=lookupKatyArticle(sku);
     if(hit){
@@ -1606,22 +1607,22 @@ function purchases(){
   const rows = companyRows('purchases').slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
   const totalSpend = rows.reduce((s,x)=> s + Number(x.total_amount || (x.qty||0)*(x.price||0) || 0), 0);
 
-  $('#content').innerHTML = head('المشتريات', `
+  $('#content').innerHTML = head(t('purchasesTitle'), `
     <div class="toolbar">
-      <button class="btn primary" id="scanPurchase">📷 تصوير / رفع فاتورة</button>
-      <button class="btn primary" id="add">+ شراء يدوي</button>
+      <button class="btn primary" id="scanPurchase">📷 ${t('scanPurchase')}</button>
+      <button class="btn primary" id="add">${t('manualBuy')}</button>
     </div>
   `) + listShareBar('purchases') + `
   <div class="grid" style="margin-bottom:14px">
-    <div class="card"><div class="muted">عدد الفواتير</div><div class="metric">${rows.length}</div></div>
-    <div class="card"><div class="muted">إجمالي المشتريات</div><div class="metric">${money(totalSpend)}</div></div>
+    <div class="card"><div class="muted">${t('invCount')}</div><div class="metric">${rows.length}</div></div>
+    <div class="card"><div class="muted">${t('purchaseTotal')}</div><div class="metric">${money(totalSpend)}</div></div>
   </div>
   ` + table(
-    ['المورد','رقم الفاتورة','التاريخ','الإجمالي','الحالة','المستند','إرسال','إجراءات'],
+    [t('supplier'),t('invNum'),t('date'),t('total'),t('status'),t('document'),t('send'),t('action')],
     rows.map(x=>{
       const total = Number(x.total_amount || (Number(x.qty||0)*Number(x.price||0)) || 0);
       const status = x.payment_status || 'pending';
-      const statusLabel = status==='paid' ? 'مدفوع' : status==='pending' ? 'معلق' : status;
+      const statusLabel = status==='paid' ? t('paid') : status==='pending' ? t('pending') : status;
       const statusClass = status==='paid' ? 'ok' : 'warn';
       return [
         esc(x.supplier || '-'),
@@ -1630,13 +1631,13 @@ function purchases(){
         money(total),
         `<span class="status ${statusClass}">${esc(statusLabel)}</span>`,
         x.receipt_url
-          ? `<button class="btn small primary" onclick="viewReceipt(${JSON.stringify(x.receipt_url)})">📄 عرض</button>`
+          ? `<button class="btn small primary" onclick="viewReceipt(${JSON.stringify(x.receipt_url)})">📄 ${t('viewDoc')}</button>`
           : '<span class="muted">—</span>',
         `<button class="btn small" onclick="exportPrint('purchases','${x.id}')">🖨️</button>
          <button class="btn small" onclick="exportPDF('purchases','${x.id}')">📄</button>
          <button class="btn small" onclick="exportEmail('purchases','${x.id}')">✉️</button>
          <button class="btn small" onclick="exportWhatsApp('purchases','${x.id}')">💬</button>`,
-        `<button class="btn small bad" onclick="deletePurchase('${x.id}')">حذف</button>`
+        `<button class="btn small bad" onclick="deletePurchase('${x.id}')">${t('deleteBtn')}</button>`
       ];
     }), 'purchases'
   );
