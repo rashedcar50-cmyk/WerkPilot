@@ -572,9 +572,9 @@ function vehicleModal(prefill={}){
  <div class="field"><label>${t('displacement')}</label><input id="cc" type="number" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
  <div class="field"><label>${t('fuel')}</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
  <div class="field"><label>${t('powerKw')}</label><input id="kw" type="number" value="${esc(prefill.engine_power_kw||'')}"></div>
- <div class="field"><label>الوزن الأقصى (kg)</label><input id="vmaxw" type="number" value="${esc(prefill.maxWeight||'')}"></div>
- <div class="field"><label>عدد المقاعد</label><input id="vseats" type="number" value="${esc(prefill.seats||'')}"></div>
- <div class="field"><label>فئة المركبة</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
+ <div class="field"><label>${t('maxWeight')}</label><input id="vmaxw" type="number" value="${esc(prefill.maxWeight||'')}"></div>
+ <div class="field"><label>${t('seats')}</label><input id="vseats" type="number" value="${esc(prefill.seats||'')}"></div>
+ <div class="field"><label>${t('vClass')}</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
  <div class="field"><label>${t('engineCode')}</label><input id="en" value="${esc(prefill.engine||'')}"></div>
  <div class="field"><label>${t('paintCode')}</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="Fahrzeugschein"></div>
  <div class="field"><label>${t('km')}</label><input id="vkm" type="number" value="${esc(prefill.km||'')}"></div>
@@ -611,7 +611,7 @@ reader.onerror = reject;
 reader.readAsDataURL(f);
 });
 
-$('#ocrStatus').textContent = 'جارٍ قراءة ورقة السيارة بالذكاء الاصطناعي...';
+$('#ocrStatus').textContent = t('readingAI');
 
 const response = await fetch(
 `${window.SUPABASE_URL}/functions/v1/vehicle-ocr`,
@@ -658,7 +658,7 @@ ocrSource: f.name
 });
    toast('تمت القراءة. راجع الحقول قبل الحفظ.');
   }catch(e){console.error(e);$('#ocrStatus').textContent='تعذرت القراءة التلقائية. يمكنك إدخال البيانات يدوياً.';$('#msave').disabled=false}
- },'قراءة البيانات');
+ },t('readData'));
  $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden')}};
 }
 
@@ -818,7 +818,7 @@ function findOrCreateFromSchein(ai){
   return {c,v};
 }
 function scanScheinStartRepair(){
-  modal('تصوير ورقة السيارة — فتح أمر',`<div class="field">
+  modal(t('scanOpenJob'),`<div class="field">
     <label>اختر صورة الورقة من الاستوديو أو الملفات، أو صوّرها بالكاميرا.</label>
     <input id="doc" type="file" accept="image/*">
     <div class="toolbar">
@@ -846,7 +846,7 @@ function scanScheinStartRepair(){
       toast('تم فتح الأمر — '+esc(v.plate||v.vin)+' / '+km+' km');
       return;
     }
-    $('#ocrStatus').textContent='جاري قراءة الورقة...';
+    $('#ocrStatus').textContent=t('readingSchein');
     $('#msave').disabled=true;
     try{
       let ai;
@@ -874,19 +874,19 @@ function scanScheinStartRepair(){
         اللوحة: ${esc(plate)}<br>
         VIN: ${esc(vin)}<br>
         ${esc(ai.brand||ai.make||'')} ${esc(ai.model||'')} ${esc(ai.year||'')}
-        <div class="field" style="margin-top:10px"><label>الكيلومتر الحالي</label><input id="scheinKm" type="number" inputmode="numeric" placeholder="مثلاً 86500"></div>
-        <div class="field"><label>وصف التصليح المطلوب</label><textarea id="scheinWork" placeholder="مثلاً: صوت من المحرك / تغيير زيت / فرامل"></textarea></div>
+        <div class="field" style="margin-top:10px"><label>${t('kmNowEx')}</label><input id="scheinKm" type="number" inputmode="numeric" placeholder="مثلاً 86500"></div>
+        <div class="field"><label>${t('repairNeeded')}</label><textarea id="scheinWork" placeholder="مثلاً: صوت من المحرك / تغيير زيت / فرامل"></textarea></div>
       </div>`;
-      $('#ocrStatus').textContent='أدخل الكم ثم اضغط حفظ';
+      $('#ocrStatus').textContent=t('enterKmSave');
       $('#msave').disabled=false;
-      $('#msave').textContent='حفظ وفتح الأمر';
+      $('#msave').textContent=t('saveOpenJob');
       setTimeout(()=>$('#scheinKm')?.focus(), 150);
     }catch(e){
       console.error(e);
-      $('#ocrStatus').textContent='تعذرت القراءة. صوّر الورقة أوضح أو أدخل الأمر يدوياً.';
+      $('#ocrStatus').textContent=t('readFailClear');
       $('#msave').disabled=false;
     }
-  }, 'قراءة الورقة');
+  }, t('readPaper'));
   $('#doc').onchange=()=>{const f=$('#doc').files[0]; if(f){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); window._scheinReady=false; }};
   if($('#pickGallery')) $('#pickGallery').onclick=()=>$('#doc').click();
 }
@@ -923,7 +923,7 @@ function repairDesk(rid){
  const photos=r.photos||[];
  const before=photos.filter(x=>x.kind==='before');
  const after=photos.filter(x=>x.kind==='after');
- const img=(arr)=>arr.map(x=>`<img class="ocr-preview" src="${x.url}">`).join('')||'<div class="muted">لا صور</div>';
+ const img=(arr)=>arr.map(x=>`<img class="ocr-preview" src="${x.url}">`).join('')||`<div class="muted">${t('noPhotos')}</div>`;
  $('#content').innerHTML=head(t('jobCard'),`<button class="btn ghost" id="backRep">${t('back')}</button>`)+`
  <div class="card">
   <div class="row" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
@@ -1647,7 +1647,7 @@ function purchases(){
 }
 
 function purchaseManualModal(){
-  modal('شراء يدوي', `
+  modal(t('manualBuyTitle'), `
     <div class="form-grid">
       <div class="field"><label>المورد</label><input id="p_supplier" placeholder="مثال: carparts-cat.com"></div>
       <div class="field"><label>رقم الفاتورة</label><input id="p_inv"></div>
@@ -1692,7 +1692,7 @@ function purchaseManualModal(){
 }
 
 function deletePurchase(pid){
-  if(!confirm('حذف فاتورة الشراء؟')) return;
+  if(!confirm(t('delPurchase'))) return;
   db.purchases = db.purchases.filter(x => x.id !== pid);
   save();
   deletePurchaseCloud(pid);
@@ -2056,7 +2056,7 @@ function inventory(){
  const low=lowStock();
  $('#content').innerHTML=head(t('inventoryTitle'),`<button class="btn primary" id="add">${t('newPart')}</button>`)+
  listShareBar('inventory')+
- (low.length?`<div class="alert"><b>تحت الحد الأدنى:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+' / حد '+ (x.minQty||3)+')').join(' · ')}</div>`:'')+
+ (low.length?`<div class="alert"><b>${t('underMin')}:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+' / حد '+ (x.minQty||3)+')').join(' · ')}</div>`:'')+
  table([t('skuCol'),t('name'),t('qty'),t('minQty'),t('buy'),t('sell'),t('status')],rows.map(x=>{
    const lowFlag=Number(x.qty||0)<=Number(x.minQty||3);
    return [esc(x.sku),esc(x.name),x.qty,x.minQty||3,money(x.buy),money(x.sell), lowFlag?`<span class="status warn">${t('shortStock')}</span>`:`<span class="status ok">${t('inStock')}</span>`];
@@ -2077,7 +2077,7 @@ $('#content').innerHTML=head(t('expensesTitle'),`<button class="btn primary" id=
 $('#scanExpense').onclick=scanExpenseDocument;
 }
    async function scanExpenseDocument(){
-modal('تصوير فاتورة مصروف',`
+modal(t('scanExp'),`
 <div class="field">
 <label>صوّر الفاتورة أو اختر صورة</label>
 <input id="doc" type="file" accept="image/*">
@@ -2092,7 +2092,7 @@ if(!f)return toast('اختر أو صوّر الفاتورة أولاً');
 
 try{
 $('#msave').disabled=true;
-$('#expenseStatus').textContent='جاري قراءة الفاتورة...';
+$('#expenseStatus').textContent=t('readingInv2');
 
 const imageData=await new Promise((resolve,reject)=>{
 const reader=new FileReader();
@@ -2151,15 +2151,15 @@ save();
 audit('expense.create',expense.note);
 closeModal();
 render();
-toast('تمت إضافة المصروف بنجاح');
+toast(t('expAdded'));
 
 }catch(e){
 console.error(e);
-$('#expenseStatus').textContent='تعذرت قراءة الفاتورة';
+$('#expenseStatus').textContent=t('ocrFail');
 toast(e.message||'حدث خطأ');
 $('#msave').disabled=false;
 }
-},'قراءة وإضافة');
+},t('readAdd2'));
 }
 
 function journal(){
@@ -2242,12 +2242,12 @@ function auditPage(){
  $('#content').innerHTML=head(t('auditTitle'))+table([t('when'),t('userCol'),t('actionCol'),t('detailCol')],rows.map(a=>[new Date(a.ts).toLocaleString(),esc(a.user),esc(a.action),esc(a.detail)]));
 }
 function newWorkshopModal(){
-  modal('ورشة جديدة / Neue Werkstatt', `<div class="form-grid">
-    <div class="field"><label>الاسم التجاري</label><input id="nwBrand" placeholder="TST Nord"></div>
-    <div class="field"><label>الاسم القانوني</label><input id="nwName" placeholder="Firma UG"></div>
-    <div class="field"><label>الدولة</label><select id="nwCountry"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="ES">España</option><option value="NL">Nederland</option></select></div>
-    <div class="field"><label>العملة</label><input id="nwCur" value="EUR"></div>
-    <div class="field span2"><label>العنوان</label><input id="nwAddr"></div>
+  modal(t('newWorkshop'), `<div class="form-grid">
+    <div class="field"><label>${t('wsTrade')}</label><input id="nwBrand" placeholder="TST Nord"></div>
+    <div class="field"><label>${t('wsLegal')}</label><input id="nwName" placeholder="Firma UG"></div>
+    <div class="field"><label>${t('country')}</label><select id="nwCountry"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="ES">España</option><option value="NL">Nederland</option></select></div>
+    <div class="field"><label>${t('currency')}</label><input id="nwCur" value="EUR"></div>
+    <div class="field span2"><label>${t('address')}</label><input id="nwAddr"></div>
   </div>`, ()=>{
     const brand=$('#nwBrand').value.trim(), name=$('#nwName').value.trim();
     if(!brand && !name) return toast('أدخل اسم الورشة');
@@ -2380,7 +2380,7 @@ function settings(){
 function studio(){
   if(!isDev()){ toast('هذه الصفحة لصاحب الورشة فقط'); session.page='dashboard'; return render(); }
   const reqs=db.settings.devRequests||[];
-  $('#content').innerHTML=head('استوديو التطوير')+`
+  $('#content').innerHTML=head(t('devStudio'))+`
   <div class="alert">هذه الصفحة وزر G تظهر فقط لحساب owner. الموظفون ما بيشوفوهم.</div>
   <div class="card">
     <p class="muted">Grok مو سيرفر جوّا الموقع، بس الطلبات محفوظة هون. الصقها بالمحادثة حتى التنفيذ يصير فوراً.</p>

@@ -432,7 +432,21 @@ window.langOptions = function(selected){
       needCustomer:'Select a customer or a vehicle linked to a customer',
       saveShowDesign:'Save and preview',addedFrom:'Added from',
       notFoundLocal:'Not found locally. Complete name and price or open Katy.',
-      needSku:'Enter a part number',maxWeight:'Max weight (kg)',seats:'Seats',vClass:'Vehicle class'
+      needSku:'Enter a part number',maxWeight:'Max weight (kg)',seats:'Seats',vClass:'Vehicle class',
+      readingAI:'Reading registration with AI...',ocrManual2:'Automatic read failed. Enter manually.',
+      newCustShort:'New customer',scanOpenJob:'Scan registration — open job',
+      kmNowEx:'Current mileage',repairNeeded:'Work required',saveOpenJob:'Save and open job',
+      readPaper:'Read document',readFailClear:'Could not read. Take a clearer photo or enter manually.',
+      enterKmSave:'Enter mileage then save',noPhotos:'No photos',
+      showDesign:'Show design',newInv:'New invoice',noCar:'No vehicle',
+      partsEuro:'Parts €',laborEuro:'Labor €',discEuro:'Discount €',taxPct2:'VAT %',
+      quoteFee2:'Quote fee €',manualBuyTitle:'Manual purchase',notesItems:'Notes / items',
+      delPurchase:'Delete purchase invoice?',scanBuy:'Scan / upload purchase invoice',
+      clickFull:'Click for full view',supplierName:'Supplier name',netEuro:'Net €',taxEuro:'VAT €',
+      saving:'Saving...',saveInv:'Save invoice',underMin:'Below minimum',limit:'min',
+      scanExp:'Scan expense receipt',readingInv2:'Reading invoice...',expAdded:'Expense added',
+      readAdd2:'Read and add',wsTrade:'Trade name',wsLegal:'Legal name',country:'Country',
+      currency:'Currency',devStudio:'Developer studio'
     },
     de:{
       purchasesTitle:'Einkäufe',scanPurchase:'Beleg scannen / laden',manualBuy:'+ Manueller Einkauf',
@@ -454,7 +468,21 @@ window.langOptions = function(selected){
       needCustomer:'Kunde oder zugeordnetes Fahrzeug wählen',
       saveShowDesign:'Speichern und Vorschau',addedFrom:'Übernommen aus',
       notFoundLocal:'Lokal nicht gefunden. Name und Preis ergänzen oder Katy öffnen.',
-      needSku:'Teilenummer eingeben',maxWeight:'Zul. Gesamtmasse (kg)',seats:'Sitze',vClass:'Fahrzeugklasse'
+      needSku:'Teilenummer eingeben',maxWeight:'Zul. Gesamtmasse (kg)',seats:'Sitze',vClass:'Fahrzeugklasse',
+      readingAI:'Schein wird per KI gelesen...',ocrManual2:'Automatik fehlgeschlagen. Manuell eingeben.',
+      newCustShort:'Neuer Kunde',scanOpenJob:'Schein scannen — Auftrag öffnen',
+      kmNowEx:'Aktueller km-Stand',repairNeeded:'Gewünschte Arbeit',saveOpenJob:'Speichern und Auftrag öffnen',
+      readPaper:'Dokument lesen',readFailClear:'Lesen fehlgeschlagen. Schärferes Foto oder manuell.',
+      enterKmSave:'km eingeben und speichern',noPhotos:'Keine Fotos',
+      showDesign:'Layout zeigen',newInv:'Neue Rechnung',noCar:'Kein Fahrzeug',
+      partsEuro:'Teile €',laborEuro:'Lohn €',discEuro:'Rabatt €',taxPct2:'MwSt. %',
+      quoteFee2:'KV-Gebühr €',manualBuyTitle:'Manueller Einkauf',notesItems:'Notizen / Positionen',
+      delPurchase:'Einkaufsbeleg löschen?',scanBuy:'Einkaufsbeleg scannen / laden',
+      clickFull:'Für Vollansicht klicken',supplierName:'Lieferant',netEuro:'Netto €',taxEuro:'MwSt. €',
+      saving:'Speichern...',saveInv:'Beleg speichern',underMin:'Unter Mindestbestand',limit:'Min.',
+      scanExp:'Ausgabenbeleg scannen',readingInv2:'Beleg wird gelesen...',expAdded:'Ausgabe hinzugefügt',
+      readAdd2:'Lesen und hinzufügen',wsTrade:'Handelsname',wsLegal:'Rechtsname',country:'Land',
+      currency:'Währung',devStudio:'Entwicklerstudio'
     },
     ar:{
       purchasesTitle:'المشتريات',scanPurchase:'تصوير / رفع فاتورة',manualBuy:'+ شراء يدوي',
@@ -476,7 +504,21 @@ window.langOptions = function(selected){
       needCustomer:'اختر العميل أو سيارة مربوطة بعميل',
       saveShowDesign:'حفظ وعرض التصميم',addedFrom:'تمت الإضافة من',
       notFoundLocal:'ما انوجدت محلياً. كمّل الاسم والسعر أو افتح Katy.',
-      needSku:'أدخل رقم القطعة',maxWeight:'الوزن الأقصى (kg)',seats:'عدد المقاعد',vClass:'فئة المركبة'
+      needSku:'أدخل رقم القطعة',maxWeight:'الوزن الأقصى (kg)',seats:'عدد المقاعد',vClass:'فئة المركبة',
+      readingAI:'جارٍ قراءة ورقة السيارة بالذكاء الاصطناعي...',ocrManual2:'تعذرت القراءة التلقائية. أدخل يدوياً.',
+      newCustShort:'زبون جديد',scanOpenJob:'تصوير ورقة السيارة — فتح أمر',
+      kmNowEx:'الكيلومتر الحالي',repairNeeded:'وصف التصليح المطلوب',saveOpenJob:'حفظ وفتح الأمر',
+      readPaper:'قراءة الورقة',readFailClear:'تعذرت القراءة. صوّر أوضح أو أدخل يدوياً.',
+      enterKmSave:'أدخل الكم ثم اضغط حفظ',noPhotos:'لا صور',
+      showDesign:'عرض التصميم',newInv:'فاتورة جديدة',noCar:'بدون سيارة',
+      partsEuro:'القطع €',laborEuro:'الأجور €',discEuro:'الخصم €',taxPct2:'الضريبة %',
+      quoteFee2:'رسوم التقدير €',manualBuyTitle:'شراء يدوي',notesItems:'ملاحظات / الأصناف',
+      delPurchase:'حذف فاتورة الشراء؟',scanBuy:'تصوير / رفع فاتورة شراء',
+      clickFull:'اضغط للعرض الكامل',supplierName:'اسم المورد',netEuro:'الصافي €',taxEuro:'الضريبة €',
+      saving:'جاري الحفظ...',saveInv:'حفظ الفاتورة',underMin:'تحت الحد الأدنى',limit:'حد',
+      scanExp:'تصوير فاتورة مصروف',readingInv2:'جاري قراءة الفاتورة...',expAdded:'تمت إضافة المصروف',
+      readAdd2:'قراءة وإضافة',wsTrade:'الاسم التجاري',wsLegal:'الاسم القانوني',country:'الدولة',
+      currency:'العملة',devStudio:'استوديو التطوير'
     }
   };
   ['en','de','ar'].forEach(c=>{ if(WP_I18N[c]) Object.assign(WP_I18N[c], more[c]); });
