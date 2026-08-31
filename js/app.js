@@ -1616,7 +1616,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       <span>${new Date().toLocaleDateString('de-DE')}</span>
       <select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select>
       <select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select>
-      <select id="fcust"><option value="">${t('chooseCustomer')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select>
+      <select id="fcust"><option value="walkin" ${!customerId?'selected':''}>${t('walkIn')||t('cashSale')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select>
       <button type="button" class="btn ok small" id="scanInvCam">📷</button>
       <input id="scanInvFile" type="file" accept="image/*" capture="environment" class="hidden">
     </div>
@@ -1661,9 +1661,9 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     if(!lines.length) return toast(t('needLine'));
     if(lines.some(l=>!l.name)) return toast(t('needDesc'));
     if(lines.some(l=>!(Number(l.qty)>0))) return toast(t('needQtyPrice'));
-    const custId=$('#fcust')?.value||'';
+    let custId=$('#fcust')?.value||'';
+    if(custId==='walkin') custId='';
     const veh=vehicleOf($('#fv').value)||{};
-    if(!custId && !veh.customerId) return toast(t('needCustomer'));
     let parts=lines.filter(x=>!isLaborLine(x)).reduce((s,x)=>s+x.qty*x.price,0);
     let labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
     const discount=latNum($('#fd')?.value), tax=latNum($('#ft')?.value)||19;

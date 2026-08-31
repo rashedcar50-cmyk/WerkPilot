@@ -434,6 +434,19 @@ window.WP_INV_DE = {
     if(window.WP_I18N[code]) Object.assign(window.WP_I18N[code], extra[code]);
   });
 })();
+(function(){
+  const w={
+    en:{walkIn:'No customer / direct sale'},
+    de:{walkIn:'Ohne Kunde / Barverkauf'},
+    ar:{walkIn:'بدون عميل / بيع مباشر'},
+    tr:{walkIn:'Müşterisiz / peşin satış'},
+    sr:{walkIn:'Bez klijenta / gotovina'},
+    ru:{walkIn:'Без клиента / наличные'},
+    pl:{walkIn:'Bez klienta / sprzedaż bezpośrednia'},
+    es:{walkIn:'Sin cliente / venta directa'}
+  };
+  Object.keys(w).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], w[c]); });
+})();
 window.t = function(key){
   const store = (typeof db!=='undefined' && db) || window.db || (window.WP && WP.db);
   let lang = (store && store.settings && store.settings.uiLang) || 'ar';
