@@ -1,4 +1,4 @@
-:root{--bg:#c5d0de;--panel:#eef2f7;--panel2:#d7e0ec;--line:#8aa0bd;--text:#1a2330;--muted:#4a5568;--pri:#c23b2a;--ok:#2F7A4F;--warn:#C9842A;--bad:#B5463A;--font:16px;--henry:#e24a2d}
+:root{--bg:#c5d0de;--panel:#eef2f7;--panel2:#d7e0ec;--line:#8aa0bd;--text:#1a2330;--muted:#4a5568;--pri:#E8A54B;--ok:#2F7A4F;--warn:#C9842A;--bad:#B5463A;--font:16px;--henry:#E8A54B}
 *{box-sizing:border-box}
 html{font-size:var(--font)}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text)}
@@ -134,7 +134,7 @@ th{background:#efebe3;position:sticky;top:0}
 @media (max-width:860px){.dev-fab{bottom:72px}.dev-panel{bottom:132px}}
 
 .henry-ui{background:#d9e2ef;border:1px solid #8aa0bd;border-radius:8px;padding:8px}
-.henry-cap{background:#c23b2a;color:#fff;font-weight:800;font-size:.82rem;padding:4px 8px;margin:0 0 6px}
+.henry-cap{background:#E8A54B;color:#1a2330;font-weight:800;font-size:.82rem;padding:4px 8px;margin:0 0 6px}
 .henry-quick{background:#cfd8e6;border:1px solid #8aa0bd;padding:8px;margin-top:8px}
 .henry-quick-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .henry-quick-row input,.henry-quick-row select{background:#fff;min-width:90px}
@@ -146,15 +146,15 @@ th{background:#efebe3;position:sticky;top:0}
 .invoice-ltr .henry-quick-row input{width:auto;flex:1}
 
 .henry-skin{grid-template-rows:36px 1fr;grid-template-columns:220px 1fr;background:#c5d0de}
-.henry-top{grid-column:1/-1;background:#e24a2d;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;padding:0 10px}
-.henry-top .btn{background:#9b2b1c;border:0;border-radius:2px;padding:4px 8px;font-size:12px}
+.henry-top{grid-column:1/-1;background:#E8A54B;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;padding:0 10px}
+.henry-top .btn{background:#b87333;border:0;border-radius:2px;padding:4px 8px;font-size:12px}
 .henry-skin .sidebar{background:#d7e0ec;border:1px solid #8aa0bd;border-radius:0;padding:8px}
 .henry-skin .nav button{border-radius:2px;text-align:left;background:#eef2f7;border:1px solid #b7c5d6;margin-bottom:3px}
-.henry-skin .nav button.active{background:#e24a2d;color:#fff;border-color:#9b2b1c}
+.henry-skin .nav button.active{background:#E8A54B;color:#fff;border-color:#b87333}
 .henry-skin .topbar{background:#d7e0ec;border-bottom:1px solid #8aa0bd;border-radius:0}
 .henry-skin .card,.henry-skin .table-wrap,.henry-skin .modal{border-radius:2px;border:1px solid #8aa0bd;background:#eef2f7}
 .henry-skin th{background:#c5d3e6}
 .henry-skin .btn{border-radius:3px}
-.henry-skin .brand-b{background:#e24a2d;color:#fff;border-radius:2px}
+.henry-skin .brand-b{background:#E8A54B;color:#fff;border-radius:2px}
 .henry-skin input,.henry-skin select,.henry-skin textarea{border-radius:2px;border-color:#8aa0bd}
 .login-screen{background:#c5d0de}
