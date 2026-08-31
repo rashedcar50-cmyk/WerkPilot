@@ -1263,12 +1263,18 @@ function deleteInvoice(iid){
   if(!canEdit()) return;
   const inv=db.invoices.find(x=>x.id===iid);
   if(!inv) return;
-  if(!confirm((t('confirmDelInv')||'Storno')+' '+(inv.number||'')+' ?')) return;
-  inv.status='storno'; inv.stornoAt=new Date().toISOString();
-  if(WP.Engine) WP.Engine.touch(inv);
-  audit('invoice.storno', inv.number||iid); save();
-  if(typeof upsertInvoiceCloud==='function') try{ upsertInvoiceCloud(inv); }catch(e){}
-  render(); toast('Storno');
+  askConfirm(
+    (t('confirmDelInv')||'Storno')+'  '+ (inv.number||''),
+    t('stornoHint')||'',
+    ()=>{
+      inv.status='storno'; inv.stornoAt=new Date().toISOString();
+      if(WP.Engine) WP.Engine.touch(inv);
+      audit('invoice.storno', inv.number||iid); save();
+      if(typeof upsertInvoiceCloud==='function') try{ upsertInvoiceCloud(inv); }catch(e){}
+      render();
+      toast((t('invDeleted')||'Storno')+'\n'+(inv.number||''));
+    }
+  );
 }
 window.invoiceForCustomer=invoiceForCustomer;
 window.invoicesForCustomer=invoicesForCustomer;
@@ -1930,7 +1936,9 @@ function purchaseManualModal(){
 }
 
 function deletePurchase(pid){
-  if(!confirm(t('delPurchase'))) return;
+  return askConfirm(t('delPurchase'), '', ()=>{ deletePurchaseDo(pid); });
+}
+function deletePurchaseDo(pid){
   db.purchases = db.purchases.filter(x => x.id !== pid);
   save();
   deletePurchaseCloud(pid);

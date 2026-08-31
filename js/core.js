@@ -168,7 +168,35 @@ function loadRaw(){
 
 function id(p='x'){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function money(v){return Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'})}
-function toast(msg){const x=document.createElement('div');x.className='toast';x.textContent=(typeof L==='function')?L(String(msg||'')):String(msg||'');document.body.append(x);setTimeout(()=>x.remove(),2200)}
+function toast(msg){
+  const x=document.createElement('div');
+  x.className='toast';
+  const text=(typeof L==='function')?L(String(msg||'')):String(msg||'');
+  x.innerHTML=text.split('\n').map(l=>`<div>${(l||'').replace(/</g,'')}</div>`).join('');
+  document.body.append(x);
+  setTimeout(()=>x.remove(),2800);
+}
+function askConfirm(title, detail, onYes){
+  document.querySelectorAll('.ask-overlay').forEach(n=>n.remove());
+  const box=document.createElement('div');
+  box.className='ask-overlay';
+  const yes=typeof t==='function'?t('save'):'OK';
+  const no=typeof t==='function'?t('cancelBtn'):'Cancel';
+  box.innerHTML=`<div class="ask-box" role="dialog">
+    <h3>${String(title||'').replace(/</g,'')}</h3>
+    ${detail?`<p>${String(detail).replace(/</g,'')}</p>`:''}
+    <div class="ask-actions">
+      <button type="button" class="btn ghost" id="askNo">${no}</button>
+      <button type="button" class="btn bad" id="askYes">${yes}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(box);
+  const close=()=>box.remove();
+  box.querySelector('#askNo').onclick=close;
+  box.querySelector('#askYes').onclick=()=>{ close(); if(onYes) onYes(); };
+  box.addEventListener('click',e=>{ if(e.target===box) close(); });
+}
+window.askConfirm=askConfirm;
 function audit(action,detail=''){db.audit.unshift({id:id('a'),ts:new Date().toISOString(),user:session?.user?.name||'system',company:session?.company?.id||'',action,detail});save()}
 function companyRows(name){return (db[name]||[]).filter(x=>x.companyId===session.company.id)}
 function visibleCompanies(){
