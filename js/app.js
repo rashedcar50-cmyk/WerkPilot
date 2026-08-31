@@ -1588,7 +1588,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     const lines=collectInvoiceRows();
     if(!lines.length) return toast(t('needLine'));
     if(lines.some(l=>!l.name)) return toast(t('needDesc'));
-    if(lines.some(l=>!(l.qty>0) || !(l.price>0))) return toast(t('needQtyPrice'));
+    if(lines.some(l=>!(Number(l.qty)>0))) return toast(t('needQtyPrice'));
     const custId=$('#fcust')?.value||'';
     const veh=vehicleOf($('#fv').value)||{};
     if(!custId && !veh.customerId) return toast(t('needCustomer'));

@@ -517,33 +517,27 @@ window.dLabel = function(s){
 window.L = function(s){
   if(s==null) return '';
   s=String(s);
-  const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'ar');
-  const exact=window.dLabel(s);
-  if(exact && exact!==s) return exact;
+  const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'de');
   const phrases={
-    'WERKSTATT. DIGITAL. EFFIZIENT.':{ar:'ورشة. رقمية. فعالة.',en:'WORKSHOP. DIGITAL. EFFICIENT.',es:'TALLER. DIGITAL. EFICIENTE.',de:'WERKSTATT. DIGITAL. EFFIZIENT.'},
-    'WERKSTATT. DIGITAL.':{ar:'ورشة. رقمية.',en:'WORKSHOP. DIGITAL.',es:'TALLER. DIGITAL.',de:'WERKSTATT. DIGITAL.'},
+    'WERKSTATT. DIGITAL. EFFIZIENT.':{ar:'ورشة. رقمية. فعالة.',en:'WORKSHOP. DIGITAL. EFFICIENT.',es:'TALLER. DIGITAL. EFICIENTE.',de:'WERKSTATT. DIGITAL. EFFIZIENT.',tr:'ATÖLYE. DİJİTAL. VERİMLİ.',sr:'RADIONICA. DIGITALNO. EFIKASNO.',ru:'МАСТЕРСКАЯ. ЦИФРОВО. ЭФФЕКТИВНО.',pl:'WARSZTAT. CYFROWO. EFEKTYWNIE.'},
     'Netto Teile':{ar:'صافي القطع',en:'Net parts',es:'Neto recambios',de:'Netto Teile'},
     'Netto Leistungen':{ar:'صافي الأجور',en:'Net labor',es:'Neto mano de obra',de:'Netto Leistungen'},
     'MwSt 19%':{ar:'الضريبة 19%',en:'VAT 19%',es:'IVA 19%',de:'MwSt. 19%'},
     'Barverkauf':{ar:'بيع نقدي',en:'Cash sale',es:'Venta al contado',de:'Barverkauf'}
   };
-  if(phrases[s.trim()] && phrases[s.trim()][lang]) return phrases[s.trim()][lang];
-  if(lang==='ar'){
-    if(!/[A-Za-zÄÖÜäöüß]/.test(s)) return s;
-    return s.split(/(\s+|·|,|\(|\)|\/)/).map(p=>phrases[p]?phrases[p].ar:(window.dLabel(p)||p)).join('');
-  }
-  if(!/[\u0600-\u06FF]/.test(s)) return exact||s;
-  const parts=s.split(/(\s+|·|,|\(|\)|\/|\+|—|-)/);
-  return parts.map(p=>{
+  const trim=s.trim();
+  if(phrases[trim] && phrases[trim][lang]) return phrases[trim][lang];
+  const exact=window.dLabel(s);
+  if(exact && exact!==s) return exact;
+  if(lang==='ar') return s;
+  if(!/[\u0600-\u06FF]/.test(s)) return s;
+  return s.split(/(\s+|·|,|\(|\)|\/|\+|—|-)/).map(p=>{
     if(!/[\u0600-\u06FF]/.test(p)) return p;
     const d=window.dLabel(p);
-    if(d && !/[\u0600-\u06FF]/.test(d)) return d;
-    const st=window.stLabel(p);
-    if(st && !/[\u0600-\u06FF]/.test(st)) return st;
-    const fl=window.fuelLabel(p);
-    if(fl && !/[\u0600-\u06FF]/.test(fl)) return fl;
-    return '—';
+    if(d && d!==p) return d;
+    if(typeof stLabel==='function'){ const st=stLabel(p); if(st && st!==p) return st; }
+    if(typeof fuelLabel==='function'){ const fl=fuelLabel(p); if(fl && fl!==p) return fl; }
+    return p;
   }).join('');
 };
 window.scrubUiLang = function(root){
@@ -700,6 +694,9 @@ window.langOptions = function(selected){
     }
   };
   ['en','de','ar'].forEach(c=>{ if(WP_I18N[c]) Object.assign(WP_I18N[c], more[c]); });
+  ['tr','sr','ru','pl','es'].forEach(c=>{
+    if(WP_I18N[c] && WP_I18N.de) WP_I18N[c]=Object.assign({}, WP_I18N.de, WP_I18N[c]);
+  });
 })();
 window.payLabel=function(p){
   const m={'open':'payOpen','offen':'payOpen','غير محدد':'payOpen','cash':'payCash','نقدي':'payCash','Bar':'payCash','card':'payCard','بطاقة':'payCard','bank':'payBank','تحويل بنكي':'payBank'};
