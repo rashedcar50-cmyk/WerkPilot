@@ -1548,31 +1548,31 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     <div class="field"><label>${t('taxPct')}</label><input id="ft" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.tax):19}"></div>
     <div class="field"><label>${t('discount')}</label><input id="fd" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.discount||0):0}"></div>
     <div class="field span2 henry-ui">
-      <div class="henry-cap">Positionen</div>
+      <div class="henry-cap">${t('positions')}</div>
       <div class="table-wrap">
         <table class="inv-edit henry-pos">
-          <thead><tr><th>Pos</th><th>Art</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th><th></th></tr></thead>
+          <thead><tr><th>${t('colPos')}</th><th>${t('colArt')}</th><th>${t('sku')}</th><th>${t('desc')}</th><th>${t('colQty')}</th><th>${t('colPrice')}</th><th>${t('colSum')}</th><th>${t('colVat')}</th><th></th></tr></thead>
           <tbody id="invRows"></tbody>
         </table>
       </div>
       <div class="henry-quick">
-        <div class="henry-cap">Schnellerfassung</div>
+        <div class="henry-cap">${t('quickEntry')}</div>
         <div class="henry-quick-row">
-          <select id="qArt"><option value="parts">Ersatzteil</option><option value="labor">Arbeitsleistung</option></select>
-          <input id="katySku" placeholder="Bestellnummer">
-          <input id="katyQty" class="latnum" inputmode="decimal" lang="de" value="1" style="width:70px" title="Menge">
-          <input id="qName" placeholder="Beschreibung">
-          <button type="button" class="btn primary" id="katyFetch">Übernehmen</button>
+          <select id="qArt"><option value="parts">${t('kindParts')}</option><option value="labor">${t('kindLabor')}</option></select>
+          <input id="katySku" placeholder="${t('orderNo')}">
+          <input id="katyQty" class="latnum" inputmode="decimal" lang="de" value="1" style="width:70px" title="${t('colQty')}">
+          <input id="qName" placeholder="${t('desc')}">
+          <button type="button" class="btn primary" id="katyFetch">${t('apply')}</button>
         </div>
-        <div id="katyHint" class="hint">Nummer eingeben und Enter — wie in Henry.</div>
+        <div id="katyHint" class="hint">${t('henryHint')}</div>
         <div class="toolbar" style="margin-top:6px">
-          <button type="button" class="btn small" id="addRow">+ Ersatzteil</button>
-          <button type="button" class="btn small" id="addLabor">+ Arbeitsleistung</button>
-          <button type="button" class="btn small" id="katyOpen">Katy</button>
+          <button type="button" class="btn small" id="addRow">+ ${t('kindParts')}</button>
+          <button type="button" class="btn small" id="addLabor">+ ${t('kindLabor')}</button>
+          <button type="button" class="btn small" id="katyOpen">${t('catalog')}</button>
           <button type="button" class="btn small" id="henryOpen">Henry</button>
         </div>
-        <textarea id="katyPaste" rows="2" placeholder="Zeilen aus Henry einfügen"></textarea>
-        <button type="button" class="btn small" id="katyPasteBtn">Einfügen</button>
+        <textarea id="katyPaste" rows="2" placeholder="${t('pasteHint')}"></textarea>
+        <button type="button" class="btn small" id="katyPasteBtn">${t('paste')}</button>
       </div>
     </div>
     <div class="field"><label>${t('customer')}</label><select id="fcust"><option value="">${t('chooseCustomer')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select></div>
