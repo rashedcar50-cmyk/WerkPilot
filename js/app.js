@@ -18,7 +18,7 @@ function login(){
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'ar')}</select></div>
  <button class="btn primary full" id="loginBtn">${t('login')}</button>
- <div class="login-fail" id="loginErr"></div>
+ <div class="login-fail" id="loginErr"></div><p class="muted" style="margin-top:14px;font-size:.8rem"><a href="impressum.html">Impressum</a> · <a href="privacy.html">Datenschutz</a></p>
  </div></div>`;
  if(typeof scrubUiLang==='function') scrubUiLang($('#app'));
  window._loginFails = window._loginFails || 0;

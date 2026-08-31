@@ -1,14 +1,20 @@
 {
+  "id": "/WerkPilot/",
   "name": "BayMeister",
   "short_name": "BayMeister",
-  "description": "Werkstatt. Digital. Effizient.",
-  "start_url": "./index.html",
+  "description": "Werkstattverwaltung für Autoservice: Aufträge, Fahrzeuge, Rechnungen.",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#0B0E14",
-  "theme_color": "#E8A54B",
-  "lang": "ar",
-  "dir": "rtl",
+  "orientation": "any",
+  "background_color": "#F4F1EA",
+  "theme_color": "#C4922A",
+  "lang": "de",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }
