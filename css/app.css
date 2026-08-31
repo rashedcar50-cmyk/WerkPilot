@@ -17,7 +17,7 @@ button{cursor:pointer}
 input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--text)}
 textarea{min-height:100px;resize:vertical}
 .btn{border:0;border-radius:12px;padding:11px 15px;background:#3A4250;color:white;font-weight:700}
-.btn.primary{background:var(--pri)}.btn.ok{background:var(--ok)}.btn.warn{background:var(--warn)}.btn.bad{background:var(--bad)}.btn.ghost{background:transparent;border:1px solid var(--line)}
+.btn.primary{background:var(--pri);color:#1C212B}.btn.ok{background:var(--ok)}.btn.warn{background:var(--warn)}.btn.bad{background:var(--bad)}.btn.ghost{background:#3A4250;color:#fff;border:1px solid #2c3340}
 .btn.small{padding:7px 10px;font-size:.9rem}.full{width:100%}
 .hint,.muted{color:var(--muted);font-size:.92rem}
 .shell{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
@@ -68,9 +68,6 @@ th{background:#efebe3;position:sticky;top:0}
   .sidebar.open{right:0;box-shadow:-12px 0 40px #1c212b33}
   .mobile-menu{display:inline-block}
   .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .btn.ghost,.btn.ghost.small,#menu,#logout,#addWorkshop{
-    background:#3A4250;color:#fff;border:1px solid #3A4250;
-  }
 }
 @media(max-width:560px){.grid,.form-grid{grid-template-columns:1fr}.span2{grid-column:auto}.hide-mobile{display:none}}
 
