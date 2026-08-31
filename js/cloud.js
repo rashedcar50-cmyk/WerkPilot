@@ -14,6 +14,7 @@ async function loadPurchasesFromCloud(){
     if(error){ console.warn('loadPurchases', error.message); return false; }
     if(!Array.isArray(data)) return false;
     mergeByCompany('purchases', data.map(r => ({
+      updatedAt:r.updated_at||r.purchase_date||'',
       id: 'p_cloud_' + r.id,
       cloudId: r.id,
       companyId: r.company_id || 'de',
@@ -30,7 +31,6 @@ async function loadPurchasesFromCloud(){
       notes: r.notes || '',
       receipt_url: r.receipt_url || ''
     })));
-    save();
     return true;
   }catch(e){ console.warn(e); return false; }
 }
@@ -94,7 +94,7 @@ async function loadCustomersFromCloud(){
       id:'c_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||session?.company?.id||'de',
       name:r.name||'', phone:r.phone||'', email:r.email||'', address:r.address||''
     })).filter(x=>x.name);
-    if(mapped.length){ mergeByCompany('customers', mapped); save(); return true; }
+    if(mapped.length){ mergeByCompany('customers', mapped); return true; }
   }catch(e){console.warn(e)}
   return false;
 }
@@ -118,7 +118,7 @@ async function loadInventoryFromCloud(){
       id:'inv_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||session?.company?.id||'de',
       sku:r.sku||'', name:r.name||'', qty:Number(r.qty||0), buy:Number(r.buy||0), sell:Number(r.sell||0)
     })).filter(x=>x.name||x.sku);
-    if(mapped.length){ mergeByCompany('inventory', mapped); save(); return true; }
+    if(mapped.length){ mergeByCompany('inventory', mapped); return true; }
   }catch(e){console.warn(e)}
   return false;
 }
@@ -145,7 +145,7 @@ async function loadVehiclesFromCloud(){
       make:r.make||'', model:r.model||'', year:r.year||'', engine:r.engine||'',
       paint:r.paint||'', km:r.km||0, nextServiceKm:r.next_service_km||0, photo:r.photo||''
     })));
-    save(); return true;
+    return true;
   }catch(e){console.warn(e);return false}
 }
 async function upsertVehicleCloud(v){
@@ -169,7 +169,7 @@ async function loadRepairsFromCloud(){
       parts: r.parts? (typeof r.parts==='string'? JSON.parse(r.parts||'[]'):r.parts):[],
       photos: r.photos? (typeof r.photos==='string'? JSON.parse(r.photos||'[]'):r.photos):[]
     })));
-    save(); return true;
+    return true;
   }catch(e){console.warn(e);return false}
 }
 async function upsertRepairCloud(r){
@@ -185,12 +185,13 @@ async function loadAppointmentsFromCloud(){
     const sb=window.supabaseClient; if(!sb) return false;
     const {data,error}=await sb.from('appointments').select('*');
     if(error||!Array.isArray(data)||!data.length) return false;
-    db.appointments=data.map(r=>({
+    mergeByCompany('appointments', data.map(r=>({
       id:'ap_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
       vehicleId:r.vehicle_id||'', customerId:r.customer_id||'',
-      date:r.appt_date||'', time:r.appt_time||'', tech:r.tech||'', note:r.note||'', status:r.status||''
-    }));
-    save(); return true;
+      date:r.appt_date||'', time:r.appt_time||'', tech:r.tech||'', note:r.note||'', status:r.status||'',
+      updatedAt:r.updated_at||r.appt_date||''
+    })));
+    return true;
   }catch(e){console.warn(e);return false}
 }
 async function upsertAppointmentCloud(a){
@@ -211,9 +212,9 @@ async function loadInvoicesFromCloud(){
       repairId:r.repair_id||'', number:r.number||'', type:r.type||'فاتورة',
       parts:r.parts||0, labor:r.labor||0, discount:r.discount||0, tax:r.tax||19,
       net:r.net||0, total:r.total||0, payment:r.payment||'', paid:!!r.paid,
-      date:r.issued_at||'', lines: r.lines? (typeof r.lines==='string'?JSON.parse(r.lines||'[]'):r.lines):[]
+      date:r.issued_at||'', updatedAt:r.updated_at||r.issued_at||'', lines: r.lines? (typeof r.lines==='string'?JSON.parse(r.lines||'[]'):r.lines):[]
     })));
-    save(); return true;
+    return true;
   }catch(e){console.warn(e);return false}
 }
 async function upsertInvoiceCloud(inv){
@@ -228,5 +229,9 @@ function syncAllCloud(){
   return Promise.all([
     loadPurchasesFromCloud(), loadCustomersFromCloud(), loadInventoryFromCloud(),
     loadVehiclesFromCloud(), loadRepairsFromCloud(), loadAppointmentsFromCloud(), loadInvoicesFromCloud()
-  ]);
+  ]).then(function(ok){
+    if(db && db.settings) db.settings.lastCloudSync=new Date().toISOString();
+    save();
+    return ok;
+  });
 }

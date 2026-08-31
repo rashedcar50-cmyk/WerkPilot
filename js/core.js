@@ -123,10 +123,17 @@ function persistJson(key, obj){
 }
 function slimForStorage(src){
   const slim=clone(src);
-  slim.audit=(slim.audit||[]).slice(0,300);
-  (slim.vehicles||[]).forEach(v=>{ if((v.photo||'').length>80000) v.photo=''; });
-  (slim.repairs||[]).forEach(r=>{ if((r.photos||[]).length>8) r.photos=r.photos.slice(0,8); });
+  slim.audit=(slim.audit||[]).slice(0,80);
+  (slim.vehicles||[]).forEach(v=>{ if((v.photo||'').length>40000) v.photo=''; });
+  (slim.repairs||[]).forEach(r=>{
+    if((r.photos||[]).length>4) r.photos=r.photos.slice(0,4);
+    (r.photos||[]).forEach(p=>{ if(p && p.url && String(p.url).length>40000) p.url=''; });
+  });
   return slim;
+}
+function touch(row){
+  if(row && typeof row==='object') row.updatedAt=new Date().toISOString();
+  return row;
 }
 function save(){
   try{
@@ -183,9 +190,30 @@ function patchWorkshop(fields){
   save();
 }
 function mergeByCompany(key, rows){
-  const cid=session?.company?.id;
-  if(!cid){ db[key]=rows; return; }
-  db[key]=(db[key]||[]).filter(x=>x.companyId!==cid).concat(rows||[]);
+  if(!Array.isArray(db[key])) db[key]=[];
+  (rows||[]).forEach(incoming=>upsertRow(key, incoming));
+}
+function upsertRow(key, incoming){
+  if(!incoming) return;
+  const list=db[key];
+  const cid=incoming.companyId||session?.company?.id;
+  const idx=list.findIndex(l=>{
+    if(incoming.cloudId && l.cloudId===incoming.cloudId) return true;
+    if(incoming.number && l.number && incoming.number===l.number && (l.companyId||cid)===(incoming.companyId||cid)) return true;
+    if(incoming.vin && l.vin && incoming.vin===l.vin && (l.companyId||cid)===(incoming.companyId||cid)) return true;
+    if(incoming.invoice_number && l.invoice_number && incoming.invoice_number===l.invoice_number && l.supplier===incoming.supplier) return true;
+    if(incoming.sku && l.sku && incoming.sku===l.sku && (l.companyId||cid)===(incoming.companyId||cid)) return true;
+    return l.id===incoming.id;
+  });
+  if(idx<0){ list.push(incoming); return; }
+  const local=list[idx];
+  const lt=Date.parse(local.updatedAt||local.date||0)||0;
+  const rt=Date.parse(incoming.updatedAt||incoming.date||0)||0;
+  if(lt>rt){
+    list[idx]=Object.assign({}, incoming, local, {cloudId:local.cloudId||incoming.cloudId, id:local.id});
+  } else {
+    list[idx]=Object.assign({}, local, incoming, {id:local.id, cloudId:local.cloudId||incoming.cloudId});
+  }
 }
 function cloudCompanyFilter(query){
   const cid=session?.company?.id;

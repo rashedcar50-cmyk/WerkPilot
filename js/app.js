@@ -499,13 +499,13 @@ function compressVehiclePhoto(file){
     const img=new Image();
     const url=URL.createObjectURL(file);
     img.onload=()=>{
-      const max=900;
+      const max=720;
       let w=img.width,h=img.height;
       if(w>max||h>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s)}
       const c=document.createElement('canvas'); c.width=w;c.height=h;
       c.getContext('2d').drawImage(img,0,0,w,h);
       URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg',0.72));
+      resolve(c.toDataURL('image/jpeg',0.55));
     };
     img.onerror=reject;
     img.src=url;
@@ -1471,7 +1471,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
     parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
     const obj={id:existing?existing.id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custId||veh.customerId||'',parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
       type:kind==='bar'?'Barverkauf':'Rechnung', payment:payCode($('#pay').value), paid:['cash','card'].includes(payCode($('#pay').value)),
-      number:existing?existing.number:nextInvoiceNumber(), lines, repairId:existing&&existing.repairId, auftrag:existing&&existing.auftrag};
+      number:existing?existing.number:nextInvoiceNumber(), lines, repairId:existing&&existing.repairId, auftrag:existing&&existing.auftrag, updatedAt:new Date().toISOString()};
     lines.forEach(rememberKatyArticle);
     if(existing){
       const i=db.invoices.findIndex(x=>x.id===existing.id);

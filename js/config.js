@@ -1,6 +1,6 @@
 /* BayMeister kernel — flags, hooks, safe errors */
 window.WP = window.WP || {};
-WP.version = '1.4.0';
+WP.version = '1.5.8';
 WP.build = '2026-08-31';
 WP.features = {
   cloud: true,
@@ -8,7 +8,8 @@ WP.features = {
   kba: true,
   ocr: true,
   distriAuto: true,
-  multiWorkshop: true
+  multiWorkshop: true,
+  mergeSync: true
 };
 WP.pages = WP.pages || {};
 WP.hooks = WP.hooks || {
