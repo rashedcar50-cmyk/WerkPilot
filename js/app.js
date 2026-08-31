@@ -1205,6 +1205,11 @@ function customerBlock(cust){
 function deMoney(n){
   return Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
+function latNum(v){
+  const s=String(v??'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(',','.');
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
 function nextKdNr(){
   const nums=(db.customers||[]).map(c=>parseInt(String(c.kdNr||c.number||'').replace(/\D/g,''),10)).filter(n=>n>0);
   const n=(nums.length?Math.max(...nums):1000)+1;
@@ -1411,9 +1416,9 @@ function collectInvoiceRows(){
   return [...document.querySelectorAll('#invRows tr')].map(tr=>{
     const sku=tr.querySelector('.c-sku')?.value.trim()||'';
     const name=tr.querySelector('.c-name')?.value.trim()||'';
-    const qty=Number(tr.querySelector('.c-qty')?.value||1);
-    const price=Number(tr.querySelector('.c-price')?.value||0);
-    const tax=Number(tr.querySelector('.c-tax')?.value||19);
+    const qty=latNum(tr.querySelector('.c-qty')?.value||1);
+    const price=latNum(tr.querySelector('.c-price')?.value||0);
+    const tax=latNum(tr.querySelector('.c-tax')?.value||19);
     const kind=tr.querySelector('.c-kind')?.value||'parts';
     return {sku,name,qty,price,tax,kind,sum:qty*price};
   }).filter(x=>x.name||x.sku);
@@ -1432,10 +1437,10 @@ function addInvoiceRow(data){
     <td><select class="c-kind"><option value="parts" ${d.kind!=='labor'?'selected':''}>${t('kindParts')}</option><option value="labor" ${d.kind==='labor'?'selected':''}>${t('kindLabor')}</option></select></td>
     <td><input class="c-sku" value="${esc(d.sku)}" placeholder="${t('sku')}"></td>
     <td><input class="c-name" value="${esc(d.name)}" placeholder="${t('desc')}"></td>
-    <td><input class="c-qty" type="number" step="0.01" value="${d.qty}"></td>
-    <td><input class="c-price" type="number" step="0.01" value="${d.price}"></td>
+    <td><input class="c-qty latnum" inputmode="decimal" lang="de" value="${Number(d.qty)}"></td>
+    <td><input class="c-price latnum" inputmode="decimal" lang="de" value="${Number(d.price)}"></td>
     <td class="c-sum">${(Number(d.qty||0)*Number(d.price||0)).toLocaleString('de-DE',{minimumFractionDigits:2})}</td>
-    <td><input class="c-tax" type="number" value="${d.tax||19}" style="width:60px"></td>
+    <td><input class="c-tax latnum" inputmode="decimal" lang="de" value="${Number(d.tax||19)}" style="width:60px"></td>
     <td><button type="button" class="btn small bad c-del">×</button></td>`;
   tb.appendChild(tr);
   tr.querySelector('.c-del').onclick=()=>{tr.remove(); numberInvoiceRows(); refreshInvoiceSums();};
@@ -1454,8 +1459,8 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   modal(title, `<div class="form-grid">
     <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
     <div class="field"><label>${t('payMethod')}</label><select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
-    <div class="field"><label>${t('taxPct')}</label><input id="ft" type="number" step=".01" value="${existing?existing.tax:19}"></div>
-    <div class="field"><label>${t('discount')}</label><input id="fd" type="number" step=".01" value="${existing?existing.discount||0:0}"></div>
+    <div class="field"><label>${t('taxPct')}</label><input id="ft" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.tax):19}"></div>
+    <div class="field"><label>${t('discount')}</label><input id="fd" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.discount||0):0}"></div>
     <div class="field span2 henry-ui">
       <div class="henry-cap">Positionen</div>
       <div class="table-wrap">
@@ -1469,7 +1474,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
         <div class="henry-quick-row">
           <select id="qArt"><option value="parts">Ersatzteil</option><option value="labor">Arbeitsleistung</option></select>
           <input id="katySku" placeholder="Bestellnummer">
-          <input id="katyQty" type="number" value="1" min="0.01" step="0.01" style="width:70px" title="Menge">
+          <input id="katyQty" class="latnum" inputmode="decimal" lang="de" value="1" style="width:70px" title="Menge">
           <input id="qName" placeholder="Beschreibung">
           <button type="button" class="btn primary" id="katyFetch">Übernehmen</button>
         </div>
@@ -1495,7 +1500,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     if(!custId && !veh.customerId) return toast(t('needCustomer'));
     let parts=lines.filter(x=>!isLaborLine(x)).reduce((s,x)=>s+x.qty*x.price,0);
     let labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
-    const discount=+$('#fd').value||0, tax=+$('#ft').value||19;
+    const discount=latNum($('#fd')?.value), tax=latNum($('#ft')?.value)||19;
     let net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
     parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
     const obj={id:existing?existing.id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custId||veh.customerId||'',parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
@@ -1528,7 +1533,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   const doFetch=()=>{
     const sku=$('#katySku').value.trim();
     const kind=$('#qArt')?.value||'parts';
-    const qty=Number($('#katyQty').value||1);
+    const qty=latNum($('#katyQty')?.value||1);
     const typed=$('#qName')?.value.trim()||'';
     if(!sku && !typed) return toast(t('needSku'));
     const hit=sku?lookupKatyArticle(sku):null;
