@@ -366,34 +366,88 @@ async function uploadWorkshopFile(file, folder){
   return '';
 }
 
+function createInvoiceAuto(payload){
+  payload=payload||{};
+  if(!session||!session.company) throw new Error('no-session');
+  let lines=(payload.lines||[]).map(l=>({
+    sku:String(l.sku||l.number||'').trim(),
+    name:String(l.name||l.desc||l.beschreibung||'').trim(),
+    qty:Number(l.qty||l.menge||1)||1,
+    price:Number(l.price||l.preis||0)||0,
+    tax:Number(l.tax||payload.tax||19)||19,
+    kind:(l.kind==='labor'||l.kind==='Arbeitsleistung'||l.kind==='اجر'||l.kind==='أجور')?'labor':'parts'
+  })).filter(l=>l.name||l.sku);
+  if(!lines.length){
+    if(Number(payload.parts)>0) lines.push({sku:'',name:'Ersatzteile',qty:1,price:Number(payload.parts),tax:19,kind:'parts'});
+    if(Number(payload.labor)>0) lines.push({sku:'',name:'Arbeitswert',qty:1,price:Number(payload.labor),tax:19,kind:'labor'});
+  }
+  if(!lines.length) throw new Error('no-lines');
+  const veh=payload.vehicleId && typeof vehicleOf==='function' ? vehicleOf(payload.vehicleId) : null;
+  const custId=payload.customerId || (veh&&veh.customerId) || '';
+  const parts=lines.filter(l=>l.kind!=='labor').reduce((s,l)=>s+l.qty*l.price,0);
+  const labor=lines.filter(l=>l.kind==='labor').reduce((s,l)=>s+l.qty*l.price,0);
+  const discount=Number(payload.discount||0)||0;
+  const tax=Number(payload.tax||19)||19;
+  const net=Math.max(0,parts+labor-discount);
+  const total=Math.round(net*(1+tax/100)*100)/100;
+  const inv={
+    id:payload.id || (typeof id==='function'?id('i'):('i'+Date.now())),
+    companyId:session.company.id,
+    vehicleId:payload.vehicleId||'',
+    customerId:custId,
+    repairId:payload.repairId||'',
+    estimateId:payload.estimateId||'',
+    km:payload.km || (veh&&veh.km) || '',
+    number:payload.number || nextInvoiceNumber(),
+    type: (payload.type==='bar'||payload.type==='Barverkauf')?'Barverkauf':'Rechnung',
+    parts:Math.round(parts*100)/100,
+    labor:Math.round(labor*100)/100,
+    discount, tax,
+    net:Math.round(net*100)/100,
+    total,
+    payment:payload.payment||'open',
+    paid:payload.paid===true || ['cash','card'].includes(payload.payment),
+    date:payload.date || new Date().toISOString(),
+    lines,
+    auftrag:payload.auftrag||'',
+    updatedAt:new Date().toISOString()
+  };
+  db.invoices=db.invoices||[];
+  db.invoices.push(inv);
+  try{ if(typeof archiveBeleg==='function') archiveBeleg(inv); }catch(e){}
+  try{ if(typeof upsertInvoiceCloud==='function') upsertInvoiceCloud(inv); }catch(e){}
+  db.journal=db.journal||[];
+  db.journal.push({id:typeof id==='function'?id('j'):('j'+Date.now()),companyId:session.company.id,date:(typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)),account:'مبيعات',debit:0,credit:total,note:inv.number});
+  if(typeof audit==='function') audit('invoice.auto', inv.number);
+  save();
+  return inv;
+}
+window.createInvoiceAuto=createInvoiceAuto;
+window.WP=window.WP||{};
+window.WP.Invoice={create:createInvoiceAuto};
+
 function convertRepairToInvoice(rid){
   const r=db.repairs.find(x=>x.id===rid);
   if(!r) return toast('الأمر غير موجود');
-  const parts=repairPartsTotal(r);
-  const labor=repairLaborTotal(r);
-  const discount=0, tax=19;
-  const net=Math.max(0,parts+labor-discount);
-  const total=net*(1+tax/100);
-  const inv={
-    id:id('i'), companyId:session.company.id, vehicleId:r.vehicleId, repairId:r.id,
-    number:nextInvoiceNumber(), type:'فاتورة',
-    parts, labor, discount, tax, net, total, payment:'غير محدد', paid:false,
-    date:new Date().toISOString(),
-    lines:[
-      ...(r.parts||[]).map(p=>({name:p.name, sku:p.sku, qty:p.qty, price:p.price, kind:'parts'})),
-      {name:'Arbeitswert', qty:Number(r.hours||1), price:Number(workshop().hourlyRate||db.settings.hourlyRate||100), kind:'labor'}
-    ], auftrag:r.number||nextAuftragNumber()
-  };
-  db.invoices.push(inv);
-  upsertInvoiceCloud(inv);
+  const lines=[
+    ...(r.parts||[]).map(p=>({name:p.name, sku:p.sku, qty:p.qty, price:p.price, kind:'parts'})),
+    {name:'Arbeitswert', qty:Number(r.hours||1), price:Number(workshop().hourlyRate||db.settings.hourlyRate||100), kind:'labor'}
+  ];
+  let inv;
+  try{
+    inv=createInvoiceAuto({
+      vehicleId:r.vehicleId, repairId:r.id, customerId:r.customerId,
+      lines, tax:19, auftrag:r.number||nextAuftragNumber(), km:r.km
+    });
+  }catch(e){ return toast(e.message||'invoice'); }
   r.status='جاهز للتسليم';
   consumePartsFromRepair(r);
-  db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:inv.number});
+  if(typeof audit==='function') audit('invoice.from_repair', inv.number);
   save();
-  audit('invoice.from_repair', inv.number);
   toast('تم إنشاء الفاتورة '+inv.number);
   session.page='invoices';
   render();
+  setTimeout(()=>{ try{ previewInvoice(inv.id); }catch(e){} }, 200);
 }
 function whatsappReady(rid){
   const r=db.repairs.find(x=>x.id===rid);
