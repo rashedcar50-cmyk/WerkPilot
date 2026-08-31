@@ -118,9 +118,11 @@ th{background:#efebe3;position:sticky;top:0}
 .steps button{font-size:.8rem}
 @media(max-width:900px){
   .content{padding:14px 14px 88px}
-  .topbar{flex-wrap:wrap}
-  .searchbox{min-width:0;width:100%;max-width:none}
-  .top-actions{width:100%}
+  .topbar{flex-wrap:nowrap;align-items:center;gap:6px;padding:8px 10px;overflow-x:auto}
+  .top-actions{width:auto;flex-wrap:nowrap;flex:1;min-width:0;gap:6px}
+  .searchbox{min-width:90px;width:120px;max-width:28vw;flex:1}
+  .topbar select{max-width:36vw;min-width:0}
+  #backBtn,.mobile-menu,#addWorkshop{flex-shrink:0}
   .table-wrap{margin-bottom:8px}
   table{min-width:520px}
   .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:20;background:#fff;border-top:1px solid var(--line);justify-content:space-around;padding:8px 4px calc(8px + env(safe-area-inset-bottom))}
