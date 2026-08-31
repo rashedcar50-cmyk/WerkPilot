@@ -833,10 +833,13 @@ function findOrCreateFromSchein(ai){
   }
   return {c,v};
 }
-function scanScheinStartRepair(){
-  modal(t('scanOpenJob'),`<div class="field">
+function scanScheinStartRepair(mode){
+  if(mode && typeof mode==='object') mode='repair';
+  mode=mode||'repair';
+  const title=mode==='estimate'?t('scanSchein'):mode==='invoice'?t('scanSchein'):t('scanOpenJob');
+  modal(title,`<div class="field">
     <label>اختر صورة الورقة من الاستوديو أو الملفات، أو صوّرها بالكاميرا.</label>
-    <input id="doc" type="file" accept="image/*">
+    <input id="doc" type="file" accept="image/*" capture="environment">
     <div class="toolbar">
       <button type="button" class="btn primary" id="pickGallery">🖼️ الاستوديو / الملفات</button>
       <button type="button" class="btn" onclick="openCamera()">📷 الكاميرا</button>
@@ -852,12 +855,26 @@ function scanScheinStartRepair(){
       if(!km) return toast('أدخل كيلومتر السيارة');
       const ai=window._scheinAI;
       const {c,v}=findOrCreateFromSchein(ai);
-      v.km=km; upsertVehicleCloud(v);
+      v.km=km; upsertVehicleCloud(v); save();
       const complaint=($('#scheinWork')&&$('#scheinWork').value||'').trim() || 'استلام من ورقة السيارة';
+      window._scheinReady=false; window._scheinAI=null;
+      if(mode==='estimate'){
+        closeModal();
+        session.page='estimates';
+        financeModal('estimate', v.id, c.id);
+        toast((v.plate||v.vin)+' / '+km+' km');
+        return;
+      }
+      if(mode==='invoice'){
+        closeModal();
+        session.page='invoices';
+        invoiceDesigner('invoice', c.id, null, v.id);
+        toast((v.plate||v.vin)+' / '+km+' km');
+        return;
+      }
       const r={id:id('r'),companyId:session.company.id,vehicleId:v.id,complaint,description:complaint,jobs:[],parts:[],photos:[],tech:session.user.name||'',hours:1,status:'استلام',km:km,fuel:'نصف',date:todayISO()};
       db.repairs.push(r); upsertRepairCloud(r); save();
       audit('repair.from_schein', (v.plate||v.vin)+' '+km);
-      window._scheinReady=false; window._scheinAI=null;
       closeModal(); session.repairId=r.id; session.page='repairs'; render();
       toast('تم فتح الأمر — '+esc(v.plate||v.vin)+' / '+km+' km');
       return;
@@ -1099,17 +1116,18 @@ function appointmentToRepair(aid){
 window.appointmentToRepair=appointmentToRepair;
 function estimates(){
  const rows=companyRows('estimates');
- $('#content').innerHTML=head(t('estimates'),`<button class="btn primary" id="add">${t('createQuote')}</button>`)+
+ $('#content').innerHTML=head(t('estimates'),`<div class="toolbar"><button class="btn ok" id="scanEst">📷 ${t('scanSchein')}</button><button class="btn primary" id="add">${t('createQuote')}</button></div>`)+
  listShareBar('invoices')+
  table([t('vehicle'),t('partsCol'),t('laborCol'),t('discount'),t('tax'),t('total'),t('quoteFee')],rows.map(x=>[vehicleName(x.vehicleId),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]), 'estimates');
  $('#add').onclick=()=>financeModal('estimate');
+ if($('#scanEst')) $('#scanEst').onclick=()=>scanScheinStartRepair('estimate');
 }
 function invoices(){
  const filter=session.customerFilter||'';
  let rows=companyRows('invoices');
  if(filter) rows=rows.filter(x=>x.customerId===filter || (vehicleOf(x.vehicleId)||{}).customerId===filter);
  const cust=filter && db.customers.find(c=>c.id===filter);
- $('#content').innerHTML=head(cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'),`<div class="toolbar"><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">${t('cashSale')}</button>${filter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
+ $('#content').innerHTML=head(cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'),`<div class="toolbar"><button class="btn ok" id="scanInv">📷 ${t('scanSchein')}</button><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">${t('cashSale')}</button>${filter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
  listShareBar('invoices')+
  table([t('invoiceNo'),t('type'),t('vehicle'),t('total'),t('payment'),t('design')],rows.map(x=>[
   esc(x.number||x.id), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(payLabel(x.payment||'-')),
@@ -1122,6 +1140,7 @@ function invoices(){
  `<div class="bottom-action"><button class="btn primary" id="inv2">${t('createInvoice')}</button></div>`;
  $('#inv').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
  if($('#inv2')) $('#inv2').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
+ if($('#scanInv')) $('#scanInv').onclick=()=>scanScheinStartRepair('invoice');
  $('#bar').onclick=()=>invoiceDesigner('bar', session.customerFilter||'');
  if($('#clrCust')) $('#clrCust').onclick=()=>{session.customerFilter=''; invoices();};
 }
@@ -1437,12 +1456,12 @@ function numberInvoiceRows(){
     const p=tr.querySelector('.c-pos'); if(p) p.textContent=i+1;
   });
 }
-function invoiceDesigner(kind='invoice', customerId='', existing=null){
+function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId=''){
   const title = existing ? (t('editInvoice')+' '+(existing.number||'')) : (kind==='bar' ? t('cashSale') : t('createInv'));
   const rate=workshop().hourlyRate||db.settings.hourlyRate||100;
-  if(existing){ customerId=customerId||existing.customerId||''; }
+  if(existing){ customerId=customerId||existing.customerId||''; vehicleId=vehicleId||existing.vehicleId||''; }
   modal(title, `<div class="form-grid">
-    <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)).map(v=>`<option value="${v.id}" ${existing&&v.id===existing.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+    <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
     <div class="field"><label>${t('payMethod')}</label><select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
     <div class="field"><label>${t('taxPct')}</label><input id="ft" type="number" step=".01" value="${existing?existing.tax:19}"></div>
     <div class="field"><label>${t('discount')}</label><input id="fd" type="number" step=".01" value="${existing?existing.discount||0:0}"></div>
@@ -1564,10 +1583,10 @@ function previewInvoice(iid){
 window.previewInvoice=previewInvoice;
 window.invoiceDesigner=invoiceDesigner;
 
-function financeModal(type){
+function financeModal(type, vehicleId='', customerId=''){
  const title=type==='estimate'?t('estimates'):type==='bar'?t('cashSale'):t('newInv');
  modal(title,`<div class="form-grid">
- <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noCar')}</option>${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+ <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noCar')}</option>${companyRows('vehicles').map(v=>`<option value="${v.id}" ${v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
  <div class="field"><label>${t('partsEuro')}</label><input id="fp" type="number" step=".01" value="0"></div>
  <div class="field"><label>${t('laborEuro')}</label><input id="fl" type="number" step=".01" value="0"></div>
  <div class="field"><label>${t('discEuro')}</label><input id="fd" type="number" step=".01" value="0"></div>
