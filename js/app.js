@@ -46,7 +46,7 @@ function render(){
  </div></aside>
  <main class="main">
   <div class="topbar">
-   <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
+   <div class="top-actions"><button class="btn ghost" id="backBtn">${t('prev')}</button><button class="btn ghost mobile-menu" id="menu">☰</button>
    <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="ورشة جديدة">＋</button>`:''}
    <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
    <div class="top-actions"><select id="uiLangTop" title="لغة البرنامج">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span><button class="btn ghost small" id="logout">${t('logout')}</button></div>
@@ -57,7 +57,8 @@ function render(){
   ${[['dashboard',t('todayShort')],['repairs',t('ordersShort')],['vehicles',t('carsShort')],['appointments',t('apptShort')],['invoices',t('invShort')]].filter(([k])=>roleCan(k)).map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </nav>
 </div>`;
- $$('[data-page]').forEach(b=>b.onclick=()=>{session.page=b.dataset.page;render()});
+ $$('[data-page]').forEach(b=>b.onclick=()=>goPage(b.dataset.page));
+ if($('#backBtn')) $('#backBtn').onclick=goBack;
  $('#logout').onclick=()=>{audit('logout');session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
  $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render())};
  if($('#addWorkshop')) $('#addWorkshop').onclick=newWorkshopModal;
@@ -384,7 +385,18 @@ function modal(title,body,onSave,saveText){
  if(typeof scrubUiLang==='function') scrubUiLang($('#modalRoot'));
 }
 function closeModal(){$('#modalRoot').innerHTML=''}
-window.goPage=function(p){ if(!p) return; session.page=p; render(); };
+window.goPage=function(p){
+  if(!p) return;
+  session.hist=session.hist||[];
+  if(session.page && session.page!==p) session.hist.push(session.page);
+  if(session.hist.length>20) session.hist=session.hist.slice(-20);
+  session.page=p; render();
+};
+window.goBack=function(){
+  session.hist=session.hist||[];
+  session.page=session.hist.pop()||'dashboard';
+  render();
+};
 
 function dashboard(){
  const inv=companyRows('invoices'),exp=companyRows('expenses'),rep=openRepairs(),veh=companyRows('vehicles');
