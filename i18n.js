@@ -443,7 +443,7 @@ window.t = function(key){
 };
 window.stLabel = function(s){
   const map={
-    'قيد التنفيذ':'stInProgress','جاري العمل':'stWorking','استلام':'stIntake',
+    intake:'stIntake',diag:'stDiag',wait_parts:'stWaitParts',working:'stWorking',ready:'stReady',delivered:'stDelivered',done:'stDone',closed:'stClosed',confirmed:'stConfirmed',converted:'converted','قيد التنفيذ':'stInProgress','جاري العمل':'stWorking','استلام':'stIntake',
     'تشخيص':'stDiag','انتظار قطع':'stWaitParts','مؤكد':'stConfirmed',
     'منجز':'stDone','مغلق':'stClosed','جاهز للتسليم':'stReady','مسلَّم':'stDelivered','مسلم':'stDelivered',
     'تم التحويل':'converted','In Arbeit':'stInProgress','Bestätigt':'stConfirmed'
