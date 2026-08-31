@@ -161,3 +161,5 @@ th{background:#efebe3;position:sticky;top:0}
 
 .brand-word{font-size:1.6rem;font-weight:800;letter-spacing:.5px;color:#1a2330}
 .henry-skin .brand-word{color:#1a2330}
+
+input.latnum,.latnum{direction:ltr!important;unicode-bidi:isolate;font-variant-numeric:lining-nums tabular-nums;font-family:ui-sans-serif,system-ui,"Segoe UI",Arial,sans-serif}

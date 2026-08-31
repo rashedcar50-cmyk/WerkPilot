@@ -511,7 +511,7 @@ function customerModal(existing){
  <div class="field"><label>${t('make')}</label><input id="vmake"></div>
  <div class="field"><label>${t('model')}</label><input id="vmodel"></div>
  <div class="field"><label>${t('year')}</label><input id="vyear"></div>
- <div class="field"><label>${t('km')}</label><input id="vkm" type="number"></div>
+ <div class="field"><label>${t('km')}</label><input id="vkm" class="latnum" inputmode="decimal" lang="de"></div>
  </div>`,()=>{
   const firma=$('#cfirma').value.trim();
   const person=$('#n').value.trim();
@@ -617,17 +617,17 @@ function vehicleModal(prefill={}){
  </div>
  <div class="field"><label>${t('make')}</label><input id="mk" value="${esc(prefill.make||'')}"></div>
  <div class="field"><label>${t('model')}</label><input id="mo" value="${esc(prefill.model||'')}"></div>
- <div class="field"><label>${t('year')}</label><input id="yr" type="number" value="${esc(prefill.year||'')}"></div>
- <div class="field"><label>${t('displacement')}</label><input id="cc" type="number" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
+ <div class="field"><label>${t('year')}</label><input id="yr" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.year||'')}"></div>
+ <div class="field"><label>${t('displacement')}</label><input id="cc" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
  <div class="field"><label>${t('fuel')}</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
- <div class="field"><label>${t('powerKw')}</label><input id="kw" type="number" value="${esc(prefill.engine_power_kw||'')}"></div>
- <div class="field"><label>${t('maxWeight')}</label><input id="vmaxw" type="number" value="${esc(prefill.maxWeight||'')}"></div>
- <div class="field"><label>${t('seats')}</label><input id="vseats" type="number" value="${esc(prefill.seats||'')}"></div>
+ <div class="field"><label>${t('powerKw')}</label><input id="kw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_power_kw||'')}"></div>
+ <div class="field"><label>${t('maxWeight')}</label><input id="vmaxw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.maxWeight||'')}"></div>
+ <div class="field"><label>${t('seats')}</label><input id="vseats" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.seats||'')}"></div>
  <div class="field"><label>${t('vClass')}</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
  <div class="field"><label>${t('engineCode')}</label><input id="en" value="${esc(prefill.engine||'')}"></div>
  <div class="field"><label>${t('paintCode')}</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="Fahrzeugschein"></div>
- <div class="field"><label>${t('km')}</label><input id="vkm" type="number" value="${esc(prefill.km||'')}"></div>
- <div class="field"><label>${t('nextService')}</label><input id="vnext" type="number" value="${esc(prefill.nextServiceKm||'')}"></div>
+ <div class="field"><label>${t('km')}</label><input id="vkm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.km||'')}"></div>
+ <div class="field"><label>${t('nextService')}</label><input id="vnext" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
   if(!$('#cu').value)return toast(t('pickCustomerFirst'));
   const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
@@ -981,7 +981,7 @@ function scanScheinStartRepair(mode){
         اللوحة: ${esc(plate)}<br>
         VIN: ${esc(vin)}<br>
         ${esc(ai.brand||ai.make||'')} ${esc(ai.model||'')} ${esc(ai.year||'')}
-        <div class="field" style="margin-top:10px"><label>${t('kmNowEx')}</label><input id="scheinKm" type="number" inputmode="numeric" placeholder="مثلاً 86500"></div>
+        <div class="field" style="margin-top:10px"><label>${t('kmNowEx')}</label><input id="scheinKm" class="latnum" inputmode="decimal" lang="de" inputmode="numeric" placeholder="مثلاً 86500"></div>
         <div class="field"><label>${t('repairNeeded')}</label><textarea id="scheinWork" placeholder="مثلاً: صوت من المحرك / تغيير زيت / فرامل"></textarea></div>
       </div>`;
       $('#ocrStatus').textContent=t('enterKmSave');
@@ -1040,7 +1040,7 @@ function repairDesk(rid){
   </div>
   <div class="steps">${sts.map(s=>`<button class="btn small ${r.status===s?'primary':''}" onclick="setRepairStatus('${r.id}','${s}')">${stLabel(s)}</button>`).join('')}</div>
   <div class="field"><label>${t('kmNow')}</label>
-    <div class="toolbar"><input id="deskKm" type="number" value="${esc(r.km||'')}">
+    <div class="toolbar"><input id="deskKm" class="latnum" inputmode="decimal" lang="de" value="${esc(r.km||'')}">
     <button class="btn primary" id="saveKm">${t('saveKm')}</button></div>
   </div>
   <p><b>${t('complaint')}:</b> ${esc(dLabel(r.complaint||'-'))}<br><b>${t('work')}:</b> ${esc(dLabel(r.description||'-'))}<br>
@@ -1049,7 +1049,7 @@ function repairDesk(rid){
   <h3>${t('issuePart')}</h3>
   <div class="toolbar">
     <select id="stockPick">${stock.map(i=>`<option value="${i.id}">${esc(i.sku||'')} ${esc(dLabel(i.name))} (${i.qty})</option>`).join('')}</select>
-    <input id="stockQty" type="number" value="1" min="1" style="width:80px">
+    <input id="stockQty" class="latnum" inputmode="decimal" lang="de" value="1" min="1" style="width:80px">
     <button class="btn primary" id="addStock">${t('issue')}</button>
   </div>
   <p>${(r.parts||[]).map(p=>esc(dLabel(p.name))+' × '+(p.qty||1)+' — '+money(p.price)+(p.consumed?' ✓':'')).join('<br>')||'-'}</p>
@@ -1104,7 +1104,7 @@ function repairModal(existing){
  modal(existing?t('editOrder'):t('newOrder'),`<div class="form-grid">
  <div class="field"><label>${t('vehicle')}</label><select id="rv">${companyRows('vehicles').map(v=>`<option value="${v.id}" ${v.id===r.vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
  <div class="field"><label>${t('tech')}</label><input id="rt" value="${esc(r.tech||'')}"></div>
- <div class="field"><label>${t('km')}</label><input id="rkm" type="number" value="${r.km||''}"></div>
+ <div class="field"><label>${t('km')}</label><input id="rkm" class="latnum" inputmode="decimal" lang="de" value="${r.km||''}"></div>
  <div class="field"><label>${t('fuel')}</label><select id="rfuel">
   <option value="فارغ" ${r.fuel==='فارغ'?'selected':''}>${t('fuelEmpty')}</option>
   <option value="ربع" ${r.fuel==='ربع'?'selected':''}>${t('fuelQ')}</option>
@@ -1115,7 +1115,7 @@ function repairModal(existing){
  <div class="field span2"><label>${t('work')}</label><textarea id="rd">${esc(r.description||'')}</textarea></div>
  <div class="field span2"><label>${t('jobsOnePerLine')}</label><textarea id="rjobs">${esc(jobs)}</textarea></div>
  <div class="field span2"><label>${t('partsLineFmt')}</label><textarea id="rparts">${esc(parts)}</textarea></div>
- <div class="field"><label>${t('hours')}</label><input id="rh" type="number" step=".25" value="${r.hours||1}"></div>
+ <div class="field"><label>${t('hours')}</label><input id="rh" class="latnum" inputmode="decimal" lang="de" step=".25" value="${r.hours||1}"></div>
  <div class="field"><label>${t('status')}</label><select id="rs">
   ${['استلام','تشخيص','انتظار قطع','قيد التنفيذ','جاهز للتسليم','مسلَّم'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${stLabel(s)}</option>`).join('')}
  </select></div>
@@ -1686,11 +1686,11 @@ function financeModal(type, vehicleId='', customerId=''){
  const title=type==='estimate'?t('estimates'):type==='bar'?t('cashSale'):t('newInv');
  modal(title,`<div class="form-grid">
  <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noCar')}</option>${companyRows('vehicles').map(v=>`<option value="${v.id}" ${v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
- <div class="field"><label>${t('partsEuro')}</label><input id="fp" type="number" step=".01" value="0"></div>
- <div class="field"><label>${t('laborEuro')}</label><input id="fl" type="number" step=".01" value="0"></div>
- <div class="field"><label>${t('discEuro')}</label><input id="fd" type="number" step=".01" value="0"></div>
- <div class="field"><label>${t('taxPct2')}</label><input id="ft" type="number" step=".01" value="19"></div>
- ${type==='estimate'?`<div class="field"><label>${t('quoteFee2')}</label><input id="ff" type="number" step=".01" value="0"></div>`:`<div class="field"><label>${t('payMethod')}</label><select id="pay"><option value="open">${t('payOpen')}</option><option value="cash">${t('payCash')}</option><option value="card">${t('payCard')}</option><option value="bank">${t('payBank')}</option></select></div>`}
+ <div class="field"><label>${t('partsEuro')}</label><input id="fp" class="latnum" inputmode="decimal" lang="de" step=".01" value="0"></div>
+ <div class="field"><label>${t('laborEuro')}</label><input id="fl" class="latnum" inputmode="decimal" lang="de" step=".01" value="0"></div>
+ <div class="field"><label>${t('discEuro')}</label><input id="fd" class="latnum" inputmode="decimal" lang="de" step=".01" value="0"></div>
+ <div class="field"><label>${t('taxPct2')}</label><input id="ft" class="latnum" inputmode="decimal" lang="de" step=".01" value="19"></div>
+ ${type==='estimate'?`<div class="field"><label>${t('quoteFee2')}</label><input id="ff" class="latnum" inputmode="decimal" lang="de" step=".01" value="0"></div>`:`<div class="field"><label>${t('payMethod')}</label><select id="pay"><option value="open">${t('payOpen')}</option><option value="cash">${t('payCash')}</option><option value="card">${t('payCard')}</option><option value="bank">${t('payBank')}</option></select></div>`}
  </div>`,()=>{
   const parts=+$('#fp').value||0,labor=+$('#fl').value||0,discount=+$('#fd').value||0,tax=+$('#ft').value||0,net=Math.max(0,parts+labor-discount),total=net*(1+tax/100);
   const obj={id:id(type[0]),companyId:session.company.id,vehicleId:$('#fv').value,parts,labor,discount,tax,net,total,date:new Date().toISOString()};
@@ -1786,7 +1786,7 @@ function purchaseManualModal(){
       <div class="field"><label>${t('supplier')}</label><input id="p_supplier" placeholder="مثال: carparts-cat.com"></div>
       <div class="field"><label>${t('invNum')}</label><input id="p_inv"></div>
       <div class="field"><label>${t('date')}</label><input id="p_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
-      <div class="field"><label>${t('total')}</label><input id="p_total" type="number" step="0.01" value="0"></div>
+      <div class="field"><label>${t('total')}</label><input id="p_total" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
       <div class="field"><label>${t('status')}</label>
         <select id="p_status">
           <option value="pending">معلق</option>
@@ -1914,9 +1914,9 @@ async function scanPurchaseDocument(){
         <div class="field"><label>${t('supplier')}</label><input id="p_supplier" placeholder="اسم المورد"></div>
         <div class="field"><label>${t('invNum')}</label><input id="p_inv"></div>
         <div class="field"><label>${t('date')}</label><input id="p_date" type="date"></div>
-        <div class="field"><label>${t('total')}</label><input id="p_total" type="number" step="0.01" value="0"></div>
-        <div class="field"><label>${t('netEuro')}</label><input id="p_sub" type="number" step="0.01" value="0"></div>
-        <div class="field"><label>${t('taxEuro')}</label><input id="p_tax" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>${t('total')}</label><input id="p_total" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
+        <div class="field"><label>${t('netEuro')}</label><input id="p_sub" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
+        <div class="field"><label>${t('taxEuro')}</label><input id="p_tax" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
         <div class="field"><label>${t('status')}</label>
           <select id="p_status">
             <option value="pending">معلق</option>
@@ -2405,8 +2405,8 @@ function settings(){
  <div class="field span2"><div class="alert">${t('activeWs')}: <b>${esc(session.company.name)}</b> · ${esc(session.company.country)}. ${t('wsOnly')}</div></div>
  <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'ar')}</select>
  <div class="hint">${t('langHint')}</div></div>
- <div class="field"><label>${t('font')}</label><input id="font" type="number" min="13" max="22" value="${db.settings.font}"></div>
- <div class="field"><label>${t('hourly')}</label><input id="hrate" type="number" step="0.01" value="${w.hourlyRate||85}"></div>
+ <div class="field"><label>${t('font')}</label><input id="font" class="latnum" inputmode="decimal" lang="de" min="13" max="22" value="${db.settings.font}"></div>
+ <div class="field"><label>${t('hourly')}</label><input id="hrate" class="latnum" inputmode="decimal" lang="de" step="0.01" value="${w.hourlyRate||85}"></div>
  <div class="field"><label>${t('phone')}</label><input id="wphone" value="${esc(w.workshopPhone||'')}"></div>
  <div class="field span2"><label>${t('invAddr')}</label><input id="waddr" value="${esc(w.workshopAddress||'')}"></div>
  <div class="field span2"><label>${t('invTpl')}</label><select id="itpl">
@@ -2423,7 +2423,7 @@ function settings(){
  <div class="field"><label>BIC</label><input id="wbic" value="${esc(w.workshopBic||'')}" placeholder="GENODEF1RLB"></div>
  <div class="field"><label>HRB</label><input id="whrb" value="${esc(w.workshopHrb||'')}" placeholder="25248 HL"></div>
  <div class="field"><label>Sitz</label><input id="wsitz" value="${esc(w.workshopSitz||'')}"></div>
- <div class="field"><label>${t('payDays')}</label><input id="pdays" type="number" value="${w.paymentDays||0}"></div>
+ <div class="field"><label>${t('payDays')}</label><input id="pdays" class="latnum" inputmode="decimal" lang="de" value="${w.paymentDays||0}"></div>
  <div class="field"><label>${t('paper')}</label><select id="ppaper">
   <option value="A4" ${(w.printPaper||'A4')==='A4'?'selected':''}>A4</option>
   <option value="A5" ${w.printPaper==='A5'?'selected':''}>A5</option>
