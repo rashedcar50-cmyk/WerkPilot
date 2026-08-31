@@ -160,7 +160,7 @@ function loadRaw(){
 
 function id(p='x'){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function money(v){return Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'})}
-function toast(t){const x=document.createElement('div');x.className='toast';x.textContent=t;document.body.append(x);setTimeout(()=>x.remove(),2200)}
+function toast(msg){const x=document.createElement('div');x.className='toast';x.textContent=(typeof L==='function')?L(String(msg||'')):String(msg||'');document.body.append(x);setTimeout(()=>x.remove(),2200)}
 function audit(action,detail=''){db.audit.unshift({id:id('a'),ts:new Date().toISOString(),user:session?.user?.name||'system',company:session?.company?.id||'',action,detail});save()}
 function companyRows(name){return (db[name]||[]).filter(x=>x.companyId===session.company.id)}
 function visibleCompanies(){

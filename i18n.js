@@ -502,7 +502,7 @@ window.langOptions = function(selected){
       saving:'Saving...',saveInv:'Save invoice',underMin:'Below minimum',limit:'min',
       scanExp:'Scan expense receipt',readingInv2:'Reading invoice...',expAdded:'Expense added',
       readAdd2:'Read and add',wsTrade:'Trade name',wsLegal:'Legal name',country:'Country',
-      currency:'Currency',devStudio:'Developer studio'
+      currency:'Currency',devStudio:'Developer studio',saveFailed:'Save failed'
     },
     de:{
       purchasesTitle:'Einkäufe',scanPurchase:'Beleg scannen / laden',manualBuy:'+ Manueller Einkauf',
@@ -538,7 +538,7 @@ window.langOptions = function(selected){
       saving:'Speichern...',saveInv:'Beleg speichern',underMin:'Unter Mindestbestand',limit:'Min.',
       scanExp:'Ausgabenbeleg scannen',readingInv2:'Beleg wird gelesen...',expAdded:'Ausgabe hinzugefügt',
       readAdd2:'Lesen und hinzufügen',wsTrade:'Handelsname',wsLegal:'Rechtsname',country:'Land',
-      currency:'Währung',devStudio:'Entwicklerstudio'
+      currency:'Währung',devStudio:'Entwicklerstudio',saveFailed:'Speichern fehlgeschlagen'
     },
     ar:{
       purchasesTitle:'المشتريات',scanPurchase:'تصوير / رفع فاتورة',manualBuy:'+ شراء يدوي',
@@ -574,7 +574,7 @@ window.langOptions = function(selected){
       saving:'جاري الحفظ...',saveInv:'حفظ الفاتورة',underMin:'تحت الحد الأدنى',limit:'حد',
       scanExp:'تصوير فاتورة مصروف',readingInv2:'جاري قراءة الفاتورة...',expAdded:'تمت إضافة المصروف',
       readAdd2:'قراءة وإضافة',wsTrade:'الاسم التجاري',wsLegal:'الاسم القانوني',country:'الدولة',
-      currency:'العملة',devStudio:'استوديو التطوير'
+      currency:'العملة',devStudio:'استوديو التطوير',saveFailed:'فشل الحفظ'
     }
   };
   ['en','de','ar'].forEach(c=>{ if(WP_I18N[c]) Object.assign(WP_I18N[c], more[c]); });

@@ -20,6 +20,7 @@ function login(){
  <button class="btn primary full" id="loginBtn">${t('login')}</button>
  <div class="login-fail" id="loginErr"></div>
  </div></div>`;
+ if(typeof scrubUiLang==='function') scrubUiLang($('#app'));
  window._loginFails = window._loginFails || 0;
  const lg=$('#loginLang');
  if(lg){ lg.onchange=()=>{db.settings.uiLang=lg.value;save();login();}; }
@@ -659,7 +660,7 @@ vehicleModal({
 ocrSource: f.name
 });
    toast('تمت القراءة. راجع الحقول قبل الحفظ.');
-  }catch(e){console.error(e);$('#ocrStatus').textContent='تعذرت القراءة التلقائية. يمكنك إدخال البيانات يدوياً.';$('#msave').disabled=false}
+  }catch(e){console.error(e);$('#ocrStatus').textContent=t('ocrManual');$('#msave').disabled=false}
  },t('readData'));
  $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden')}};
 }
@@ -1502,12 +1503,12 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
     const hit=lookupKatyArticle(sku);
     if(hit){
       addInvoiceRow({sku:hit.sku||sku,name:hit.name,qty,price:hit.price,tax:+$('#ft').value||19,kind:'parts'});
-      $('#katyHint').textContent='تمت الإضافة من '+hit.source+' — '+hit.name;
+      $('#katyHint').textContent=t('addedFrom')+' '+hit.source+' — '+hit.name;
       rememberKatyArticle(hit);
       $('#katySku').value='';
     } else {
       addInvoiceRow({sku,name:'',qty,price:0,tax:+$('#ft').value||19,kind:'parts'});
-      $('#katyHint').textContent='ما انوجدت محلياً. كمّل الاسم والسعر بالجدول أو افتح Katy.';
+      $('#katyHint').textContent=t('notFoundLocal');
       openKatySearch(sku);
     }
   };
@@ -1533,7 +1534,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null){
 }
 function previewInvoice(iid){
   const page=printDocMarkup('invoices', iid);
-  modal('عرض التصميم', `<div id="prevHost" style="height:70vh;background:#fff;border-radius:8px;overflow:hidden"></div>
+  modal(t('showDesign'), `<div id="prevHost" style="height:70vh;background:#fff;border-radius:8px;overflow:hidden"></div>
     <div class="toolbar" style="margin-top:10px"><button class="btn primary" id="printNow">طباعة</button><button class="btn" id="pdfNow">PDF</button></div>`, null);
   setTimeout(()=>{
     const host=$('#prevHost');
@@ -1551,22 +1552,22 @@ window.previewInvoice=previewInvoice;
 window.invoiceDesigner=invoiceDesigner;
 
 function financeModal(type){
- const title=type==='estimate'?'Kostenvoranschlag':type==='bar'?'Barverkauf':'فاتورة جديدة';
+ const title=type==='estimate'?t('quotes'):type==='bar'?'Barverkauf':t('newInv');
  modal(title,`<div class="form-grid">
- <div class="field"><label>السيارة</label><select id="fv"><option value="">بدون سيارة</option>${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
- <div class="field"><label>القطع €</label><input id="fp" type="number" step=".01" value="0"></div>
- <div class="field"><label>الأجور €</label><input id="fl" type="number" step=".01" value="0"></div>
- <div class="field"><label>الخصم €</label><input id="fd" type="number" step=".01" value="0"></div>
- <div class="field"><label>الضريبة %</label><input id="ft" type="number" step=".01" value="19"></div>
- ${type==='estimate'?'<div class="field"><label>رسوم إعداد التقدير €</label><input id="ff" type="number" step=".01" value="0"></div>':'<div class="field"><label>طريقة الدفع</label><select id="pay"><option>غير محدد</option><option>نقدي</option><option>بطاقة</option><option>تحويل بنكي</option></select></div>'}
+ <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noCar')}</option>${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+ <div class="field"><label>${t('partsEuro')}</label><input id="fp" type="number" step=".01" value="0"></div>
+ <div class="field"><label>${t('laborEuro')}</label><input id="fl" type="number" step=".01" value="0"></div>
+ <div class="field"><label>${t('discEuro')}</label><input id="fd" type="number" step=".01" value="0"></div>
+ <div class="field"><label>${t('taxPct2')}</label><input id="ft" type="number" step=".01" value="19"></div>
+ ${type==='estimate'?`<div class="field"><label>${t('quoteFee2')}</label><input id="ff" type="number" step=".01" value="0"></div>`:`<div class="field"><label>${t('payMethod')}</label><select id="pay"><option value="open">${t('payOpen')}</option><option value="cash">${t('payCash')}</option><option value="card">${t('payCard')}</option><option value="bank">${t('payBank')}</option></select></div>`}
  </div>`,()=>{
   const parts=+$('#fp').value||0,labor=+$('#fl').value||0,discount=+$('#fd').value||0,tax=+$('#ft').value||0,net=Math.max(0,parts+labor-discount),total=net*(1+tax/100);
   const obj={id:id(type[0]),companyId:session.company.id,vehicleId:$('#fv').value,parts,labor,discount,tax,net,total,date:new Date().toISOString()};
   if(type==='estimate'){obj.fee=+$('#ff').value||0;db.estimates.push(obj);audit('estimate.create',money(total))}
   else{
-    obj.type=type==='bar'?'Barverkauf':'فاتورة';
-    obj.payment=$('#pay').value;
-    obj.paid=['نقدي','بطاقة'].includes(obj.payment);
+    obj.type=type==='bar'?'Barverkauf':'Rechnung';
+    obj.payment=payCode($('#pay').value);
+    obj.paid=['cash','card'].includes(obj.payment);
     obj.number=nextInvoiceNumber();
     obj.lines=[{name:'قطع',qty:1,price:parts},{name:'أجور',qty:1,price:labor}];
     db.invoices.push(obj);
@@ -1651,17 +1652,17 @@ function purchases(){
 function purchaseManualModal(){
   modal(t('manualBuyTitle'), `
     <div class="form-grid">
-      <div class="field"><label>المورد</label><input id="p_supplier" placeholder="مثال: carparts-cat.com"></div>
-      <div class="field"><label>رقم الفاتورة</label><input id="p_inv"></div>
-      <div class="field"><label>التاريخ</label><input id="p_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
-      <div class="field"><label>الإجمالي €</label><input id="p_total" type="number" step="0.01" value="0"></div>
-      <div class="field"><label>الحالة</label>
+      <div class="field"><label>${t('supplier')}</label><input id="p_supplier" placeholder="مثال: carparts-cat.com"></div>
+      <div class="field"><label>${t('invNum')}</label><input id="p_inv"></div>
+      <div class="field"><label>${t('date')}</label><input id="p_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="field"><label>${t('total')}</label><input id="p_total" type="number" step="0.01" value="0"></div>
+      <div class="field"><label>${t('status')}</label>
         <select id="p_status">
           <option value="pending">معلق</option>
           <option value="paid">مدفوع</option>
         </select>
       </div>
-      <div class="field span2"><label>ملاحظات / الأصناف</label><textarea id="p_notes" placeholder="وصف القطع أو ملاحظات"></textarea></div>
+      <div class="field span2"><label>${t('notesItems')}</label><textarea id="p_notes" placeholder="وصف القطع أو ملاحظات"></textarea></div>
     </div>
   `, ()=>{
     const supplier = $('#p_supplier').value.trim();
@@ -1760,7 +1761,7 @@ async function scanPurchaseDocument(){
   let pendingAi = {};
   let pendingReceiptUrl = '';
 
-  modal('تصوير / رفع فاتورة شراء', `
+  modal(t('scanBuy'), `
     <div class="field">
       <label>1) صوّر أو ارفع الفاتورة</label>
       <div class="filebox" style="margin-top:8px">
@@ -1779,19 +1780,19 @@ async function scanPurchaseDocument(){
     <div id="purchaseFormBox" class="hidden" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
       <div class="muted" style="margin-bottom:10px">2) راجع البيانات قبل الحفظ</div>
       <div class="form-grid">
-        <div class="field"><label>المورد</label><input id="p_supplier" placeholder="اسم المورد"></div>
-        <div class="field"><label>رقم الفاتورة</label><input id="p_inv"></div>
-        <div class="field"><label>التاريخ</label><input id="p_date" type="date"></div>
-        <div class="field"><label>الإجمالي €</label><input id="p_total" type="number" step="0.01" value="0"></div>
-        <div class="field"><label>الصافي €</label><input id="p_sub" type="number" step="0.01" value="0"></div>
-        <div class="field"><label>الضريبة €</label><input id="p_tax" type="number" step="0.01" value="0"></div>
-        <div class="field"><label>الحالة</label>
+        <div class="field"><label>${t('supplier')}</label><input id="p_supplier" placeholder="اسم المورد"></div>
+        <div class="field"><label>${t('invNum')}</label><input id="p_inv"></div>
+        <div class="field"><label>${t('date')}</label><input id="p_date" type="date"></div>
+        <div class="field"><label>${t('total')}</label><input id="p_total" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>${t('netEuro')}</label><input id="p_sub" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>${t('taxEuro')}</label><input id="p_tax" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>${t('status')}</label>
           <select id="p_status">
             <option value="pending">معلق</option>
             <option value="paid">مدفوع</option>
           </select>
         </div>
-        <div class="field span2"><label>ملاحظات / الأصناف</label><textarea id="p_notes" rows="2"></textarea></div>
+        <div class="field span2"><label>${t('notesItems')}</label><textarea id="p_notes" rows="2"></textarea></div>
       </div>
     </div>
   `, async ()=>{
@@ -1804,7 +1805,7 @@ async function scanPurchaseDocument(){
 
     try{
       $('#msave').disabled = true;
-      $('#purchaseStatus').textContent = 'جاري الحفظ...';
+      $('#purchaseStatus').textContent = t('saving');
 
       // ارفع الملف الآن فقط عند التأكيد (أسرع في مرحلة القراءة)
       let receiptUrl = pendingReceiptUrl;
@@ -1846,7 +1847,7 @@ async function scanPurchaseDocument(){
     }catch(e){
       console.error(e);
       $('#purchaseStatus').textContent = 'خطأ: ' + (e.message||'');
-      toast(e.message || 'فشل الحفظ');
+      toast(e.message || t('saveFailed'));
       $('#msave').disabled = false;
     }
   }, 'حفظ الفاتورة');
@@ -1882,7 +1883,7 @@ async function scanPurchaseDocument(){
       }
       btnRead.disabled = false;
       btnPreview.disabled = false;
-      status.textContent = 'جاهز — اضغط «قراءة البيانات» أو «عرض الفاتورة»';
+      status.textContent = t('readData');
     }
 
     fileInput.onchange = ()=>{
@@ -1921,12 +1922,12 @@ async function scanPurchaseDocument(){
       if(!f) return toast(t('pickPhoto'));
 
       btnRead.disabled = true;
-      status.textContent = '⚡ جاري قراءة البيانات...';
+      status.textContent = t('readingInv2');
       const t0 = performance.now();
 
       try{
         // تصغير وضغط الصورة أولاً → أسرع في الإرسال والقراءة
-        status.textContent = '⚡ جاري تجهيز الصورة...';
+        status.textContent = t('readingInv2');
         const imageData = await compressImageForOCR(f, 1280, 0.72);
         const approxKB = Math.round((imageData.length * 0.75) / 1024);
         status.textContent = `⚡ جاري قراءة البيانات (~${approxKB}KB)...`;
