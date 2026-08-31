@@ -387,9 +387,65 @@ window.dLabel = function(s){
     'فلتر زيت VW':{de:'Ölfilter VW',en:'VW oil filter'},
     'فحمات فرامل أمامية':{de:'Vorderbremsbeläge',en:'Front brake pads'},
     'بطارية 12V 70Ah':{de:'Batterie 12V 70Ah',en:'Battery 12V 70Ah'},
-    'طلب تجريبي':{de:'Testdatensatz',en:'Demo record'}
+    'طلب تجريبي':{de:'Testdatensatz',en:'Demo record'},
+    'أحمد الخليل':{de:'Ahmad Al-Khalil',en:'Ahmad Al-Khalil'},
+    'يوسف منصور':{de:'Youssef Mansour',en:'Youssef Mansour'},
+    'فاتورة':{de:'Rechnung',en:'Invoice'},
+    'مبيعات':{de:'Umsatz',en:'Sales'},
+    'مصروف':{de:'Ausgabe',en:'Expense'},
+    'قطع':{de:'Teile',en:'Parts'},
+    'أجور':{de:'Lohn',en:'Labor'},
+    'أجر':{de:'Lohn',en:'Labor'},
+    'قطعة':{de:'Teil',en:'Part'},
+    'نصف':{de:'halb',en:'half'},
+    'ربع':{de:'viertel',en:'quarter'},
+    'فارغ':{de:'leer',en:'empty'},
+    'ممتلئ':{de:'voll',en:'full'},
+    'نقدي':{de:'Bar',en:'Cash'},
+    'بطاقة':{de:'Karte',en:'Card'},
+    'تحويل بنكي':{de:'Überweisung',en:'Bank transfer'},
+    'غير محدد':{de:'offen',en:'open'},
+    'مدفوع':{de:'bezahlt',en:'paid'},
+    'معلق':{de:'offen',en:'pending'},
+    'زيت محرك':{de:'Motoröl',en:'Engine oil'},
+    'فلتر زيت':{de:'Ölfilter',en:'Oil filter'},
+    'فحمات فرامل':{de:'Bremsbeläge',en:'Brake pads'}
   };
   return (map[s] && map[s][lang]) || s;
+};
+window.L = function(s){
+  if(s==null) return '';
+  s=String(s);
+  const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'ar');
+  if(lang==='ar' || !/[\u0600-\u06FF]/.test(s)) return s;
+  const parts=s.split(/(\s+|·|,|\(|\)|\/|\+|—|-)/);
+  return parts.map(p=>{
+    if(!/[\u0600-\u06FF]/.test(p)) return p;
+    const d=window.dLabel(p);
+    if(d && !/[\u0600-\u06FF]/.test(d)) return d;
+    const st=window.stLabel(p);
+    if(st && !/[\u0600-\u06FF]/.test(st)) return st;
+    const fl=window.fuelLabel(p);
+    if(fl && !/[\u0600-\u06FF]/.test(fl)) return fl;
+    return lang==='de'?'—':(lang==='en'?'—':p);
+  }).join('');
+};
+window.scrubUiLang = function(root){
+  const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'ar');
+  if(lang==='ar' || !root) return;
+  const skip=/^(INPUT|TEXTAREA|SCRIPT|STYLE)$/;
+  const walk=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(n){
+      const pe=n.parentElement; if(!pe || skip.test(pe.tagName)) return NodeFilter.FILTER_REJECT;
+      return /[\u0600-\u06FF]/.test(n.nodeValue||'') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  const nodes=[];
+  while(walk.nextNode()) nodes.push(walk.currentNode);
+  nodes.forEach(n=>{ n.nodeValue=window.L(n.nodeValue); });
+  root.querySelectorAll('option').forEach(o=>{
+    if(/[\u0600-\u06FF]/.test(o.textContent||'')) o.textContent=window.L(o.textContent);
+  });
 };
 window.fuelLabel = function(s){
   const map={'فارغ':'fuelEmpty','ربع':'fuelQ','نصف':'fuelH','ممتلئ':'fuelF'};

@@ -118,6 +118,7 @@ function page(){
  const fn = m[session.page]||dashboard;
  WP.run('beforeRender', session);
  fn();
+ if(typeof scrubUiLang==='function'){ scrubUiLang($('#app')); scrubUiLang($('#modalRoot')); }
  WP.run('afterRender', session);
 }
 function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>${action}</div>`}
@@ -379,6 +380,7 @@ function modal(title,body,onSave,saveText){
  ${body}<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="msave">${saveText}</button><button class="btn ghost" id="mcancel">${t('cancelBtn')}</button></div>
  </div></div>`;
  $('#xmod').onclick=closeModal;$('#mcancel').onclick=closeModal;$('#msave').onclick=onSave;
+ if(typeof scrubUiLang==='function') scrubUiLang($('#modalRoot'));
 }
 function closeModal(){$('#modalRoot').innerHTML=''}
 
