@@ -1,4 +1,15 @@
 /* BayMeister screens */
+function vehicleOf(vid){ return (window.vehicleOf && window.vehicleOf!==vehicleOf)? window.vehicleOf(vid) : ((db.vehicles||[]).find(x=>x.id===vid)); }
+function customerOf(cid){ return (db.customers||[]).find(c=>c.id===cid); }
+function customerOfVehicle(vid){
+  const v = (typeof vehicleOf==='function') ? vehicleOf(vid) : ((db.vehicles||[]).find(x=>x.id===vid));
+  if(v && v.customerId) return customerOf(v.customerId);
+  return null;
+}
+function customerName(cid){ const c=customerOf(cid); return (c&&(c.companyName||c.name))||'-'; }
+function vehicleName(vid){ const v=vehicleOf(vid); return v?`${v.plate||v.vin||'-'} · ${v.make||''} ${v.model||''}`:'-'; }
+window.vehicleOf=vehicleOf; window.customerOf=customerOf; window.customerOfVehicle=customerOfVehicle;
+window.customerName=customerName; window.vehicleName=vehicleName;
 function nav(){
  return [
   ['dashboard', t('dash')],['customers', t('customers')],['vehicles', t('vehicles')],['repairs', t('repairs')],['appointments', t('appointments')],
