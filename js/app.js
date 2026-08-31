@@ -1243,10 +1243,13 @@ function estimates(){
 }
 function invoices(){
  const filter=session.customerFilter||'';
+ const payFilter=session.invoiceFilter||'';
  let rows=companyRows('invoices');
  if(filter) rows=rows.filter(x=>x.customerId===filter || (vehicleOf(x.vehicleId)||{}).customerId===filter);
+ if(payFilter==='unpaid') rows=rows.filter(x=>x.status!=='storno' && !x.paid && !['cash','card'].includes(x.payment));
  const cust=filter && db.customers.find(c=>c.id===filter);
- $('#content').innerHTML=head(cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'),`<div class="toolbar"><button class="btn ok" id="scanInv">📷 ${t('scanSchein')}</button><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">${t('cashSale')}</button>${filter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
+ const title=payFilter==='unpaid' ? (t('unpaidInvoices')||t('invoices')) : (cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'));
+ $('#content').innerHTML=head(title,`<div class="toolbar"><button class="btn ok" id="scanInv">📷 ${t('scanSchein')}</button><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">${t('cashSale')}</button>${filter||payFilter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
  listShareBar('invoices')+
  table([t('invoiceNo'),t('type'),t('vehicle'),t('total'),t('payment'),t('design')],rows.map(x=>[
   esc(x.number||x.id)+(x.status==='storno'?' · STORNO':''), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(payLabel(x.payment||'-')),
@@ -1261,7 +1264,7 @@ function invoices(){
  if($('#inv2')) $('#inv2').onclick=()=>invoiceDesigner('invoice', session.customerFilter||'');
  if($('#scanInv')) $('#scanInv').onclick=()=>scanScheinStartRepair('invoice');
  $('#bar').onclick=()=>invoiceDesigner('bar', session.customerFilter||'');
- if($('#clrCust')) $('#clrCust').onclick=()=>{session.customerFilter=''; invoices();};
+ if($('#clrCust')) $('#clrCust').onclick=()=>{session.customerFilter=''; session.invoiceFilter=''; invoices();};
 }
 function invoiceForCustomer(cid){ invoiceDesigner('invoice', cid); }
 function invoicesForCustomer(cid){ session.customerFilter=cid; session.page='invoices'; render(); }
@@ -2440,24 +2443,24 @@ function reports(){
  const sales=inv.reduce((a,x)=>a+Number(x.total||0),0);
  const purCost=pur.reduce((a,x)=>a+Number(x.total_amount||(x.qty||0)*(x.price||0)||0),0);
  const costs=exp.reduce((a,x)=>a+Number(x.amount||0),0)+purCost;
- const unpaid=inv.filter(x=>!x.paid && x.payment==='غير محدد');
+ const unpaid=inv.filter(x=>x.status!=='storno' && !x.paid && !['cash','card'].includes(x.payment));
  const hours=companyRows('repairs').reduce((a,x)=>a+Number(x.hours||0),0);
  const topParts={};
  companyRows('repairs').forEach(r=>(r.parts||[]).forEach(p=>{topParts[p.name]=(topParts[p.name]||0)+Number(p.qty||0)}));
  const top=Object.entries(topParts).sort((a,b)=>b[1]-a[1]).slice(0,5);
  $('#content').innerHTML=head(t('reportsTitle'))+`<div class="grid">
- <div class="card"><div class="muted">${t('sales')}</div><div class="metric">${money(sales)}</div></div>
- <div class="card"><div class="muted">${t('costsPurch')}</div><div class="metric">${money(costs)}</div></div>
- <div class="card"><div class="muted">${t('approxDiff')}</div><div class="metric">${money(sales-costs)}</div></div>
- <div class="card"><div class="muted">${t('unpaidInvoices')}</div><div class="metric">${unpaid.length}</div></div>
- <div class="card"><div class="muted">${t('hoursLogged')}</div><div class="metric">${hours}</div></div>
- <div class="card"><div class="muted">${t('openJobs')}</div><div class="metric">${openRepairs().length}</div></div>
+ <div class="card tap" onclick="session.invoiceFilter='';goPage('invoices')"><div class="muted">${t('sales')}</div><div class="metric">${money(sales)}</div><div class="hint">${t('openBtn')}</div></div>
+ <div class="card tap" onclick="goPage('expenses')"><div class="muted">${t('costsPurch')}</div><div class="metric">${money(costs)}</div><div class="hint">${t('openBtn')}</div></div>
+ <div class="card tap" onclick="goPage('journal')"><div class="muted">${t('approxDiff')}</div><div class="metric">${money(sales-costs)}</div><div class="hint">${t('openBtn')}</div></div>
+ <div class="card tap" onclick="session.invoiceFilter='unpaid';goPage('invoices')"><div class="muted">${t('unpaidInvoices')}</div><div class="metric">${unpaid.length}</div><div class="hint">${t('openBtn')}</div></div>
+ <div class="card tap" onclick="goPage('repairs')"><div class="muted">${t('hoursLogged')}</div><div class="metric">${hours}</div><div class="hint">${t('openBtn')}</div></div>
+ <div class="card tap" onclick="goPage('repairs')"><div class="muted">${t('openJobs')}</div><div class="metric">${openRepairs().length}</div><div class="hint">${t('openBtn')}</div></div>
  </div>
- <div class="card" style="margin-top:12px"><b>${t('topParts')}</b>
+ <div class="card tap" style="margin-top:12px" onclick="goPage('inventory')"><b>${t('topParts')}</b>
  ${top.length?table([t('parts'),t('qty')],top.map(([n,q])=>[esc(dLabel(n)),q]),'top_parts'):`<p class="muted">${t('noData')}</p>`}
  </div>
  <div class="card" style="margin-top:12px"><b>${t('customerDebts')}</b>
- ${unpaid.length?table([t('invoiceNo'),t('vehicle'),t('total')],unpaid.map(x=>[esc(x.number||x.id),vehicleName(x.vehicleId),money(x.total)]),'unpaid'):`<p class="muted">${t('noDebts')}</p>`}
+ ${unpaid.length?table([t('invoiceNo'),t('vehicle'),t('total')],unpaid.map(x=>[`<button class="btn small" onclick="previewInvoice('${x.id}')">${esc(x.number||x.id)}</button>`,vehicleName(x.vehicleId),money(x.total)]),'unpaid'):`<p class="muted">${t('noDebts')}</p>`}
  </div>`;
 }
 function integrations(){
