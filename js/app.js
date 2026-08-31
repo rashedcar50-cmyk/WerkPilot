@@ -838,6 +838,44 @@ function findOrCreateFromSchein(ai){
   }
   return {c,v};
 }
+async function scheinFileToCustomerVehicle(file){
+  let ai;
+  try{ ai=await readScheinAI(file); }
+  catch(err){
+    const compressed=await compressVehiclePhoto(file);
+    let text='';
+    try{ await WP.loadOcr(); }catch(e){}
+    if(window.Tesseract){
+      const res=await Tesseract.recognize(compressed,'deu+eng');
+      text=res?.data?.text||'';
+    }
+    const parsed=parseVehicleOCR(text||'');
+    ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:''};
+    if(!ai.license_plate && !ai.vin) throw err;
+  }
+  const {c,v}=findOrCreateFromSchein(ai);
+  save();
+  return {c,v,ai};
+}
+function fillInvoicePartySelects(c,v){
+  const fv=$('#fv'), fc=$('#fcust');
+  if(fv && v){
+    if(![...fv.options].some(o=>o.value===v.id)){
+      const o=document.createElement('option');
+      o.value=v.id; o.textContent=(v.plate||v.vin||v.id)+' · '+(v.make||'')+' '+(v.model||'');
+      fv.appendChild(o);
+    }
+    fv.value=v.id;
+  }
+  if(fc && c){
+    if(![...fc.options].some(o=>o.value===c.id)){
+      const o=document.createElement('option');
+      o.value=c.id; o.textContent=(c.kdNr||'')+' · '+(c.companyName||c.name||c.id);
+      fc.appendChild(o);
+    }
+    fc.value=c.id;
+  }
+}
 function scanScheinStartRepair(mode){
   if(mode && typeof mode==='object') mode='repair';
   mode=mode||'repair';
@@ -1457,7 +1495,14 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   const rate=workshop().hourlyRate||db.settings.hourlyRate||100;
   if(existing){ customerId=customerId||existing.customerId||''; vehicleId=vehicleId||existing.vehicleId||''; }
   modal(title, `<div class="form-grid">
-    <div class="field"><label>${t('vehicle')}</label><select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></div>
+    <div class="field"><label>${t('vehicle')}</label>
+      <select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select>
+      <div class="toolbar" style="margin-top:6px">
+        <button type="button" class="btn ok small" id="scanInvCam">📷 ${t('scanSchein')}</button>
+        <input id="scanInvFile" type="file" accept="image/*" capture="environment" class="hidden">
+      </div>
+      <div id="scanInvHint" class="hint"></div>
+    </div>
     <div class="field"><label>${t('payMethod')}</label><select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
     <div class="field"><label>${t('taxPct')}</label><input id="ft" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.tax):19}"></div>
     <div class="field"><label>${t('discount')}</label><input id="fd" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.discount||0):0}"></div>
@@ -1527,6 +1572,20 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   if($('#fv')) $('#fv').onchange=()=>{
     const v=vehicleOf($('#fv').value);
     if(v && v.customerId && $('#fcust')) $('#fcust').value=v.customerId;
+  };
+  if($('#scanInvCam')) $('#scanInvCam').onclick=()=>$('#scanInvFile')?.click();
+  if($('#scanInvFile')) $('#scanInvFile').onchange=async function(){
+    const f=this.files&&this.files[0]; if(!f) return;
+    const hint=$('#scanInvHint'); if(hint) hint.textContent=t('readingSchein');
+    try{
+      const {c,v}=await scheinFileToCustomerVehicle(f);
+      fillInvoicePartySelects(c,v);
+      if(hint) hint.textContent=(v.plate||v.vin||'')+' · '+(c.name||'');
+      toast((v.plate||v.vin||'')+' OK');
+    }catch(e){
+      if(hint) hint.textContent=t('readFailClear');
+    }
+    this.value='';
   };
   if($('#addRow')) $('#addRow').onclick=()=>addInvoiceRow({tax:+$('#ft').value||19,kind:'parts'});
   if($('#addLabor')) $('#addLabor').onclick=()=>addInvoiceRow({name:'Arbeitswert',qty:1,price:rate,tax:+$('#ft').value||19,kind:'labor'});
