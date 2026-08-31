@@ -384,6 +384,7 @@ function modal(title,body,onSave,saveText){
  if(typeof scrubUiLang==='function') scrubUiLang($('#modalRoot'));
 }
 function closeModal(){$('#modalRoot').innerHTML=''}
+window.goPage=function(p){ if(!p) return; session.page=p; render(); };
 
 function dashboard(){
  const inv=companyRows('invoices'),exp=companyRows('expenses'),rep=openRepairs(),veh=companyRows('vehicles');
@@ -393,22 +394,22 @@ function dashboard(){
  const inside=rep.filter(r=>['قيد التنفيذ','جاري العمل','استلام','تشخيص','انتظار قطع'].includes(r.status));
  $('#content').innerHTML=head(t('todayBoard'))+`
  <div class="grid">
-  <div class="card"><div class="muted">${t('carsInShop')}</div><div class="metric">${inside.length}</div></div>
-  <div class="card"><div class="muted">${t('openJobs')}</div><div class="metric">${rep.length}</div></div>
-  <div class="card"><div class="muted">${t('todayAppts')}</div><div class="metric">${todayAp.length}</div></div>
-  <div class="card"><div class="muted">${t('lowStock')}</div><div class="metric">${low.length}</div></div>
-  <div class="card"><div class="muted">${t('sales')}</div><div class="metric">${money(sales)}</div></div>
-  ${session.user.role==='manager'?`<div class="card"><div class="muted">${t('netApprox')}</div><div class="metric">${money(sales-costs)}</div></div>`:''}
+  <div class="card tap" onclick="goPage('repairs')"><div class="muted">${t('carsInShop')}</div><div class="metric">${inside.length}</div><div class="hint">${t('openBtn')}</div></div>
+  <div class="card tap" onclick="goPage('repairs')"><div class="muted">${t('openJobs')}</div><div class="metric">${rep.length}</div><div class="hint">${t('openBtn')}</div></div>
+  <div class="card tap" onclick="goPage('appointments')"><div class="muted">${t('todayAppts')}</div><div class="metric">${todayAp.length}</div><div class="hint">${t('openBtn')}</div></div>
+  <div class="card tap" onclick="goPage('inventory')"><div class="muted">${t('lowStock')}</div><div class="metric">${low.length}</div><div class="hint">${t('openBtn')}</div></div>
+  <div class="card tap" onclick="goPage('invoices')"><div class="muted">${t('sales')}</div><div class="metric">${money(sales)}</div><div class="hint">${t('openBtn')}</div></div>
+  ${session.user.role==='manager'?`<div class="card tap" onclick="goPage('reports')"><div class="muted">${t('netApprox')}</div><div class="metric">${money(sales-costs)}</div><div class="hint">${t('openBtn')}</div></div>`:''}
  </div>
- ${low.length?`<div class="alert"><b>${t('stockAlert')}:</b> ${low.map(x=>esc(dLabel(x.name))+' ('+x.qty+')').join(' · ')}</div>`:''}
- ${due.length?`<div class="alert"><b>${t('maintDue')}:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' km').join(' · ')}</div>`:''}
+ ${low.length?`<div class="alert tap" onclick="goPage('inventory')"><b>${t('stockAlert')}:</b> ${low.map(x=>esc(dLabel(x.name))+' ('+x.qty+')').join(' · ')}</div>`:''}
+ ${due.length?`<div class="alert tap" onclick="goPage('vehicles')"><b>${t('maintDue')}:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' km').join(' · ')}</div>`:''}
  ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
  return `<div class="card" style="margin-top:12px"><b>${t('vatReport')}</b>
  <div class="grid" style="margin-top:8px">
-  <div class="card"><div class="muted">${t('netParts')}</div><div class="metric">${money(teile)}</div></div>
-  <div class="card"><div class="muted">${t('netLabor')}</div><div class="metric">${money(leist)}</div></div>
-  <div class="card"><div class="muted">${t('vat19')}</div><div class="metric">${money(vat)}</div></div>
- </div></div>`+(stale?`<div class="alert">${t('backupWarn')}</div>`:'');
+  <div class="card tap" onclick="goPage('invoices')"><div class="muted">${t('netParts')}</div><div class="metric">${money(teile)}</div></div>
+  <div class="card tap" onclick="goPage('invoices')"><div class="muted">${t('netLabor')}</div><div class="metric">${money(leist)}</div></div>
+  <div class="card tap" onclick="goPage('invoices')"><div class="muted">${t('vat19')}</div><div class="metric">${money(vat)}</div></div>
+ </div></div>`+(stale?`<div class="alert tap" onclick="goPage('settings')">${t('backupWarn')}</div>`:'');
  })()}
  <div class="card" style="margin-top:12px"><b>${t('todayCars')}</b>
  ${inside.length?inside.map(r=>`<div class="today-item"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(dLabel(r.description||''))} · ${esc(dLabel(r.tech||''))}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(stLabel(r.status))}</span>

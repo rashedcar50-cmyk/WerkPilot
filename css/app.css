@@ -36,6 +36,8 @@ textarea{min-height:100px;resize:vertical}
 .page-title h1{margin:0;font-size:1.7rem}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.card.tap,.alert.tap{cursor:pointer}
+.card.tap:hover{border-color:#C4922A;box-shadow:0 6px 18px #1c212b14}
 .metric{font-size:1.8rem;font-weight:800;margin-top:6px}
 .badge{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border-radius:999px;background:#efebe3;border:1px solid var(--line)}
 .dot{width:8px;height:8px;border-radius:50%;background:#22c55e}
