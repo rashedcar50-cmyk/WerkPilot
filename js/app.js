@@ -281,7 +281,7 @@ function printDocMarkup(type, id){
       .print-doc,.inv-a4{margin:0;padding:0}
       .rechnung{width:100%;max-width:190mm;margin:0 auto}
       .rh-main{display:block}
-      .rh-title{text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;margin:0}
+      .rh-title{text-align:center;font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;font-weight:700;letter-spacing:.5px;margin:0;color:#d4af37}
       .rh-legal{text-align:center;font-size:10px;margin:2px 0}
       .rh-sub{text-align:center;font-size:10px;margin-bottom:10px}
       .rh-grid{display:flex;justify-content:space-between;gap:16px;margin-bottom:10px}
@@ -308,7 +308,7 @@ function printDocMarkup(type, id){
       .rh-foot{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #111;margin-top:10px;padding-top:6px;font-size:9px;page-break-inside:avoid}
       .rh-foot>div{flex:1}
       .rh-band{display:block;width:100%;text-align:center;background:#111;color:#d4af37;padding:10px 0;margin:0 0 8px;border-bottom:3px solid #d4af37}
-      .rh-band .rh-title,.rh-band td{color:#d4af37;text-align:center!important;font-size:28px;letter-spacing:6px;width:100%}
+      .rh-band .rh-title,.rh-band td{color:#d4af37;text-align:center!important;font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;letter-spacing:.5px;width:100%}
       .rh-band .rh-doc{color:#fff}
       .rh-doc{font-size:26px;font-weight:800;letter-spacing:1px}
       .tpl-classic{padding:0}
@@ -1447,8 +1447,9 @@ function buildWorkshopRechnung(x){
   const m=invoiceModel(x);
   const tpl=workshop().invoiceTpl||db.settings.invoiceTpl||'modern';
   const {w,cust}=m;
-  const henryHead=`<div class="rh-band"><div class="rh-title">TST</div></div>
-      <div class="rh-henry-title">AUTOSERVICE UND AUTOTEILE UG<br><span>(haftungsbeschränkt)</span></div>
+  const coTitle=(w.name && !/^TST$/i.test(String(w.name).trim())) ? w.name : 'Autoservice und Autoteile Tabah UG';
+  const henryHead=`<div class="rh-band"><div class="rh-title">${esc(coTitle)}</div></div>
+      <div class="rh-legal">(haftungsbeschränkt)</div>
       <div class="rh-sender">${esc(w.name)}, ${esc(w.address)}</div>`;
   if(tpl==='modern'){
     return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
