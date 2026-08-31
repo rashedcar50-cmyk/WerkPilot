@@ -3,12 +3,16 @@
    Invoices/print for DE companies stay German. */
 window.WP_RTL = ['ar','fa','ur','he','ps','sd','ug','dv','yi'];
 window.WP_LANGS = [
-  ['ar','العربية'],
   ['de','Deutsch'],
+  ['ar','العربية'],
   ['en','English'],
+  ['tr','Türkçe'],
+  ['sr','Srpski'],
+  ['ru','Русский'],
+  ['pl','Polski'],
   ['es','Español']
 ];
-window.WP_ALLOWED_LANGS = ['ar','de','en','es'];
+window.WP_ALLOWED_LANGS = ['de','ar','en','tr','sr','ru','pl','es'];
 
 window.WP_I18N = {
 en:{app:'BayMeister',tag:'WORKSHOP. DIGITAL. EFFICIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
@@ -181,10 +185,50 @@ font:'Tamaño de fuente',language:'Idioma del programa',hourly:'Tarifa horaria �
 invoiceNote:'Las facturas legales de Alemania permanecen en alemán.',
 saved:'Guardado',backup:'Exportar copia',sync:'Sincronizar nube',reset:'Borrar datos demo'
 });
-Object.assign(window.WP_I18N.fr,{dash:'Aujourd’hui',customers:'Clients',vehicles:'Véhicules',repairs:'Ordres',appointments:'Rendez-vous',invoices:'Factures',purchases:'Achats',inventory:'Stock',settings:'Paramètres',login:'Connexion',logout:'Déconnexion',language:'Langue du logiciel',invoiceNote:'Les factures restent en allemand si l’entreprise active est en Allemagne.'});
-Object.assign(window.WP_I18N.tr,{dash:'Bugün',customers:'Müşteriler',vehicles:'Araçlar',repairs:'İş emirleri',appointments:'Randevular',invoices:'Faturalar',purchases:'Alımlar',inventory:'Stok',settings:'Ayarlar',login:'Giriş',logout:'Çıkış',language:'Program dili',invoiceNote:'Aktif firma Almanya’daysa faturalar Almanca kalır.'});
-Object.assign(window.WP_I18N.ru,{dash:'Сегодня',customers:'Клиенты',vehicles:'Авто',repairs:'Заказы',appointments:'Записи',invoices:'Счета',purchases:'Закупки',inventory:'Склад',settings:'Настройки',login:'Вход',logout:'Выход',language:'Язык программы',invoiceNote:'Счета остаются на немецком, если активная фирма в Германии.'});
-Object.assign(window.WP_I18N.pl,{dash:'Dziś',customers:'Klienci',vehicles:'Pojazdy',repairs:'Zlecenia',appointments:'Terminy',invoices:'Faktury',purchases:'Zakupy',inventory:'Magazyn',settings:'Ustawienia',login:'Zaloguj',logout:'Wyloguj',language:'Język programu',invoiceNote:'Faktury pozostają po niemiecku, gdy aktywna firma jest w Niemczech.'});
+window.WP_I18N.tr=Object.assign({},window.WP_I18N.de,{
+  tag:'ATÖLYE. DİJİTAL. VERİMLİ.',user:'Kullanıcı adı',pass:'Şifre',login:'Giriş',logout:'Çıkış',
+  dash:'Bugün',todayBoard:'Bugün',carsInShop:'Atölyedeki araçlar',openJobs:'Açık işler',todayAppts:'Bugünkü randevular',lowStock:'Düşük stok',sales:'Ciro',
+  customers:'Müşteriler',vehicles:'Araçlar',repairs:'İş emirleri',appointments:'Randevular',
+  estimates:'Teklifler',invoices:'Faturalar ve peşin satış',purchases:'Alımlar',inventory:'Depo ve parçalar',
+  employees:'Personel ve maaş',expenses:'Giderler',journal:'Yevmiye',reports:'Raporlar',settings:'Ayarlar',
+  search:'Arama: plaka / müşteri / parça / iş',save:'Kaydet',cancelBtn:'İptal',print:'Yazdır',
+  createInvoice:'+ Yeni fatura',cashSale:'Peşin satış',prev:'Geri',language:'Program dili',
+  kindParts:'Yedek parça',kindLabor:'İşçilik',payOpen:'Açık',payCash:'Nakit',payCard:'Kart',payBank:'Havale',
+  invoiceNote:'Aktif firma Almanya’daysa fatura Almanca basılır.'
+});
+window.WP_I18N.sr=Object.assign({},window.WP_I18N.de,{
+  tag:'RADIONICA. DIGITALNO. EFIKASNO.',user:'Korisničko ime',pass:'Lozinka',login:'Prijava',logout:'Odjava',
+  dash:'Danas',todayBoard:'Danas',carsInShop:'Vozila u radionici',openJobs:'Otvoreni nalozi',todayAppts:'Termini danas',lowStock:'Niska zaliha',sales:'Promet',
+  customers:'Klijenti',vehicles:'Vozila',repairs:'Nalozi',appointments:'Termini',
+  estimates:'Ponude',invoices:'Računi i gotovina',purchases:'Nabavke',inventory:'Magacin i delovi',
+  employees:'Zaposleni i plata',expenses:'Troškovi',journal:'Dnevnik',reports:'Izveštaji',settings:'Podešavanja',
+  search:'Pretraga: tablica / klijent / deo / nalog',save:'Sačuvaj',cancelBtn:'Otkaži',print:'Štampaj',
+  createInvoice:'+ Novi račun',cashSale:'Gotovinska prodaja',prev:'Nazad',language:'Jezik programa',
+  kindParts:'Rezervni deo',kindLabor:'Rad',payOpen:'Otvoreno',payCash:'Gotovina',payCard:'Kartica',payBank:'Prenos',
+  invoiceNote:'Ako je aktivna firma u Nemačkoj, račun ostaje na nemačkom.'
+});
+window.WP_I18N.ru=Object.assign({},window.WP_I18N.de,{
+  tag:'МАСТЕРСКАЯ. ЦИФРОВО. ЭФФЕКТИВНО.',user:'Логин',pass:'Пароль',login:'Вход',logout:'Выход',
+  dash:'Сегодня',todayBoard:'Сегодня',carsInShop:'Авто в цехе',openJobs:'Открытые заказы',todayAppts:'Записи на сегодня',lowStock:'Мало на складе',sales:'Оборот',
+  customers:'Клиенты',vehicles:'Автомобили',repairs:'Заказ-наряды',appointments:'Записи',
+  estimates:'Сметы',invoices:'Счета и наличные',purchases:'Закупки',inventory:'Склад и запчасти',
+  employees:'Сотрудники и зарплата',expenses:'Расходы',journal:'Журнал',reports:'Отчёты',settings:'Настройки',
+  search:'Поиск: номер / клиент / деталь / заказ',save:'Сохранить',cancelBtn:'Отмена',print:'Печать',
+  createInvoice:'+ Новый счёт',cashSale:'Наличная продажа',prev:'Назад',language:'Язык программы',
+  kindParts:'Запчасть',kindLabor:'Работа',payOpen:'Открыто',payCash:'Наличные',payCard:'Карта',payBank:'Перевод',
+  invoiceNote:'Если фирма в Германии, счёт печатается по-немецки.'
+});
+window.WP_I18N.pl=Object.assign({},window.WP_I18N.de,{
+  tag:'WARSZTAT. CYFROWO. EFEKTYWNIE.',user:'Użytkownik',pass:'Hasło',login:'Zaloguj',logout:'Wyloguj',
+  dash:'Dziś',todayBoard:'Dziś',carsInShop:'Auta w warsztacie',openJobs:'Otwarte zlecenia',todayAppts:'Terminy dziś',lowStock:'Niski stan',sales:'Obrót',
+  customers:'Klienci',vehicles:'Pojazdy',repairs:'Zlecenia',appointments:'Terminy',
+  estimates:'Oferty',invoices:'Faktury i sprzedaż gotówkowa',purchases:'Zakupy',inventory:'Magazyn i części',
+  employees:'Pracownicy i płace',expenses:'Koszty',journal:'Dziennik',reports:'Raporty',settings:'Ustawienia',
+  search:'Szukaj: tablica / klient / część / zlecenie',save:'Zapisz',cancelBtn:'Anuluj',print:'Drukuj',
+  createInvoice:'+ Nowa faktura',cashSale:'Sprzedaż gotówkowa',prev:'Wstecz',language:'Język programu',
+  kindParts:'Część',kindLabor:'Robocizna',payOpen:'Otwarte',payCash:'Gotówka',payCard:'Karta',payBank:'Przelew',
+  invoiceNote:'Gdy firma jest w Niemczech, faktura zostaje po niemiecku.'
+});
 
 window.WP_INV_DE = {
   invoice:'Rechnung', invoices:'Rechnungsliste', number:'Rechnungsnr.', date:'Datum', customer:'Kunde',
@@ -393,9 +437,9 @@ window.WP_INV_DE = {
 window.t = function(key){
   const store = (typeof db!=='undefined' && db) || window.db || (window.WP && WP.db);
   let lang = (store && store.settings && store.settings.uiLang) || 'ar';
-  if(!(window.WP_ALLOWED_LANGS||['ar','de','en']).includes(lang)) lang='ar';
-  const pack = (window.WP_I18N && (WP_I18N[lang] || WP_I18N.en)) || {};
-  return pack[key] || (window.WP_I18N && WP_I18N.en && WP_I18N.en[key]) || key;
+  if(!(window.WP_ALLOWED_LANGS||['de','ar','en']).includes(lang)) lang='de';
+  const pack = (window.WP_I18N && (WP_I18N[lang] || WP_I18N.de)) || {};
+  return pack[key] || (WP_I18N.de && WP_I18N.de[key]) || (WP_I18N.en && WP_I18N.en[key]) || key;
 };
 window.stLabel = function(s){
   const map={
