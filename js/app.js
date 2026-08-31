@@ -1552,10 +1552,19 @@ function collectInvoiceRows(){
   }).filter(x=>x.name||x.sku);
 }
 function refreshInvoiceSums(){
-  collectInvoiceRows().forEach((l,i)=>{
+  const lines=collectInvoiceRows();
+  lines.forEach((l,i)=>{
     const tr=document.querySelectorAll('#invRows tr')[i];
     if(tr && tr.querySelector('.c-sum')) tr.querySelector('.c-sum').textContent=(l.qty*l.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
   });
+  const disc=latNum($('#fd')?.value||0);
+  const tax=latNum($('#ft')?.value||19);
+  const net=Math.max(0, lines.reduce((s,l)=>s+l.qty*l.price,0)-disc);
+  const gross=net*(1+tax/100);
+  const fmt=n=>(Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if($('#henryEK')) $('#henryEK').textContent=fmt(net);
+  if($('#henryVK')) $('#henryVK').textContent=fmt(gross);
+  if($('#henryGross')) $('#henryGross').textContent=fmt(gross);
 }
 function addInvoiceRow(data){
   const d=Object.assign({sku:'',name:'',qty:1,price:0,tax:19,kind:'parts'},data||{});
@@ -1602,37 +1611,33 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   const title = existing ? (t('editInvoice')+' '+(existing.number||'')) : (kind==='bar' ? t('cashSale') : t('createInv'));
   const rate=workshop().hourlyRate||db.settings.hourlyRate||100;
   if(existing){ customerId=customerId||existing.customerId||''; vehicleId=vehicleId||existing.vehicleId||''; }
-  modal(title, `<div class="form-grid">
-    <div class="field"><label>${t('vehicle')}</label>
+  modal(title, `<div class="hy-desk">
+    <div class="hy-bar">
+      <span>${new Date().toLocaleDateString('de-DE')}</span>
+      <select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select>
       <select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select>
-      <div class="toolbar" style="margin-top:6px">
-        <button type="button" class="btn ok small" id="scanInvCam">📷 ${t('scanSchein')}</button>
-        <input id="scanInvFile" type="file" accept="image/*" capture="environment" class="hidden">
-      </div>
-      <div id="scanInvHint" class="hint"></div>
+      <select id="fcust"><option value="">${t('chooseCustomer')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select>
+      <button type="button" class="btn ok small" id="scanInvCam">📷</button>
+      <input id="scanInvFile" type="file" accept="image/*" capture="environment" class="hidden">
     </div>
-    <div class="field"><label>${t('payMethod')}</label><select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select></div>
-    <div class="field"><label>${t('taxPct')}</label><input id="ft" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.tax):19}"></div>
-    <div class="field"><label>${t('discount')}</label><input id="fd" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.discount||0):0}"></div>
-    <div class="field span2 henry-ui">
-      <div class="henry-cap">${t('positions')}</div>
-      <div class="table-wrap">
-        <table class="inv-edit henry-pos">
-          <thead><tr><th>${t('colPos')}</th><th>${t('colArt')}</th><th>${t('sku')}</th><th>${t('desc')}</th><th>${t('colQty')}</th><th>${t('colPrice')}</th><th>${t('colSum')}</th><th>${t('colVat')}</th><th></th></tr></thead>
-          <tbody id="invRows"></tbody>
-        </table>
-      </div>
-      <div class="henry-quick">
-        <div class="henry-cap">${t('quickEntry')}</div>
-        <div class="henry-quick-row">
+    <div class="hy-split">
+      <div class="hy-main">
+        <div class="table-wrap">
+          <table class="inv-edit henry-pos">
+            <thead><tr><th>${t('colPos')}</th><th>${t('colArt')}</th><th>${t('sku')}</th><th>${t('desc')}</th><th>${t('colQty')}</th><th>${t('colPrice')}</th><th>${t('colSum')}</th><th>${t('colVat')}</th><th></th></tr></thead>
+            <tbody id="invRows"></tbody>
+          </table>
+        </div>
+        <div class="hy-entry">
           <select id="qArt"><option value="parts">${t('kindParts')}</option><option value="labor">${t('kindLabor')}</option></select>
+          <input id="katyQty" class="latnum" inputmode="decimal" lang="de" value="1,00">
           <input id="katySku" placeholder="${t('orderNo')}">
-          <input id="katyQty" class="latnum" inputmode="decimal" lang="de" value="1" style="width:70px" title="${t('colQty')}">
           <input id="qName" placeholder="${t('desc')}">
           <button type="button" class="btn primary" id="katyFetch">${t('apply')}</button>
         </div>
         <div id="katyHint" class="hint">${t('henryHint')}</div>
-        <div class="toolbar" style="margin-top:6px">
+        <div id="scanInvHint" class="hint"></div>
+        <div class="toolbar">
           <button type="button" class="btn small" id="addRow">+ ${t('kindParts')}</button>
           <button type="button" class="btn small" id="addLabor">+ ${t('kindLabor')}</button>
           <button type="button" class="btn small" id="katyOpen">${t('catalog')}</button>
@@ -1641,8 +1646,16 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
         <textarea id="katyPaste" rows="2" placeholder="${t('pasteHint')}"></textarea>
         <button type="button" class="btn small" id="katyPasteBtn">${t('paste')}</button>
       </div>
+      <aside class="hy-side">
+        <label>${t('taxPct')}</label>
+        <input id="ft" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.tax):19}">
+        <div class="hy-tot"><span>EK</span><b id="henryEK">0,00</b></div>
+        <div class="hy-tot"><span>VK</span><b id="henryVK">0,00</b></div>
+        <label>${t('discount')}</label>
+        <input id="fd" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.discount||0):0}">
+        <div class="hy-tot hy-gross"><span>${t('total')}</span><b id="henryGross">0,00</b></div>
+      </aside>
     </div>
-    <div class="field"><label>${t('customer')}</label><select id="fcust"><option value="">${t('chooseCustomer')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select></div>
   </div>`,()=>{
     const lines=collectInvoiceRows();
     if(!lines.length) return toast(t('needLine'));
@@ -1676,8 +1689,9 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   if(existing && existing.lines && existing.lines.length){
     existing.lines.forEach(l=>addInvoiceRow(l));
   } else if(!existing){
-    addInvoiceRow({sku:'',name:'Arbeitswert',qty:1.5,price:rate,tax:19,kind:'labor'});
+    setTimeout(()=>$('#katySku')?.focus(), 50);
   }
+  ['fd','ft'].forEach(id=>{ const el=$('#'+id); if(el) el.addEventListener('input',refreshInvoiceSums); });
   if($('#fv')) $('#fv').onchange=()=>{
     const v=vehicleOf($('#fv').value);
     if(v && v.customerId && $('#fcust')) $('#fcust').value=v.customerId;

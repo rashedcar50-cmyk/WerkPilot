@@ -164,3 +164,18 @@ th{background:#efebe3;position:sticky;top:0}
 .henry-skin .brand-word{color:#1a2330}
 
 input.latnum,.latnum{direction:ltr!important;unicode-bidi:isolate;font-variant-numeric:lining-nums tabular-nums;font-family:ui-sans-serif,system-ui,"Segoe UI",Arial,sans-serif}
+.hy-desk{background:#dce3ee;border:1px solid #8aa0bd;padding:0}
+.hy-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:#c23b32;color:#fff;padding:6px 8px}
+.hy-bar select,.hy-bar input{background:#fff;color:#111;border:1px solid #8aa0bd;border-radius:2px;padding:3px 6px;font-size:12px}
+.hy-split{display:grid;grid-template-columns:1fr 170px;min-height:320px}
+.hy-main{padding:6px;background:#e8edf4}
+.hy-entry{display:flex;gap:4px;align-items:center;background:#d5deea;border:1px solid #8aa0bd;padding:4px;margin-top:6px}
+.hy-entry input,.hy-entry select{border:1px solid #8aa0bd;border-radius:2px;padding:4px;background:#fff}
+.hy-entry #katySku{flex:1;min-width:120px}
+.hy-entry #qName{flex:2;min-width:140px}
+.hy-entry #katyQty{width:64px}
+.hy-side{background:#d7e0ec;border-left:1px solid #8aa0bd;padding:8px;font-size:12px}
+.hy-tot{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #b7c5d6}
+.hy-gross{font-weight:800}
+.modal.wide{width:min(1100px,98vw)}
+@media(max-width:800px){.hy-split{grid-template-columns:1fr}}
