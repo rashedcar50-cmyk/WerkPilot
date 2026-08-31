@@ -210,6 +210,11 @@ function upsertRow(key, incoming){
   const local=list[idx];
   const lt=Date.parse(local.updatedAt||local.date||0)||0;
   const rt=Date.parse(incoming.updatedAt||incoming.date||0)||0;
+  if(lt && rt && Math.abs(lt-rt)>500 && JSON.stringify(local)!==JSON.stringify(incoming)){
+    db.conflicts=db.conflicts||[];
+    db.conflicts.unshift({ts:new Date().toISOString(), key, id:local.id, winner: lt>rt?'local':'cloud'});
+    db.conflicts=db.conflicts.slice(0,80);
+  }
   if(lt>rt){
     list[idx]=Object.assign({}, incoming, local, {cloudId:local.cloudId||incoming.cloudId, id:local.id});
   } else {

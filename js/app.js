@@ -5,7 +5,7 @@ function nav(){
   ['estimates', t('estimates')],['invoices', t('invoices')],['purchases', t('purchases')],
   ['inventory', t('inventory')],['employees', t('employees')],['expenses', t('expenses')],
   ['journal', t('journal')],['reports', t('reports')],['integrations', t('integrations')],
-  ['audit', t('audit')],['settings', t('settings')],['studio', t('studio')]
+  ['audit', t('audit')],['help', t('help')||'Hilfe'],['settings', t('settings')],['studio', t('studio')]
  ];
 }
 
@@ -118,7 +118,7 @@ function toggleDevPanel(){
   };
 }
 function page(){
- const m={dashboard,customers,vehicles,repairs,appointments,estimates,invoices,purchases,inventory,employees,expenses,journal,reports,integrations,audit:auditPage,settings,studio};
+ const m={dashboard,customers,vehicles,repairs,appointments,estimates,invoices,purchases,inventory,employees,expenses,journal,reports,integrations,audit:auditPage,help:helpPage,settings,studio};
  Object.keys(WP.pages||{}).forEach(k=>{ m[k]=WP.pages[k]; });
  const fn = m[session.page]||dashboard;
  WP.run('beforeRender', session);
@@ -127,6 +127,28 @@ function page(){
  WP.run('afterRender', session);
 }
 function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>${action}</div>`}
+function archiveBeleg(inv){
+  if(!inv) return;
+  db.archive=db.archive||[];
+  const snap={id:id('a'),invoiceId:inv.id,number:inv.number,total:inv.total,date:inv.date,html:typeof buildWorkshopRechnung==='function'?buildWorkshopRechnung(inv):'',ts:new Date().toISOString(),companyId:session.company.id};
+  const i=db.archive.findIndex(x=>x.invoiceId===inv.id);
+  if(i>=0) db.archive[i]=snap; else db.archive.unshift(snap);
+  db.archive=db.archive.slice(0,250);
+}
+function helpPage(){
+  $('#content').innerHTML=head(t('help')||'Hilfe')+`<div class="card" dir="ltr" lang="de">
+    <h2>Werkivo — Kurz-Anleitung</h2>
+    <ol>
+      <li>Anmelden (Mechaniker: ismail / 1977A).</li>
+      <li>Fahrzeugschein fotografieren — Kunde und Fahrzeug werden angelegt.</li>
+      <li>km-Stand prüfen, Auftrag oder Rechnung öffnen.</li>
+      <li>Positionen wie in Henry: Nummer, Menge, Enter.</li>
+      <li>Speichern → Vorschau → Drucken / PDF (Belegnummer bleibt).</li>
+    </ol>
+    <p>Rechnung bleibt immer Deutsch. Programmsprache ändert nur die Bedienung.</p>
+    <p class="muted">Archiv: ${((db.archive)||[]).length} Belege · Konflikte: ${((db.conflicts)||[]).length}</p>
+  </div>`;
+}
 
 const PAGE_SIZE = 50;
 function table(headers, rows, pageKey){
@@ -356,6 +378,7 @@ async function exportInvoicePDF(iid){
       left-=pageH; offset+=pageH;
     }
     const name=(inv.number||'Rechnung').replace(/[^\w.-]+/g,'_')+'.pdf';
+    archiveBeleg(inv);
     pdf.save(name);
     toast('تم حفظ PDF');
   }catch(e){
@@ -1568,6 +1591,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
       audit('invoice.create',obj.number);
     }
+    archiveBeleg(obj);
     save(); closeModal(); render();
     setTimeout(()=>previewInvoice(obj.id), 200);
   }, existing?t('saveEdit'):t('saveShowDesign'));
@@ -2373,7 +2397,9 @@ function newWorkshopModal(){
 window.newWorkshopModal=newWorkshopModal;
 function settings(){
  const w=workshop();
- $('#content').innerHTML=head(t('settings'))+`<div class="card"><div class="form-grid">
+ const conf=(db.conflicts||[]).slice(0,8).map(c=>`${esc(c.ts)} · ${esc(c.key)} · ${esc(c.winner)}`).join('<br>')||'—';
+ const arch=(db.archive||[]).slice(0,8).map(a=>`${esc(a.number||'')} · ${money(a.total)}`).join('<br>')||'—';
+ $('#content').innerHTML=head(t('settings'))+`<div class="grid"><div class="card"><b>Beleg-Archiv</b><div class="muted">${arch}</div></div><div class="card"><b>Sync-Konflikte</b><div class="muted">${conf}</div></div></div><div class="card"><div class="form-grid">
  <div class="field span2"><div class="alert">${t('activeWs')}: <b>${esc(session.company.name)}</b> · ${esc(session.company.country)}. ${t('wsOnly')}</div></div>
  <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'ar')}</select>
  <div class="hint">${t('langHint')}</div></div>

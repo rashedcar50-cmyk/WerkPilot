@@ -426,8 +426,8 @@ function roleCan(section){
  if(r==='developer') return true;
  if(r==='manager') return section!=='studio';
  if(r==='accountant') return !['settings','studio'].includes(section);
- if(r==='mechanic') return ['dashboard','customers','vehicles','repairs','estimates','appointments'].includes(section);
- if(r==='warehouse') return ['dashboard','inventory','purchases','integrations'].includes(section);
+ if(r==='mechanic') return ['dashboard','customers','vehicles','repairs','estimates','appointments','help'].includes(section);
+ if(r==='warehouse') return ['dashboard','inventory','purchases','integrations','help'].includes(section);
  return false;
 }
 
