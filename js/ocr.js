@@ -131,7 +131,38 @@
     });
     return (res&&res.data&&res.data.text)||'';
   }
+  function qualityFromCanvas(ctx,w,h){
+    const data=ctx.getImageData(0,0,w,h).data;
+    let sum=0, sum2=0, n=w*h;
+    for(let i=0;i<data.length;i+=4){
+      const g=data[i]*0.3+data[i+1]*0.59+data[i+2]*0.11;
+      sum+=g; sum2+=g*g;
+    }
+    const avg=sum/n, v=sum2/n-avg*avg;
+    const issues=[];
+    if(avg<45) issues.push('dark');
+    if(avg>210) issues.push('bright');
+    if(v<180) issues.push('flat');
+    return {avg, variance:v, ok:issues.length===0, issues};
+  }
+  async function quality(file){
+    return new Promise((resolve,reject)=>{
+      const img=new Image();
+      const url=URL.createObjectURL(file);
+      img.onload=()=>{
+        const c=document.createElement('canvas');
+        const s=Math.min(1, 640/Math.max(img.width,img.height));
+        c.width=Math.max(8,Math.round(img.width*s)); c.height=Math.max(8,Math.round(img.height*s));
+        const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,c.width,c.height);
+        URL.revokeObjectURL(url);
+        resolve(qualityFromCanvas(ctx,c.width,c.height));
+      };
+      img.onerror=reject; img.src=url;
+    });
+  }
   async function read(file){
+    const q=await quality(file);
+    if(!q.ok) console.warn('ocr-quality', q.issues);
     await (W.loadOcr? W.loadOcr(): Promise.resolve());
     const imgA=await preprocess(file,'contrast');
     const imgB=await preprocess(file,'binary');
@@ -153,10 +184,11 @@
     const out=merge(cloud, local);
     out.ocrScore=score(out);
     out.ocrSource='werkivo-ocr';
-    if(!out.vin && !out.license_plate) throw new Error('ocr-empty');
+    out.ocrQuality=q;
+    if(!out.vin && !out.license_plate) throw new Error(q.ok?'ocr-empty':'ocr-photo-quality');
     return out;
   }
-  W.OCR={parse,preprocess,merge,read,score};
+  W.OCR={parse,preprocess,merge,read,score,quality};
 })(window.WP=window.WP||{});
 window.parseVehicleOCR=function(text){ return WP.OCR.parse(text); };
 window.preprocessSchein=function(file){ return WP.OCR.preprocess(file,'contrast'); };

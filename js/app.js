@@ -130,7 +130,9 @@ function head(title,action=''){return `<div class="page-title"><h1>${title}</h1>
 function archiveBeleg(inv){
   if(!inv) return;
   db.archive=db.archive||[];
-  const snap={id:id('a'),invoiceId:inv.id,number:inv.number,total:inv.total,date:inv.date,html:typeof buildWorkshopRechnung==='function'?buildWorkshopRechnung(inv):'',ts:new Date().toISOString(),companyId:session.company.id};
+  const existing=db.archive.find(x=>x.invoiceId===inv.id && x.locked);
+  if(existing) return existing;
+  const snap={id:id('a'),invoiceId:inv.id,number:inv.number,total:inv.total,date:inv.date,html:typeof buildWorkshopRechnung==='function'?buildWorkshopRechnung(inv):'',ts:new Date().toISOString(),companyId:session.company.id,locked:true};
   const i=db.archive.findIndex(x=>x.invoiceId===inv.id);
   if(i>=0) db.archive[i]=snap; else db.archive.unshift(snap);
   db.archive=db.archive.slice(0,250);
@@ -1355,7 +1357,7 @@ function totBlock(m){
     </div>
   </div>
   <p class="rh-pay">Bei Zahlung bitte Kd-Nr und Beleg-Nr angeben. Zahlbar sofort und ohne Abzug.</p>
-  <p class="rh-legalhint">Eigentumsvorbehalt: Gelieferte Teile bleiben bis zur vollständigen Bezahlung unser Eigentum. Es gelten unsere AGB.</p>`;
+  <p class="rh-legalhint">Eigentumsvorbehalt: Gelieferte Teile bleiben bis zur vollständigen Bezahlung unser Eigentum. Es gelten unsere AGB. Beleg archiviert unter der Belegnummer. Kein Ersatz für steuerliche Einzelberatung.</p>`;
 }
 function footBlock(w){
   return `<div class="rh-foot">
