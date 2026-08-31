@@ -206,7 +206,7 @@ function buildDocHTML(type, id){
     title = t('listInventory');
     const rows = companyRows('inventory');
     body = `<table><thead><tr><th>${t('skuCol')}</th><th>${t('name')}</th><th>${t('qty')}</th><th>${t('buy')}</th><th>${t('sell')}</th></tr></thead><tbody>` +
-      rows.map(x=>`<tr><td>${esc(x.sku||'')}</td><td>${esc(x.name||'')}</td><td>${x.qty}</td><td>${money(x.buy)}</td><td>${money(x.sell)}</td></tr>`).join('') +
+      rows.map(x=>`<tr><td>${esc(x.sku||'')}</td><td>${esc(dLabel(x.name||''))}</td><td>${x.qty}</td><td>${money(x.buy)}</td><td>${money(x.sell)}</td></tr>`).join('') +
       `</tbody></table>`;
   } else {
     title = t('report');
@@ -397,7 +397,7 @@ function dashboard(){
   <div class="card"><div class="muted">${t('sales')}</div><div class="metric">${money(sales)}</div></div>
   ${session.user.role==='manager'?`<div class="card"><div class="muted">${t('netApprox')}</div><div class="metric">${money(sales-costs)}</div></div>`:''}
  </div>
- ${low.length?`<div class="alert"><b>${t('stockAlert')}:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+')').join(' · ')}</div>`:''}
+ ${low.length?`<div class="alert"><b>${t('stockAlert')}:</b> ${low.map(x=>esc(dLabel(x.name))+' ('+x.qty+')').join(' · ')}</div>`:''}
  ${due.length?`<div class="alert"><b>${t('maintDue')}:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' km').join(' · ')}</div>`:''}
  ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
  return `<div class="card" style="margin-top:12px"><b>${t('vatReport')}</b>
@@ -412,16 +412,16 @@ function dashboard(){
  <button class="btn small" onclick="openRepair('${r.id}')">${t('openBtn')}</button></div></div>`).join(''):`<p class="muted">${t('noCarsInShop')}</p>`}
  </div>
  <div class="card" style="margin-top:12px"><b>${t('todayApptsTitle')}</b>
- ${todayAp.length?todayAp.map(a=>`<div class="today-item"><div>${esc(a.time||'')} · ${esc(vehicleName(a.vehicleId))}<div class="muted">${esc(a.note||'')} · ${esc(a.tech||'')}</div></div><span class="status info">${esc(stLabel(a.status))}</span></div>`).join(''):`<p class="muted">${t('noApptsToday')}</p>`}
+ ${todayAp.length?todayAp.map(a=>`<div class="today-item"><div>${esc(a.time||'')} · ${esc(vehicleName(a.vehicleId))}<div class="muted">${esc(dLabel(a.note||''))} · ${esc(dLabel(a.tech||''))}</div></div><span class="status info">${esc(stLabel(a.status))}</span></div>`).join(''):`<p class="muted">${t('noApptsToday')}</p>`}
  </div>`;
 }
 function showSearchResults(q){
   const s=globalSearch(q);
   $('#content').innerHTML=head(t('searchResults')+': '+esc(q))+`
-  <div class="card"><b>عملاء</b>${s.customers.length?table([t('name'),t('phone'),t('email')],s.customers.map(c=>[esc(c.name),esc(c.phone),esc(c.email)]),'s_c'):'<p class="muted">'+t('noResults')+'</p>'}</div>
-  <div class="card" style="margin-top:10px"><b>سيارات</b>${s.vehicles.length?table([t('plate'),'VIN',t('make'),t('model'),'km'],s.vehicles.map(v=>[esc(v.plate),esc(v.vin),esc(v.make),esc(v.model),v.km||'-']),'s_v'):'<p class="muted">'+t('noResults')+'</p>'}</div>
-  <div class="card" style="margin-top:10px"><b>أوامر</b>${s.repairs.length?table([t('vehicle'),t('statement'),t('status')],s.repairs.map(r=>[vehicleName(r.vehicleId),esc(r.description),esc(r.status)]),'s_r'):'<p class="muted">'+t('noResults')+'</p>'}</div>
-  <div class="card" style="margin-top:10px"><b>مخزون</b>${s.inventory.length?table(['SKU',t('name'),t('qty')],s.inventory.map(i=>[esc(i.sku),esc(i.name),i.qty]),'s_i'):'<p class="muted">'+t('noResults')+'</p>'}</div>`;
+  <div class="card"><b>${t('customers')}</b>${s.customers.length?table([t('name'),t('phone'),t('email')],s.customers.map(c=>[esc(c.name),esc(c.phone),esc(c.email)]),'s_c'):'<p class="muted">'+t('noResults')+'</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>${t('vehicles')}</b>${s.vehicles.length?table([t('plate'),'VIN',t('make'),t('model'),'km'],s.vehicles.map(v=>[esc(v.plate),esc(v.vin),esc(v.make),esc(v.model),v.km||'-']),'s_v'):'<p class="muted">'+t('noResults')+'</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>${t('repairs')}</b>${s.repairs.length?table([t('vehicle'),t('statement'),t('status')],s.repairs.map(r=>[vehicleName(r.vehicleId),esc(dLabel(r.description)),esc(stLabel(r.status))]),'s_r'):'<p class="muted">'+t('noResults')+'</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>${t('inventory')}</b>${s.inventory.length?table(['SKU',t('name'),t('qty')],s.inventory.map(i=>[esc(i.sku),esc(dLabel(i.name)),i.qty]),'s_i'):'<p class="muted">'+t('noResults')+'</p>'}</div>`;
 }
 
 
@@ -2056,10 +2056,10 @@ function inventory(){
  const low=lowStock();
  $('#content').innerHTML=head(t('inventoryTitle'),`<button class="btn primary" id="add">${t('newPart')}</button>`)+
  listShareBar('inventory')+
- (low.length?`<div class="alert"><b>${t('underMin')}:</b> ${low.map(x=>esc(x.name)+' ('+x.qty+' / حد '+ (x.minQty||3)+')').join(' · ')}</div>`:'')+
+ (low.length?`<div class="alert"><b>${t('underMin')}:</b> ${low.map(x=>esc(dLabel(x.name))+' ('+x.qty+' / '+t('limit')+' '+ (x.minQty||3)+')').join(' · ')}</div>`:'')+
  table([t('skuCol'),t('name'),t('qty'),t('minQty'),t('buy'),t('sell'),t('status')],rows.map(x=>{
    const lowFlag=Number(x.qty||0)<=Number(x.minQty||3);
-   return [esc(x.sku),esc(x.name),x.qty,x.minQty||3,money(x.buy),money(x.sell), lowFlag?`<span class="status warn">${t('shortStock')}</span>`:`<span class="status ok">${t('inStock')}</span>`];
+   return [esc(x.sku),esc(dLabel(x.name)),x.qty,x.minQty||3,money(x.buy),money(x.sell), lowFlag?`<span class="status warn">${t('shortStock')}</span>`:`<span class="status ok">${t('inStock')}</span>`];
  }), 'inventory');
  $('#add').onclick=()=>simpleModal(t('newPart'),[['sku',t('skuCol')],['name',t('name')],['qty',t('qty'),'number'],['minQty',t('minQty'),'number'],['buy',t('buy'),'number'],['sell',t('sell'),'number']],o=>{o.companyId=session.company.id;o.id=id('i');o.qty=Number(o.qty||0);o.minQty=Number(o.minQty||3);db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
 }
