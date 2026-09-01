@@ -159,6 +159,7 @@ function bindVinEnter(inputId, ids){
     const vin=cleanVin(el.value);
     el.value=vin;
     if(vin.length!==17) return toast(t('vinNeed17'));
+    if(/^\d+$/.test(vin) || /^1234567890/.test(vin) || /[IOQ]/.test(vin)) return toast(t('vinBad')||'FIN ungültig');
     toast(t('fetchingCar'));
     try{
       const info=await lookupVin(vin);
