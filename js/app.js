@@ -2038,24 +2038,23 @@ async function scanPurchaseDocument(){
 
   modal(t('scanBuy'), `
     <div class="field">
-      <label>1) صوّر أو ارفع الفاتورة</label>
-      <div class="filebox" style="margin-top:8px">
-        <input id="purchaseFile" type="file" accept="image/*,.pdf">
-        <div class="muted" style="margin-top:6px">صور أو PDF</div>
+      <label>1) ${t('pickSchein')}</label>
+      <input id="purchaseFile" type="file" accept="image/*,.pdf" class="hidden">
+      <div class="toolbar" style="margin-top:8px">
+        <button type="button" class="btn" id="btnPickFile">${t('pickFile')}</button>
+        <button type="button" class="btn" id="btnOpenCam">💻 ${t('openCam')}</button>
+        <button type="button" class="btn primary" id="btnRead" disabled>⚡ ${t('readData')}</button>
+        <button type="button" class="btn ghost" id="btnPreview" disabled>👁️ ${t('preview')}</button>
       </div>
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn" id="btnOpenCam">💻 كاميرا اللابتوب</button>
-        <button type="button" class="btn primary" id="btnRead" disabled>⚡ قراءة البيانات</button>
-        <button type="button" class="btn ghost" id="btnPreview" disabled>👁️ عرض الفاتورة</button>
-      </div>
-      <img id="purchaseImg" class="ocr-preview hidden" style="margin-top:12px;max-height:280px;cursor:pointer" title="اضغط للعرض الكامل">
-      <div id="purchaseStatus" class="hint" style="margin-top:8px">اختر صورة أولاً ثم اضغط «قراءة البيانات»</div>
+      <div class="hint" id="purchaseFileName"></div>
+      <img id="purchaseImg" class="ocr-preview hidden" style="margin-top:12px;max-height:280px;cursor:pointer">
+      <div id="purchaseStatus" class="hint" style="margin-top:8px">${t('ocrHint')}</div>
     </div>
 
     <div id="purchaseFormBox" class="hidden" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
-      <div class="muted" style="margin-bottom:10px">2) راجع البيانات قبل الحفظ</div>
+      <div class="muted" style="margin-bottom:10px">2) ${t('ocrHint')}</div>
       <div class="form-grid">
-        <div class="field"><label>${t('supplier')}</label><input id="p_supplier" placeholder="اسم المورد"></div>
+        <div class="field"><label>${t('supplier')}</label><input id="p_supplier"></div>
         <div class="field"><label>${t('invNum')}</label><input id="p_inv"></div>
         <div class="field"><label>${t('date')}</label><input id="p_date" type="date"></div>
         <div class="field"><label>${t('total')}</label><input id="p_total" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
@@ -2063,8 +2062,8 @@ async function scanPurchaseDocument(){
         <div class="field"><label>${t('taxEuro')}</label><input id="p_tax" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
         <div class="field"><label>${t('status')}</label>
           <select id="p_status">
-            <option value="pending">معلق</option>
-            <option value="paid">مدفوع</option>
+            <option value="pending">${t('pending')}</option>
+            <option value="paid">${t('paid')}</option>
           </select>
         </div>
         <div class="field span2"><label>${t('notesItems')}</label><textarea id="p_notes" rows="2"></textarea></div>
@@ -2074,9 +2073,9 @@ async function scanPurchaseDocument(){
     // الحفظ النهائي فقط
     const supplier = ($('#p_supplier')?.value || '').trim();
     const total = Number($('#p_total')?.value) || 0;
-    if(!pendingFile && !pendingReceiptUrl) return toast('ارفع فاتورة أولاً');
-    if(!supplier) return toast('أدخل اسم المورد');
-    if(total <= 0) return toast('أدخل المبلغ الإجمالي');
+    if(!pendingFile && !pendingReceiptUrl) return toast(t('pickScheinFirst'));
+    if(!supplier) return toast(t('needName'));
+    if(total <= 0) return toast(t('needQtyPrice'));
 
     try{
       $('#msave').disabled = true;
@@ -2118,14 +2117,14 @@ async function scanPurchaseDocument(){
       if(pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
       closeModal();
       render();
-      toast('تم حفظ الفاتورة');
+      toast(t('saved'));
     }catch(e){
       console.error(e);
       $('#purchaseStatus').textContent = 'خطأ: ' + (e.message||'');
       toast(e.message || t('saveFailed'));
       $('#msave').disabled = false;
     }
-  }, 'حفظ الفاتورة');
+  }, t('save'));
 
   // تعطيل زر الحفظ في البداية
   setTimeout(()=>{
@@ -2163,8 +2162,12 @@ async function scanPurchaseDocument(){
 
     fileInput.onchange = ()=>{
       const f = fileInput.files[0];
-      if(f) setPreviewFromFile(f);
+      if(f){
+        setPreviewFromFile(f);
+        const nm=$('#purchaseFileName'); if(nm) nm.textContent=f.name;
+      }
     };
+    const pick=$('#btnPickFile'); if(pick) pick.onclick=()=>fileInput.click();
 
     // عرض كامل قبل الحفظ
     function openFullPreview(){
@@ -2357,16 +2360,19 @@ $('#scanExpense').onclick=scanExpenseDocument;
    async function scanExpenseDocument(){
 modal(t('scanExp'),`
 <div class="field">
-<label>صوّر الفاتورة أو اختر صورة</label>
-<input id="doc" type="file" accept="image/*">
-<button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
-<div class="hint">سيتم قراءة الفاتورة وإضافتها تلقائيًا إلى المصروفات.</div>
+<label>${t('pickSchein')}</label>
+<input id="doc" type="file" accept="image/*" class="hidden">
+<div class="toolbar">
+<button type="button" class="btn" id="pickExp">${t('pickFile')}</button>
+<button type="button" class="btn primary" onclick="openCamera()">📷 ${t('openCam')}</button>
+</div>
+<div class="hint">${t('ocrHint')}</div>
 <img id="expenseImg" class="ocr-preview hidden">
 <div id="expenseStatus" class="hint"></div>
 </div>
 `,async()=>{
 const f=$('#doc').files[0];
-if(!f)return toast('اختر أو صوّر الفاتورة أولاً');
+if(!f)return toast(t('pickScheinFirst'));
 
 try{
 $('#msave').disabled=true;
@@ -2438,6 +2444,7 @@ toast(e.message||'حدث خطأ');
 $('#msave').disabled=false;
 }
 },t('readAdd2'));
+if($('#pickExp')) $('#pickExp').onclick=()=>$('#doc').click();
 }
 
 function journal(){

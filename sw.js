@@ -1,9 +1,9 @@
-const CACHE='baymeister-v1.10.4';
+const CACHE='baymeister-v1.10.5';
 const PRECACHE=[
   './','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png',
-  './css/app.css?v=1.10.4','./i18n.js?v=1.10.4','./supabase-config.js',
-  './js/config.js?v=1.10.4','./js/engine.js?v=1.10.4','./js/core.js?v=1.10.4','./js/ocr.js?v=1.10.4','./js/cloud.js?v=1.10.4',
-  './js/lookup.js?v=1.10.4','./js/app.js?v=1.10.4'
+  './css/app.css?v=1.10.5','./i18n.js?v=1.10.5','./supabase-config.js',
+  './js/config.js?v=1.10.5','./js/engine.js?v=1.10.5','./js/core.js?v=1.10.5','./js/ocr.js?v=1.10.5','./js/cloud.js?v=1.10.5',
+  './js/lookup.js?v=1.10.5','./js/app.js?v=1.10.5'
 ];
 self.addEventListener('install', e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRECACHE).catch(()=>{})));
