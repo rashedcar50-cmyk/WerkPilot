@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.11.0</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.11.1</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -1925,23 +1925,23 @@ function purchases(){
 function purchaseManualModal(){
   modal(t('manualBuyTitle'), `
     <div class="form-grid">
-      <div class="field"><label>${t('supplier')}</label><input id="p_supplier" placeholder="مثال: carparts-cat.com"></div>
+      <div class="field"><label>${t('supplier')}</label><input id="p_supplier" placeholder="z.B. carparts-cat.com"></div>
       <div class="field"><label>${t('invNum')}</label><input id="p_inv"></div>
-      <div class="field"><label>${t('date')}</label><input id="p_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="field"><label>${t('date')}</label><input id="p_date" type="date" lang="de" value="${new Date().toISOString().slice(0,10)}"></div>
       <div class="field"><label>${t('total')}</label><input id="p_total" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
       <div class="field"><label>${t('status')}</label>
         <select id="p_status">
-          <option value="pending">معلق</option>
-          <option value="paid">مدفوع</option>
+          <option value="pending">${t('pending')}</option>
+          <option value="paid">${t('paid')}</option>
         </select>
       </div>
-      <div class="field span2"><label>${t('notesItems')}</label><textarea id="p_notes" placeholder="وصف القطع أو ملاحظات"></textarea></div>
+      <div class="field span2"><label>${t('notesItems')}</label><textarea id="p_notes" placeholder="${t('notesItems')}"></textarea></div>
     </div>
   `, ()=>{
     const supplier = $('#p_supplier').value.trim();
     const total = Number($('#p_total').value)||0;
-    if(!supplier) return toast('أدخل اسم المورد');
-    if(total <= 0) return toast('أدخل المبلغ الإجمالي');
+    if(!supplier) return toast(t('needName'));
+    if(total <= 0) return toast(t('needQtyPrice'));
 
     const purchase = {
       id: id('p'),
