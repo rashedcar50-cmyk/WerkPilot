@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.11.2</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.11.3</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -1340,6 +1340,25 @@ function dePrintName(s){
   }
   return s;
 }
+function printLineName(s){
+  s=dePrintName(s);
+  return String(s)
+    .replace(/زيت محرك/g,'Motoröl')
+    .replace(/زيت/g,'Öl')
+    .replace(/فلتر هواء/g,'Luftfilter')
+    .replace(/فلتر زيت/g,'Ölfilter')
+    .replace(/فلتر/g,'Filter')
+    .replace(/فرامل/g,'Bremsen')
+    .replace(/مكابح/g,'Bremsen')
+    .replace(/بطارية/g,'Batterie')
+    .replace(/شمعات/g,'Zündkerzen')
+    .replace(/إطارات/g,'Reifen')
+    .replace(/أجور|عمالة|يد عاملة/g,'Arbeitswert')
+    .replace(/[\u0600-\u06FF]+/g,'')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+}
+window.printLineName=printLineName;
 function customerBlock(cust){
   const rawFirma=cust.companyName|| (cust.type==='company'?cust.name:'');
   const rawPerson=cust.contact|| (!rawFirma?cust.name:'');
@@ -1389,7 +1408,7 @@ function invoiceModel(x){
   const filled=lines.map((ln,i)=>{
     const labor=isLaborLine(ln);
     return {
-      pos:i+1, sku:ln.sku||ln.number||'', name:ln.name||'',
+      pos:i+1, sku:ln.sku||ln.number||'', name:printLineName(ln.name||ln.desc||''),
       kind: labor?'Arbeitsleistung':'Ersatzteil',
       qty:Number(ln.qty||1), price:Number(ln.price||0),
       tax:Number(ln.tax||x.tax||19), sum:Math.round(lineSum(ln)*100)/100
