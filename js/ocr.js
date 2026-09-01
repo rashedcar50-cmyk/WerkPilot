@@ -475,60 +475,103 @@
       }catch(e){ resolve(dataUrl); }
     });
   }
+  function vinCheckOk(vin){
+    const v=String(vin||'').toUpperCase();
+    if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(v)) return false;
+    const map={A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,J:1,K:2,L:3,M:4,N:5,P:7,R:9,S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9};
+    const w=[8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+    let sum=0;
+    for(let i=0;i<17;i++){
+      const ch=v[i];
+      const n=/[0-9]/.test(ch)?+ch:(map[ch]||0);
+      sum+=n*w[i];
+    }
+    const cd=sum%11;
+    const expect=cd===10?'X':String(cd);
+    return v[8]===expect;
+  }
+  function grounded(val, raw){
+    const v=String(val||'').trim();
+    if(!v) return false;
+    const U=String(raw||'').toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g,'');
+    const C=v.toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g,'');
+    if(C.length<4) return U.indexOf(C)>=0;
+    if(U.indexOf(C)>=0) return true;
+    if(C.length>=8){
+      for(let i=0;i<=C.length-6;i++){ if(U.indexOf(C.slice(i,i+6))>=0) return true; }
+    }
+    return false;
+  }
+  function dropUngrounded(out, raw){
+    out=out||{};
+    const keep=(v)=>grounded(v, raw);
+    if(out.owner_name && !keep(out.owner_name) && !keep(String(out.owner_name).split(/\s+/).pop())) out.owner_name='';
+    if(out.address && !keep(out.address) && !/\d{5}/.test(out.address)) out.address='';
+    if((out.license_plate||out.plate) && !keep(out.license_plate||out.plate)) out.license_plate=out.plate='';
+    if(out.vin && !keep(out.vin) && !vinCheckOk(out.vin)) out.vin='';
+    if(out.brand && !keep(out.brand) && !keep(out.make)) { out.brand=''; out.make=''; }
+    if(out.model && !keep(out.model)) out.model='';
+    return out;
+  }
+  async function openaiChat(key, body, ms){
+    const controller=new AbortController();
+    const to=setTimeout(()=>controller.abort(), ms||28000);
+    try{
+      const res=await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST', signal:controller.signal,
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+        body:JSON.stringify(body)
+      });
+      clearTimeout(to);
+      const js=await res.json().catch(()=>({}));
+      return {ok:res.ok, status:res.status, js};
+    }catch(e){ clearTimeout(to); return {ok:false, status:0, js:{error:{message:String(e)}}}; }
+  }
   async function openaiRead(img){
     const key=openaiKey();
     if(!key){ W._ocrLast='no-key'; return {}; }
     let url=String(img||'');
     if(url && url.indexOf('data:image/')!==0) url='data:image/jpeg;base64,'+url.replace(/^data:[^;]+;base64,/,'');
-    url=await shrinkDataUrl(url, 1400, 0.72);
-    const sys='Antworte NUR als JSON mit keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration. Nur Text der auf dem Dokument steht. VERBOTEN: Max Mustermann, Musterstraße, Musterstadt, AB-CD 123, 1HGBH41, Beispielwerte. Teil II: rechte aktuelle Haltersäule. Feld A Kennzeichen. Feld E VIN. Feld B Jahr. Unleserlich = leerer String.';
-    const attempts=[
-      {model:'gpt-4o-mini', detail:'high', json:true},
-      {model:'gpt-4o-mini', detail:'auto', json:true},
-      {model:'gpt-4o-mini', detail:'high', json:false}
-    ];
-    for(const att of attempts){
-      const controller=new AbortController();
-      const to=setTimeout(()=>controller.abort(), 28000);
-      try{
-        const body={
-          model:att.model, temperature:0,
-          messages:[
-            {role:'system',content:sys},
-            {role:'user',content:[
-              {type:'text',text:'JSON Felder füllen. Kennzeichen Feld A rechts.'},
-              {type:'image_url',image_url:{url:url,detail:att.detail}}
-            ]}
-          ]
-        };
-        if(att.json) body.response_format={type:'json_object'};
-        const res=await fetch('https://api.openai.com/v1/chat/completions',{
-          method:'POST', signal:controller.signal,
-          headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-          body:JSON.stringify(body)
-        });
-        clearTimeout(to);
-        const js=await res.json().catch(()=>({}));
-        if(!res.ok){
-          const err=(js.error&& (js.error.code||js.error.message))||res.status;
-          W._ocrLast='http-'+res.status;
-          W._ocrDetail=String(err).slice(0,80);
-          console.warn('openai-ocr', att, js);
-          if(res.status===401 || res.status===403) return {};
-          continue;
-        }
-        W._ocrLast='openai';
-        W._ocrDetail='';
-        const txt=(js.choices&&js.choices[0]&&js.choices[0].message&&js.choices[0].message.content)||'{}';
-        let data={};
-        try{ data=JSON.parse(txt); }catch(e){ data=parse(txt); }
-        let got=merge(normalizeCloud(data), parse([data.owner_name,data.address,data.license_plate,data.vin,data.brand,data.model].filter(Boolean).join('\n')));
-        got=stripDemo(cleanFields(got, JSON.stringify(got)+' '+JSON.stringify(data)));
-        if(isDemoValue([got.owner_name,got.address,got.vin,got.license_plate,got.plate].join(' '))) continue;
-        if(got.owner_name || got.vin || got.license_plate || got.plate) return got;
-      }catch(e){ clearTimeout(to); W._ocrLast='net'; console.warn('openai-ocr', e); }
+    url=await shrinkDataUrl(url, 1600, 0.78);
+    const tr=await openaiChat(key,{
+      model:'gpt-4o-mini', temperature:0,
+      messages:[
+        {role:'system',content:'Du bist ein OCR-Gerät. Transkribiere NUR sichtbaren Text der Zulassungsbescheinigung, zeilenweise. Keine Ergänzung, keine Beispiele, keine Erklärung.'},
+        {role:'user',content:[
+          {type:'text',text:'Transkription komplett, auch rechte Haltersäule bei Teil II.'},
+          {type:'image_url',image_url:{url:url,detail:'high'}}
+        ]}
+      ]
+    }, 30000);
+    if(!tr.ok){
+      W._ocrLast='http-'+(tr.status||0);
+      W._ocrDetail=String((tr.js.error&&(tr.js.error.code||tr.js.error.message))||tr.status).slice(0,80);
+      if(tr.status===401||tr.status===403) return {};
+    }else{
+      W._ocrLast='openai';
     }
-    return {};
+    const rawTxt=(tr.js.choices&&tr.js.choices[0]&&tr.js.choices[0].message&&tr.js.choices[0].message.content)||'';
+    W._ocrRaw=rawTxt;
+    let fromText=rawTxt?parse(rawTxt):{};
+    fromText=stripDemo(fromText);
+    const map=await openaiChat(key,{
+      model:'gpt-4o-mini', temperature:0,
+      response_format:{type:'json_object'},
+      messages:[
+        {role:'system',content:'Extrahiere Felder NUR aus dem gelieferten Text. Unbekannte Felder leer. VERBOTEN: Mustermann, Musterstraße, AB-CD 123, 1HGBH41, erfundene Werte. Teil II: aktuelle rechte Spalte.'},
+        {role:'user',content:'Text:\n'+(rawTxt||'').slice(0,4000)+'\nJSON keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration'}
+      ]
+    }, 20000);
+    let data={};
+    if(map.ok){
+      const txt=(map.js.choices&&map.js.choices[0]&&map.js.choices[0].message&&map.js.choices[0].message.content)||'{}';
+      try{ data=JSON.parse(txt); }catch(e){ data=parse(txt); }
+    }
+    let got=merge(normalizeCloud(data), fromText);
+    got=dropUngrounded(stripDemo(cleanFields(got, rawTxt+' '+JSON.stringify(data))), rawTxt);
+    if(got.vin && !vinCheckOk(got.vin) && !grounded(got.vin, rawTxt)) got.vin='';
+    if(got.owner_name || got.vin || got.license_plate || got.plate) return got;
+    return stripDemo(fromText||{});
   }
   async function spaceRead(img){
     try{
@@ -607,14 +650,15 @@
       }catch(e){}
     }
     if(!out.year && out.first_registration) out.year=String(out.first_registration).slice(-4);
-    out=cleanFields(out, device||'');
+    out=cleanFields(out, (W._ocrRaw||'')+' '+(device||''));
+    out=dropUngrounded(stripDemo(out), W._ocrRaw||device||'');
     out.ocrScore=score(out);
     out.ocrSource=W._ocrLast==='openai'?'openai':(W._ocrLast||'ocr');
     out.ocrQuality=q;
     if(!out.vin && !out.license_plate) throw new Error(q.ok?'ocr-empty':'ocr-photo-quality');
     return out;
   }
-  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields};
+  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields,vinCheckOk,grounded,stripDemo};
 })(window.WP=window.WP||{});
 window.parseVehicleOCR=function(text){ return WP.OCR.parse(text); };
 window.preprocessSchein=function(file){ return WP.OCR.preprocess(file,'contrast'); };
