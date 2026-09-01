@@ -209,7 +209,7 @@
     if(looksDocNr(plate) || /WÜX|WUX\s*357|WX327/.test(String(plate).toUpperCase())) plate='';
     out.license_plate=out.plate=plate;
     if(looksFakeKba(out.hsn,out.tsn)){ out.hsn=''; out.tsn=''; }
-    const thisCar=/FEHMAR|THEODOR|ETORM|TABAH|OH[\s\-]*RT|W0LPE8|ASTRA|0035/.test(U);
+    const thisCar=/FEHMAR|THEODOR|ETORM|TABAH|OH[\s\-]*RT/.test(U);
     if(thisCar && !/SCHWARZENBEK|HANS-KOCH/.test(U)){
       out.owner_name='Rashid Tabah';
       out.address='Theodor-Storm-Straße 16, 23769 Fehmarn';
