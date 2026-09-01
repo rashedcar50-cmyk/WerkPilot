@@ -51,7 +51,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.20</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.21</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2368,63 +2368,109 @@ async function scanPurchaseDocument(){
 }
 
 async function openCameraForPurchase(onCapture){
+  return openProCamera({ onFile:onCapture, title:t('scanPurchase') });
+}
+async function openProCamera(opts){
+  opts=opts||{};
+  if(typeof opts==='string') opts={target:opts};
+  if(opts.target) window._camInput=opts.target;
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
     return toast(t('camUnsupported')||t('openCam'));
   }
-
-  const box = document.createElement('div');
-  box.className = 'modal-back';
-  box.innerHTML = `
-    <div class="modal" style="max-width:700px">
-      <div class="modal-head">
-        <b>📷 ${t('scanPurchase')}</b>
-        <button id="camClose" class="btn bad">✕</button>
-      </div>
-      <video id="cameraVideo" autoplay playsinline style="width:100%;border-radius:12px;background:#000;max-height:60vh"></video>
-      <div style="margin-top:12px;text-align:center;display:flex;gap:8px;justify-content:center">
-        <button id="takePhoto" class="btn primary">📸 ${t('takePhoto')||t('openCam')}</button>
-        <button id="camClose2" class="btn ghost">${t('cancelBtn')}</button>
-      </div>
+  document.querySelectorAll('.procam').forEach(n=>n.remove());
+  const box=document.createElement('div');
+  box.className='procam';
+  box.innerHTML=`
+    <div class="procam-stage">
+      <video id="pcVideo" autoplay playsinline muted></video>
+      <div class="procam-mask"><div class="procam-frame"></div></div>
+      <div class="procam-hint">${t('alignSchein')}</div>
     </div>
-  `;
+    <div class="procam-bar">
+      <button type="button" class="ico-btn" id="pcClose">✕</button>
+      <button type="button" class="ico-btn" id="pcFlash">⚡</button>
+      <button type="button" class="procam-shutter" id="pcShot" aria-label="Capture"></button>
+      <input type="range" id="pcZoom" min="1" max="3" step="0.1" value="1">
+    </div>
+    <div class="procam-review hidden" id="pcReview">
+      <img id="pcPrev" alt="">
+      <div class="procam-bar">
+        <button type="button" class="btn" id="pcRetake">${t('retake')}</button>
+        <button type="button" class="btn primary" id="pcUse">${t('usePhoto')}</button>
+      </div>
+    </div>`;
   document.body.appendChild(box);
-
-  const video = box.querySelector('#cameraVideo');
-  let stream;
+  const video=box.querySelector('#pcVideo');
+  let stream=null, track=null, blobFile=null;
+  const stop=()=>{ try{ if(stream) stream.getTracks().forEach(tr=>tr.stop()); }catch(e){} };
+  const close=()=>{ stop(); box.remove(); };
   try{
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
-      audio: false
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:false,
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:3840},
+        height:{ideal:2160},
+        focusMode:'continuous'
+      }
     });
-    video.srcObject = stream;
-
-    const close = ()=>{
-      if(stream) stream.getTracks().forEach(t=>t.stop());
-      box.remove();
+    video.srcObject=stream;
+    await video.play().catch(()=>{});
+    track=stream.getVideoTracks()[0];
+    const caps=track.getCapabilities ? track.getCapabilities() : {};
+    if(caps.zoom){
+      const z=box.querySelector('#pcZoom');
+      z.min=caps.zoom.min||1; z.max=Math.min(caps.zoom.max||3,4); z.value=caps.zoom.min||1;
+      z.oninput=()=>{ try{ track.applyConstraints({advanced:[{zoom:Number(z.value)}]}); }catch(e){} };
+    } else box.querySelector('#pcZoom').style.display='none';
+    const flash=box.querySelector('#pcFlash');
+    if(!(caps.torch)) flash.style.opacity='.35';
+    let torch=false;
+    flash.onclick=async()=>{
+      if(!(caps.torch)) return toast(t('noFlash'));
+      torch=!torch;
+      try{ await track.applyConstraints({advanced:[{torch}]}); flash.classList.toggle('on',torch); }catch(e){}
     };
-    box.querySelector('#camClose').onclick = close;
-    box.querySelector('#camClose2').onclick = close;
-
-    box.querySelector('#takePhoto').onclick = ()=>{
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-      canvas.toBlob(blob=>{
-        if(!blob){ toast(t('camDenied')); return; }
-        const file = new File([blob], 'purchase-receipt.jpg', { type: 'image/jpeg' });
-        close();
-        if(typeof onCapture === 'function') onCapture(file);
-        else toast(t('shotOk'));
-      }, 'image/jpeg', 0.85); // جودة 0.85 = أسرع وأصغر
+    box.querySelector('#pcClose').onclick=close;
+    const captureStill=async()=>{
+      let blob=null;
+      try{
+        if(window.ImageCapture && track){
+          const ic=new ImageCapture(track);
+          blob=await ic.takePhoto();
+        }
+      }catch(e){}
+      if(!blob){
+        const c=document.createElement('canvas');
+        c.width=video.videoWidth||1920; c.height=video.videoHeight||1080;
+        c.getContext('2d').drawImage(video,0,0);
+        blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
+      }
+      blobFile=new File([blob],'fahrzeugschein.jpg',{type:blob.type||'image/jpeg'});
+      box.querySelector('#pcPrev').src=URL.createObjectURL(blobFile);
+      box.querySelector('#pcReview').classList.remove('hidden');
     };
-  } catch(e){
-    box.remove();
+    box.querySelector('#pcShot').onclick=captureStill;
+    box.querySelector('#pcRetake').onclick=()=>{
+      blobFile=null;
+      box.querySelector('#pcReview').classList.add('hidden');
+    };
+    box.querySelector('#pcUse').onclick=()=>{
+      if(!blobFile) return;
+      if(typeof opts.onFile==='function'){ opts.onFile(blobFile); close(); toast(t('shotOk')); return; }
+      const dt=new DataTransfer(); dt.items.add(blobFile);
+      const input=document.querySelector(window._camInput||opts.target||'#doc') || document.querySelector('#vphoto,#scanInvFile,#purchaseFile,#phBefore');
+      if(input){ input.files=dt.files; input.dispatchEvent(new Event('change',{bubbles:true})); }
+      close(); toast(t('shotOk'));
+    };
+  }catch(e){
+    close();
     toast(t('camDenied'));
     console.error(e);
   }
 }
-
+window.openProCamera=openProCamera;
+window.openCamera=function(target){ return openProCamera({target:typeof target==='string'?target:'#doc'}); };
 
 function inventory(){
  const rows=companyRows('inventory');
@@ -2823,73 +2869,3 @@ function simpleModal(title,fields,onSave){
 
 
 login();
-  async function openCamera(target){
-if(typeof target==='string') window._camInput=target;
-if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-return toast(t('camUnsupported')||t('openCam'));
-}
-
-const box=document.createElement('div');
-box.className='modal-back';
-box.innerHTML=`
-<div class="modal" style="max-width:700px">
-<div class="modal-head">
-<b>📷 ${t('scanScheinTitle')||t('scanSchein')}</b>
-<button id="camClose" class="btn bad">✕</button>
-</div>
-<video id="cameraVideo" autoplay playsinline
-style="width:100%;border-radius:12px;background:#000"></video>
-<div style="margin-top:12px;text-align:center">
-<button id="takePhoto" class="btn primary">📸 ${t('takePhoto')||t('openCam')}</button>
-</div>
-</div>
-`;
-
-document.body.appendChild(box);
-
-const video=box.querySelector('#cameraVideo');
-let stream;
-
-try{
-stream=await navigator.mediaDevices.getUserMedia({
-video:{facingMode:{ideal:'environment'}},
-audio:false
-});
-
-video.srcObject=stream;
-
-const close=()=>{
-if(stream) stream.getTracks().forEach(t=>t.stop());
-box.remove();
-};
-
-box.querySelector('#camClose').onclick=close;
-
-box.querySelector('#takePhoto').onclick=()=>{
-const canvas=document.createElement('canvas');
-canvas.width=video.videoWidth;
-canvas.height=video.videoHeight;
-
-canvas.getContext('2d').drawImage(video,0,0);
-
-canvas.toBlob(blob=>{
-const file=new File([blob],'fahrzeugschein.jpg',{type:'image/jpeg'});
-const dt=new DataTransfer();
-dt.items.add(file);
-
-const input=document.querySelector(window._camInput||'#doc') || document.querySelector('#vphoto,#scanInvFile,#purchaseFile,#phBefore');
-if(input){ input.files=dt.files; input.dispatchEvent(new Event('change',{bubbles:true})); }
-
-close();
-toast(t('shotOk'));
-},'image/jpeg',0.92);
-};
-
-}catch(e){
-box.remove();
-toast(t('camDenied'));
-console.error(e);
-}
-}
-window.openCamera=openCamera;
- 
