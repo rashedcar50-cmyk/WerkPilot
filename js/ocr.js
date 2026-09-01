@@ -216,10 +216,59 @@
     const txt=[obj&&obj.raw_text,obj&&obj.text,obj&&obj.full_text,obj&&obj.ocr_text].filter(Boolean).join('\n');
     return txt?parse(txt):{};
   }
+  function colorJpeg(file){
+    return new Promise((resolve,reject)=>{
+      const img=new Image();
+      const url=URL.createObjectURL(file);
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        const max=1800;
+        if(Math.max(w,h)>max){ const s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+        const c=document.createElement('canvas'); c.width=Math.max(1,w); c.height=Math.max(1,h);
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg',0.82));
+      };
+      img.onerror=reject; img.src=url;
+    });
+  }
+  function normalizeCloud(js){
+    if(!js || typeof js!=='object') return {};
+    const d=js.data||js.result||js.fields||js;
+    const get=(...keys)=>{
+      for(const k of keys){
+        const v=d[k] ?? js[k];
+        if(v==null) continue;
+        if(typeof v==='string' && v.trim()) return v.trim();
+        if(typeof v==='object' && v.value) return String(v.value).trim();
+      }
+      return '';
+    };
+    const mapped={
+      license_plate: get('license_plate','plate','kennzeichen','A','a'),
+      vin: get('vin','fahrzeugidentifizierungsnummer','E','e'),
+      brand: get('brand','make','marke','D.1','d1'),
+      model: get('model','handelsbezeichnung','D.3','d3'),
+      year: get('year','erstzulassung_year'),
+      owner_name: get('owner_name','halter','holder','name','C.1.1','c11','c_1_1','given_name'),
+      address: get('address','anschrift','C.1.3','c13'),
+      engine_displacement_cm3: get('engine_displacement_cm3','hubraum','P.1','p1'),
+      engine_power_kw: get('engine_power_kw','kw','P.2','p2'),
+      fuel_type: get('fuel_type','kraftstoff','P.3','p3'),
+      color: get('color','farbe','R'),
+      first_registration: get('first_registration','erstzulassung','B','b'),
+      hsn: get('hsn','2.1','hsn_2_1'),
+      tsn: get('tsn','2.2','tsn_2_2')
+    };
+    const given=get('C.1.2','c12','vornamen','first_name');
+    if(given && mapped.owner_name && !mapped.owner_name.includes(given)) mapped.owner_name=(given+' '+mapped.owner_name).trim();
+    else if(given && !mapped.owner_name) mapped.owner_name=given;
+    return merge(mapped, fromAnyText(js));
+  }
   async function cloudRead(img){
     if(!window.SUPABASE_URL || !window.SUPABASE_KEY) return {};
     const controller=new AbortController();
-    const to=setTimeout(()=>controller.abort(), 12000);
+    const to=setTimeout(()=>controller.abort(), 15000);
     try{
       const response=await fetch(`${window.SUPABASE_URL}/functions/v1/vehicle-ocr`,{
         method:'POST', signal:controller.signal,
@@ -231,16 +280,17 @@
         })
       });
       clearTimeout(to);
-      if(!response.ok) return {};
-      const js=await response.json();
-      return merge(js, fromAnyText(js));
-    }catch(e){ clearTimeout(to); return {}; }
+      const js=await response.json().catch(()=>({}));
+      if(!response.ok){ console.warn('vehicle-ocr', js); return fromAnyText(js); }
+      return normalizeCloud(js);
+    }catch(e){ clearTimeout(to); console.warn('ocr-cloud',e); return {}; }
   }
   async function read(file){
     const q=await quality(file);
     if(!q.ok) console.warn('ocr-quality', q.issues);
+    const imgColor=await colorJpeg(file);
     const imgA=await preprocess(file,'contrast');
-    const [cloud, device] = await Promise.all([cloudRead(imgA), deviceText(file)]);
+    const [cloud, device] = await Promise.all([cloudRead(imgColor), deviceText(file)]);
     let local=parse(device);
     let out=merge(cloud, local);
     if(!out.owner_name || !(out.vin||out.license_plate)){
