@@ -62,6 +62,11 @@ assert(!/WÜX|WX327|357206/.test(cleaned.plate||cleaned.license_plate||''),'clea
 assert((cleaned.vin||'')==='W0LPE8EC2F8054488' || !(cleaned.vin||'').startsWith('1234'),'clean drops fake vin');
 assert(/Tabah/i.test(cleaned.owner_name||''),'clean kaplan+fehmarn → Tabah');
 assert(/OH-RT 803/.test(cleaned.plate||cleaned.license_plate||''),'clean fehmarn plate OH-RT 803');
+const demo=OCR.cleanFields({owner_name:'Max Mustermann',address:'Musterstraße 1, 12345 Musterstadt',license_plate:'AB-CD 123',vin:'1HGBH41JXMN109186'},'');
+assert(!/Mustermann/i.test(demo.owner_name||''),'strip Mustermann');
+assert(!/Musterstadt/i.test(demo.address||''),'strip Musterstadt');
+assert(!/AB-CD/.test(demo.plate||demo.license_plate||''),'strip demo plate');
+assert((demo.vin||'')==='','strip demo vin');
 
 const named=OCR.parse('C.1.1 Tabah\nC.1.2 Rashid\nC.1.3 Hans-Koch-Ring 12\nE WVWZZZ1JZXW000001\nA RZ-TB 76');
 assert(/Tabah/i.test(named.owner_name||''),'ocr owner family C.1.1');

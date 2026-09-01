@@ -230,7 +230,7 @@
     if(!out.hsn && /0035/.test(U)) out.hsn='0035';
     if(!out.tsn && /ASL/.test(U)) out.tsn='ASL';
     if(!out.year && /30\.04\.2015/.test(String(raw||blob))) out.year='2015';
-    return out;
+    return stripDemo(out);
   }
   function preprocess(file, mode){
     return new Promise((resolve,reject)=>{
@@ -299,6 +299,21 @@
       engine: pick(a.engine||a.engine_code, b.engine||b.engine_code),
       paint: pick(a.paint||a.color, b.paint||b.color)
     };
+  }
+  function isDemoValue(s){
+    const u=String(s||'').toUpperCase();
+    return /MUSTERMANN|MUSTERFRAU|MUSTERSTRASSE|MUSTERSTRAßE|MUSTERSTADT|MAX MUSTER|ERIKA MUSTER|AB-CD\s*123|HH-AB\s*1234|1HGBH41JXMN109186|WVWZZZ1JZXW000001|12345678901234567|EXAMPLE\.COM|TESTKUNDE/.test(u);
+  }
+  function stripDemo(out){
+    out=out||{};
+    if(isDemoValue(out.owner_name)) out.owner_name='';
+    if(isDemoValue(out.address)) out.address='';
+    if(isDemoValue(out.license_plate)||isDemoValue(out.plate)) out.license_plate=out.plate='';
+    if(isDemoValue(out.vin)) out.vin='';
+    if(isDemoValue(out.brand)||isDemoValue(out.make)) { out.brand=''; out.make=''; }
+    if(isDemoValue(out.model)) out.model='';
+    if(isDemoValue(out.email)) out.email='';
+    return out;
   }
   function score(r){
     let n=0;
@@ -463,7 +478,7 @@
     let url=String(img||'');
     if(url && url.indexOf('data:image/')!==0) url='data:image/jpeg;base64,'+url.replace(/^data:[^;]+;base64,/,'');
     url=await shrinkDataUrl(url, 1280, 0.68);
-    const sys='Antworte NUR als JSON mit keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration. Teil I/II: rechte aktuelle Haltersäule (nicht links). Kennzeichen ist Feld A mit Bindestrich (z.B. OH-RT 803), NIEMALS Dokumentnummer WX/WÜX. vin Feld E 17 Zeichen. year nur Feld B.';
+    const sys='Antworte NUR als JSON mit keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration. Lies NUR sichtbaren Text. KEINE Beispiele: kein Max Mustermann, keine Musterstraße, kein AB-CD 123, keine 1HGBH41. Teil I/II rechte aktuelle Haltersäule. Kennzeichen Feld A mit Bindestrich, nie Dokumentnummer WX. vin Feld E 17 Zeichen. year nur Feld B. Unleserlich = leer.';
     const attempts=[
       {model:'gpt-4o-mini', detail:'low', json:true},
       {model:'gpt-4o-mini', detail:'low', json:false},
@@ -558,7 +573,8 @@
     const imgColor=await colorJpeg(file);
     const imgA=await preprocess(file,'contrast');
     let out=await openaiRead(imgColor);
-    if(score(out)>=72 && out.owner_name && (out.vin||out.license_plate) && (out.hsn||out.model||out.brand)){
+    out=stripDemo(out);
+    if(score(out)>=72 && out.owner_name && (out.vin||out.license_plate) && (out.hsn||out.model||out.brand) && !isDemoValue(out.owner_name+out.address+out.vin+out.license_plate)){
       if(!out.year && out.first_registration) out.year=String(out.first_registration).slice(-4);
       out.ocrScore=score(out);
       out.ocrSource='openai';
