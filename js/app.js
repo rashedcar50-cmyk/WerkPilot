@@ -606,9 +606,10 @@ function addVehiclePhoto(vid){
   if(!v) return toast(t('carMissing'));
   modal(t('photo'),`
     <div class="field">
-      <label>التقط أو ارفع صورة السيارة بعد تسجيل البيانات</label>
-      <input id="vphoto" type="file" accept="image/*">
-      <button type="button" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
+      <label>${t('pickPhoto')}</label>
+      <input id="vphoto" type="file" accept="image/*" class="hidden">
+      <button type="button" class="btn" id="pickVphoto">${t('pickFile')||t('pickPhoto')}</button>
+      <button type="button" class="btn primary" onclick="openCamera()">📷 ${t('openCam')}</button>
       ${v.photo?`<img class="ocr-preview" src="${v.photo}">`:''}
     </div>
   `, async()=>{
@@ -620,12 +621,13 @@ function addVehiclePhoto(vid){
       closeModal(); render(); toast(t('photoSaved'));
     }catch(e){ toast(t('photoFail')); }
   }, t('savePhoto'));
+  if($('#pickVphoto')) $('#pickVphoto').onclick=()=>$('#vphoto').click();
 }
 window.addVehiclePhoto=addVehiclePhoto;
 
 function vehicles(){
  const rows=companyRows('vehicles');
- const addBtn=canEdit()?`<button class="btn primary" id="add">${t('newVehicle')}</button><button class="btn ok" id="scan">📷 Fahrzeugschein</button>`:`<span class="muted">—</span>`;
+ const addBtn=canEdit()?`<button class="btn primary" id="add">${t('newVehicle')}</button><button class="btn ok" id="scan">📷 ${t('scanSchein')}</button>`:`<span class="muted">—</span>`;
  $('#content').innerHTML=head(t('vehicles'),`<div class="toolbar">${addBtn}</div>`)+
  listShareBar('vehicles')+
  table([t('photo'),t('customer'),t('plate'),'VIN',t('make'),t('model'),t('year'),t('action')],rows.map(v=>[
@@ -685,14 +687,18 @@ function vehicleModal(prefill={}){
 }
 function scanVehicleDocument(){
  modal(t('scanScheinTitle'),`<div class="field">
- <label>اختر صورة Fahrzeugschein / Zulassungsbescheinigung</label>
- <input id="doc" type="file" accept="image/*">
- <button type="button" id="camOpen" class="btn primary" onclick="openCamera()">📷 فتح الكاميرا</button>
- <div class="hint">تتم قراءة الصورة في المتصفح. راجع البيانات قبل الحفظ.</div>
+ <label>${t('pickSchein')}</label>
+ <input id="doc" type="file" accept="image/*" class="hidden">
+ <div class="toolbar">
+ <button type="button" class="btn" id="pickDoc">${t('pickFile')||t('pickSchein')}</button>
+ <button type="button" id="camOpen" class="btn primary" onclick="openCamera()">📷 ${t('openCam')}</button>
+ </div>
+ <div class="hint" id="docName"></div>
+ <div class="hint">${t('ocrHint')}</div>
  <img id="ocrImg" class="ocr-preview hidden">
  <div id="ocrBox" class="hidden"><div class="progress"><div id="ocrProg"></div></div><div id="ocrStatus" class="muted"></div></div>
  </div>`,async()=>{
-  const f=$('#doc').files[0];if(!f)return toast('اختر أو صوّر الورقة أولاً');
+  const f=$('#doc').files[0];if(!f)return toast(t('pickScheinFirst'));
   $('#ocrBox').classList.remove('hidden');
   $('#msave').disabled=true;
   try{
@@ -752,7 +758,8 @@ ocrSource: f.name
    toast('تمت القراءة. راجع الحقول قبل الحفظ.');
   }catch(e){console.error(e);$('#ocrStatus').textContent=t('ocrManual');$('#msave').disabled=false}
  },t('readData'));
- $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden')}};
+ $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden'); if($('#docName')) $('#docName').textContent=f.name;}};
+ if($('#pickDoc')) $('#pickDoc').onclick=()=>$('#doc').click();
 }
 
 function fieldAfter(text, keys){
@@ -956,21 +963,22 @@ function scanScheinStartRepair(mode){
   mode=mode||'repair';
   const title=mode==='estimate'?t('scanSchein'):mode==='invoice'?t('scanSchein'):t('scanOpenJob');
   modal(title,`<div class="field">
-    <label>اختر صورة الورقة من الاستوديو أو الملفات، أو صوّرها بالكاميرا.</label>
-    <input id="doc" type="file" accept="image/*" capture="environment">
+    <label>${t('pickSchein')}</label>
+    <input id="doc" type="file" accept="image/*" class="hidden">
     <div class="toolbar">
-      <button type="button" class="btn primary" id="pickGallery">🖼️ الاستوديو / الملفات</button>
-      <button type="button" class="btn" onclick="openCamera()">📷 الكاميرا</button>
+      <button type="button" class="btn primary" id="pickGallery">${t('pickFile')||t('pickSchein')}</button>
+      <button type="button" class="btn" onclick="openCamera()">📷 ${t('openCam')}</button>
     </div>
+    <div class="hint">${t('ocrHint')}</div>
     <img id="ocrImg" class="ocr-preview hidden">
     <div id="ocrStatus" class="hint"></div>
     <div id="scheinPreview" class="hidden"></div>
   </div>`, async()=>{
     const f=$('#doc').files[0];
-    if(!f) return toast('صوّر الورقة أولاً');
+    if(!f) return toast(t('pickScheinFirst'));
     if(window._scheinReady){
       const km=Number($('#scheinKm')?.value||0);
-      if(!km) return toast('أدخل كيلومتر السيارة');
+      if(!km) return toast(t('kmNowEx'));
       const ai=window._scheinAI;
       const {c,v}=findOrCreateFromSchein(ai);
       v.km=km; upsertVehicleCloud(v); save();
@@ -1025,7 +1033,7 @@ function scanScheinStartRepair(mode){
         اللوحة: ${esc(plate)}<br>
         VIN: ${esc(vin)}<br>
         ${esc(ai.brand||ai.make||'')} ${esc(ai.model||'')} ${esc(ai.year||'')}
-        <div class="field" style="margin-top:10px"><label>${t('kmNowEx')}</label><input id="scheinKm" class="latnum" inputmode="decimal" lang="de" inputmode="numeric" placeholder="مثلاً 86500"></div>
+        <div class="field" style="margin-top:10px"><label>${t('kmNowEx')}</label><input id="scheinKm" class="latnum" inputmode="decimal" lang="de" inputmode="numeric" placeholder="86500"></div>
         <div class="field"><label>${t('repairNeeded')}</label><textarea id="scheinWork" placeholder="مثلاً: صوت من المحرك / تغيير زيت / فرامل"></textarea></div>
       </div>`;
       $('#ocrStatus').textContent=t('enterKmSave');

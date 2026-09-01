@@ -436,9 +436,9 @@ window.WP_INV_DE = {
 })();
 (function(){
   const w={
-    en:{download:'Download',walkIn:'No customer / direct sale',stornoHint:'The invoice is cancelled (Storno), not deleted. The number stays archived.'},
-    de:{download:'Herunterladen',walkIn:'Ohne Kunde / Barverkauf',stornoHint:'Die Rechnung wird storniert, nicht gelöscht. Die Nummer bleibt im Archiv.'},
-    ar:{download:'تحميل',walkIn:'بدون عميل / بيع مباشر',stornoHint:'الفاتورة تتلغى (Storno) وما بتنحذف. الرقم بيضل بالأرشيف.'},
+    en:{download:'Download',walkIn:'No customer / direct sale',stornoHint:'The invoice is cancelled (Storno), not deleted. The number stays archived.',pickFile:'Choose file',openCam:'Open camera'},
+    de:{download:'Herunterladen',walkIn:'Ohne Kunde / Barverkauf',stornoHint:'Die Rechnung wird storniert, nicht gelöscht. Die Nummer bleibt im Archiv.',pickFile:'Datei wählen',openCam:'Kamera öffnen'},
+    ar:{download:'تحميل',walkIn:'بدون عميل / بيع مباشر',stornoHint:'الفاتورة تتلغى (Storno) وما بتنحذف. الرقم بيضل بالأرشيف.',pickFile:'اختيار ملف',openCam:'فتح الكاميرا'},
     tr:{walkIn:'Müşterisiz / peşin satış'},
     sr:{walkIn:'Bez klijenta / gotovina'},
     ru:{walkIn:'Без клиента / наличные'},
