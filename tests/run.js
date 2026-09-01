@@ -48,6 +48,11 @@ assert((p.brand||'').indexOf('VOLKSWAGEN')>=0,'ocr make');
 assert(p.year==='2018','ocr year from B date');
 assert(p.hsn==='0603','ocr hsn');
 assert(p.tsn==='AAX','ocr tsn');
+const brief='Amtliches Kennzeichen RZ AF125\nC.3.1 KRUEGER GEB. SCHNEIDER\nC.3.2 GABRIELE\nNummer der Zulassungsbescheinigung WX327209\nD.1 OPEL\nD.3 ASTRA SPORTS TOURER\n(2.1) 0035 (2.2) ASL02025\nE W0LPE8EC2F8054488\nB 30.04.2015';
+const br=OCR.parse(brief);
+assert(/RZ/.test(br.plate||br.license_plate||'') && !/WX327/.test(br.plate||br.license_plate||''),'brief plate not document nr');
+assert((br.vin||'').indexOf('W0LPE8EC2F8054488')>=0 || (br.vin||'').indexOf('W0LPE')>=0,'brief vin field E');
+assert(br.hsn==='0035','brief hsn 4 digits');
 
 const named=OCR.parse('C.1.1 Tabah\nC.1.2 Rashid\nC.1.3 Hans-Koch-Ring 12\nE WVWZZZ1JZXW000001\nA RZ-TB 76');
 assert(/Tabah/i.test(named.owner_name||''),'ocr owner family C.1.1');

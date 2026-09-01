@@ -14,16 +14,19 @@
     const raw=String(text||'').replace(/\r/g,'\n');
     const t=raw.replace(/[ \t]+/g,' ').replace(/\n+/g,'\n');
     const upper=t.toUpperCase().replace(/O(?=[A-HJ-NPR-Z0-9]{16})/g,'0');
-    const vinMatch=upper.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
+    const vinMatch=upper.replace(/WOL(?=[A-HJ-NPR-Z0-9]{14})/g,'W0L').match(/\b(?:E\s+)?([A-HJ-NPR-Z0-9]{17})\b/);
     function parsePlate(src){
       const U=String(src||'').toUpperCase();
       const lines=U.split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
       const fmt=(a,b,c)=>a+'-'+b+' '+c;
       const ok=(a,b,c,ctx)=>{
         if(!a||!b||!c) return false;
+        if(/ZULASSUNGSBESCHEINIGUNG|NUMMER DER|FAHRZEUGBRIEF|TEIL II|WX\d{5,}/.test(ctx||'')) return false;
         if(/^\d$/.test(c) && /[-\/]\d/.test(ctx||'')) return false;
         if(/\/\d/.test(ctx||'')) return false;
         if((ctx||'').split(/[-\/]/).length>=4) return false;
+        if(String(c).replace(/\D/g,'').length>4) return false;
+        if(a.length===1 && b.length===1 && String(c).length>=5) return false;
         return true;
       };
       for(let i=0;i<lines.length;i++){
@@ -46,7 +49,7 @@
       return all[0]?all[0].p:'';
     }
     const plate=parsePlate(raw);
-    const hsn=(upper.match(/\bHSN\s*[:.]?\s*(\d{4})\b/)||upper.match(/2[\s.,]*1\s*[:.]?\s*(\d{4})\b/)||upper.match(/\b(\d{4})\s+2[\s.,]*2\b/)||[])[1]||'';
+    const hsn=(upper.match(/\(2\.1\)\s*(\d{4})/)||upper.match(/2[\s.,]*1\s*[:.)]*\s*(\d{4})(?!\d)/)||upper.match(/\bHSN\s*[:.]?\s*(\d{4})\b/)||[])[1]||'';
     const tsn=(upper.match(/2[\s.,]*2\s*[:.]?\s*([A-Z]{1,3})(?![A-Z0-9])/)||upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{2,3})\b/)||[])[1]||'';
     function ownerFromLines(src){
       const lines=String(src||'').split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
@@ -71,15 +74,15 @@
       let fam='', given='', street='', city='';
       for(let i=0;i<lines.length;i++){
         const L=lines[i];
-        if(/C\.?\s*1\.?\s*1\b|Name oder Firmenname/i.test(L)){
+        if(/C\.?\s*[136]\.?\s*1\b|Name oder Firmenname/i.test(L)){
           const same=L.replace(/^.*?C\.?\s*1\.?\s*1\s*/i,'').replace(/Name oder Firmenname/ig,'').trim();
           fam=isName(same)?same:after(i);
         }
-        if(/C\.?\s*1\.?\s*2\b|Vorname/i.test(L) && !/C\.?\s*1\.?\s*1\b/.test(L)){
+        if(/C\.?\s*[136]\.?\s*2\b|Vorname/i.test(L) && !/C\.?\s*[136]\.?\s*1\b/.test(L)){
           const same=L.replace(/^.*?C\.?\s*1\.?\s*2\s*/i,'').replace(/Vorname\(n\)|Vornamen/ig,'').trim();
           given=isName(same)?same:after(i);
         }
-        if(/C\.?\s*1\.?\s*3\b|Anschrift/i.test(L)){
+        if(/C\.?\s*[136]\.?\s*3\b|Anschrift/i.test(L)){
           street=after(i);
           const nxt=lines[i+2]||'';
           if(/\d{5}/.test(nxt)) city=nxt;
@@ -124,7 +127,7 @@
     return {
       license_plate: plate,
       plate,
-      vin: vinMatch? vinMatch[0] : '',
+      vin: vinMatch? (vinMatch[1]||vinMatch[0]).replace(/^E/,'') : '',
       brand: String(make||'').trim(),
       make: String(make||'').trim(),
       model: String(model||'').trim().slice(0,40),
@@ -374,9 +377,9 @@
           temperature:0,
           response_format:{type:'json_object'},
           messages:[
-            {role:'system',content:'Du liest deutsche Zulassungsbescheinigung Teil I. Antworte NUR mit JSON-Strings. Felder: owner_name, address, license_plate (nur Amtliches Kennzeichen, nie Dokument-Nr.), vin, brand, model, year, first_registration, hsn (Feld 2.1, genau 4 Ziffern), tsn (Feld 2.2, 2-3 Zeichen wie AF), engine_displacement_cm3 (P.1), engine_power_kw (P.2), fuel_type (P.3), color (R), maxWeight (G in kg), seats (S), vehicleClass (J z.B. M1), engine (Motorkennbuchstabe falls lesbar). Leere Felder "".'},
+            {role:'system',content:'Du liest Zulassungsbescheinigung Teil I oder Teil II. JSON only. license_plate=Feld A (z.B. RZ AF125), nie Dokumentnummer WX327209. vin=Feld E 17 Zeichen, Opel=W0L nicht WOL. owner_name=Vorname Nachname aus C.1 oder C.3/C.6 mit Umlaut. hsn=2.1 genau 4 Ziffern. tsn=2.2 nur 2-3 Buchstaben. model=D.3 year aus B. Leere Felder "".'},
             {role:'user',content:[
-              {type:'text',text:'Extrahiere alle Felder dieser Zulassungsbescheinigung Teil I.'},
+              {type:'text',text:'Lies Teil I oder Teil II. Feld A ist das Kennzeichen.'},
               {type:'image_url',image_url:{url:img,detail:'high'}}
             ]}
           ]
@@ -424,7 +427,7 @@
         headers:{'Content-Type':'application/json','apikey':window.SUPABASE_KEY,'Authorization':'Bearer '+window.SUPABASE_KEY},
         body:JSON.stringify({
           image:img, country:'DE',
-          document:'Zulassungsbescheinigung Teil I',
+          document:'Zulassungsbescheinigung Teil I oder Teil II',
           fields:['C.1.1','C.1.2','C.1.3','A','B','D.1','D.3','E','2.1','2.2','P.1','P.2']
         })
       });
