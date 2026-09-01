@@ -19,6 +19,26 @@
     const plate=plateMatch ? (plateMatch[1]+'-'+plateMatch[2]+' '+plateMatch[3]) : '';
     const hsn=(upper.match(/\bHSN\s*[:.]?\s*(\d{4})\b/)||upper.match(/\b2\.1\s*[:.]?\s*(\d{4})\b/)||[])[1]||'';
     const tsn=(upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{3})\b/)||upper.match(/\b2\.2\s*[:.]?\s*([A-Z0-9]{3})\b/)||[])[1]||'';
+    function ownerFromLines(src){
+      const lines=String(src||'').split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+      let fam='', given='';
+      const clean=s=>String(s||'').replace(/^C\.?\s*1\.?\s*[123]\s*/i,'').replace(/Name oder Firmenname|Vornamen|Anschrift|Halter(in)?/ig,'').replace(/[|]/g,' ').trim();
+      for(let i=0;i<lines.length;i++){
+        const L=lines[i];
+        if(/C\.?\s*1\.?\s*1\b|Firmenname|Name oder/i.test(L)){
+          fam=clean(L); if(!fam || fam.length<2) fam=clean(lines[i+1]||'');
+        }
+        if(/C\.?\s*1\.?\s*2\b|Vornamen/i.test(L)){
+          given=clean(L); if(!given || given.length<2) given=clean(lines[i+1]||'');
+        }
+      }
+      let name=[given,fam].filter(x=>x && x.length>1 && !/^C\.?\s*1/i.test(x) && !/Zulassung|Kennzeichen|Fahrzeug/i.test(x)).join(' ').trim();
+      if(!name){
+        const m=src.match(/Halter(?:in)?\s*[:.]?\s*([A-ZÄÖÜa-zäöüß\-]+(?:\s+[A-ZÄÖÜa-zäöüß\-]+){0,3})/);
+        if(m) name=m[1].trim();
+      }
+      return name.replace(/\s{2,}/g,' ').slice(0,80);
+    }
     const d1=fieldAfter(t,['D\\.1','Marke','Hersteller']);
     const d3=fieldAfter(t,['D\\.3','Handelsbezeichnung']);
     const makeFromList=MAKES.find(x=>upper.includes(x))||'';
@@ -38,7 +58,7 @@
       year,
       first_registration: firstRegistration,
       firstRegistration,
-      owner_name: String(fieldAfter(t,['C\\.1\\.1','Halter','Name oder Firmenname'])||'').replace(/C\.1\.\d/g,'').trim(),
+      owner_name: ownerFromLines(raw) || String(fieldAfter(t,['C\\.1\\.1','Halter','Name oder Firmenname'])||'').replace(/C\.1\.\d/g,'').trim(),
       address: fieldAfter(t,['C\\.1\\.3','Anschrift']),
       engine_displacement_cm3: (fieldAfter(t,['P\\.1','Hubraum']).match(/\d{3,5}/)||[''])[0],
       engine_power_kw: (fieldAfter(t,['P\\.2','Nennleistung']).match(/\d{2,3}/)||[''])[0],
@@ -160,30 +180,49 @@
       img.onerror=reject; img.src=url;
     });
   }
+  async function deviceText(file){
+    try{
+      if(typeof window.TextDetector!=='function') return '';
+      const det=new TextDetector();
+      const bmp=await createImageBitmap(file);
+      const boxes=await det.detect(bmp);
+      return (boxes||[]).map(b=>b.rawValue||b.cornerPoints&&'').filter(Boolean).join('\n');
+    }catch(e){ return ''; }
+  }
   async function read(file){
     const q=await quality(file);
     if(!q.ok) console.warn('ocr-quality', q.issues);
-    await (W.loadOcr? W.loadOcr(): Promise.resolve());
     const imgA=await preprocess(file,'contrast');
-    const imgB=await preprocess(file,'binary');
     let cloud={};
     try{
       if(window.SUPABASE_URL && window.SUPABASE_KEY){
+        const controller=new AbortController();
+        const to=setTimeout(()=>controller.abort(), 8000);
         const response=await fetch(`${window.SUPABASE_URL}/functions/v1/vehicle-ocr`,{
-          method:'POST',
+          method:'POST', signal:controller.signal,
           headers:{'Content-Type':'application/json','apikey':window.SUPABASE_KEY,'Authorization':'Bearer '+window.SUPABASE_KEY},
           body:JSON.stringify({image:imgA,country:'DE',document:'Zulassungsbescheinigung Teil I'})
         });
+        clearTimeout(to);
         if(response.ok) cloud=await response.json();
       }
     }catch(e){ console.warn('ocr-cloud',e); }
-    let text1='', text2='';
-    try{ text1=await tess(imgA,6); }catch(e){}
-    try{ text2=await tess(imgB,4); }catch(e){}
-    const local=merge(parse(text1), parse(text2));
+    const device=await deviceText(file);
+    let local=parse(device);
+    const needLocal=!(cloud.owner_name||local.owner_name) || !(cloud.vin||local.vin||cloud.license_plate||local.license_plate);
+    if(needLocal){
+      try{
+        await (W.loadOcr? W.loadOcr(): Promise.resolve());
+        const text1=await Promise.race([
+          tess(imgA,6),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error('tess-timeout')), 12000))
+        ]).catch(()=>'');
+        local=merge(local, parse(text1));
+      }catch(e){}
+    }
     const out=merge(cloud, local);
     out.ocrScore=score(out);
-    out.ocrSource='werkivo-ocr';
+    out.ocrSource=device && local.owner_name ? 'device+cloud' : 'werkivo-ocr';
     out.ocrQuality=q;
     if(!out.vin && !out.license_plate) throw new Error(q.ok?'ocr-empty':'ocr-photo-quality');
     return out;
