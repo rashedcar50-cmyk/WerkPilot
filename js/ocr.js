@@ -187,6 +187,7 @@
     if(!s) return true;
     if(/^\d+$/.test(s)) return true;
     if(/^1234567890/.test(s)) return true;
+    if(/^1HGBH41/.test(s)) return true;
     if(s.length!==17) return true;
     if(/[IOQ]/.test(s)) return true;
     return false;
@@ -272,6 +273,8 @@
   function merge(a,b){
     const pick=(x,y,ok)=>{
       x=String(x||'').trim(); y=String(y||'').trim();
+      if(isDemoValue(x)) x='';
+      if(isDemoValue(y)) y='';
       if(ok){ if(ok(x)) return x; if(ok(y)) return y; }
       return x||y||'';
     };
@@ -301,8 +304,8 @@
     };
   }
   function isDemoValue(s){
-    const u=String(s||'').toUpperCase();
-    return /MUSTERMANN|MUSTERFRAU|MUSTERSTRASSE|MUSTERSTRAßE|MUSTERSTADT|MAX MUSTER|ERIKA MUSTER|AB-CD\s*123|HH-AB\s*1234|1HGBH41JXMN109186|12345678901234567|EXAMPLE\.COM|TESTKUNDE/.test(u);
+    const u=String(s||'').toUpperCase().replace(/ß/g,'SS');
+    return /MUSTERMANN|MUSTERMAN|MUSTERFRAU|MUSTERSTRASSE|MUSTERSTADT|MUSTERWEG|MAX MUSTER|ERIKA MUSTER|AB[\s\-]*CD[\s\-]*123|HH[\s\-]*AB[\s\-]*1234|1HGBH41|12345678901234567|EXAMPLE\.COM|TESTKUNDE|JOHN DOE|JANE DOE/.test(u);
   }
   function stripDemo(out){
     out=out||{};
@@ -477,12 +480,12 @@
     if(!key){ W._ocrLast='no-key'; return {}; }
     let url=String(img||'');
     if(url && url.indexOf('data:image/')!==0) url='data:image/jpeg;base64,'+url.replace(/^data:[^;]+;base64,/,'');
-    url=await shrinkDataUrl(url, 1280, 0.68);
-    const sys='Antworte NUR als JSON mit keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration. Lies NUR sichtbaren Text. KEINE Beispiele: kein Max Mustermann, keine Musterstraße, kein AB-CD 123, keine 1HGBH41. Teil I/II rechte aktuelle Haltersäule. Kennzeichen Feld A mit Bindestrich, nie Dokumentnummer WX. vin Feld E 17 Zeichen. year nur Feld B. Unleserlich = leer.';
+    url=await shrinkDataUrl(url, 1400, 0.72);
+    const sys='Antworte NUR als JSON mit keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration. Nur Text der auf dem Dokument steht. VERBOTEN: Max Mustermann, Musterstraße, Musterstadt, AB-CD 123, 1HGBH41, Beispielwerte. Teil II: rechte aktuelle Haltersäule. Feld A Kennzeichen. Feld E VIN. Feld B Jahr. Unleserlich = leerer String.';
     const attempts=[
-      {model:'gpt-4o-mini', detail:'low', json:true},
-      {model:'gpt-4o-mini', detail:'low', json:false},
-      {model:'gpt-4o-mini', detail:'auto', json:true}
+      {model:'gpt-4o-mini', detail:'high', json:true},
+      {model:'gpt-4o-mini', detail:'auto', json:true},
+      {model:'gpt-4o-mini', detail:'high', json:false}
     ];
     for(const att of attempts){
       const controller=new AbortController();
@@ -519,7 +522,10 @@
         const txt=(js.choices&&js.choices[0]&&js.choices[0].message&&js.choices[0].message.content)||'{}';
         let data={};
         try{ data=JSON.parse(txt); }catch(e){ data=parse(txt); }
-        return merge(normalizeCloud(data), parse([data.owner_name,data.address,data.license_plate,data.vin,data.brand,data.model].filter(Boolean).join('\n')));
+        let got=merge(normalizeCloud(data), parse([data.owner_name,data.address,data.license_plate,data.vin,data.brand,data.model].filter(Boolean).join('\n')));
+        got=stripDemo(cleanFields(got, JSON.stringify(got)+' '+JSON.stringify(data)));
+        if(isDemoValue([got.owner_name,got.address,got.vin,got.license_plate,got.plate].join(' '))) continue;
+        if(got.owner_name || got.vin || got.license_plate || got.plate) return got;
       }catch(e){ clearTimeout(to); W._ocrLast='net'; console.warn('openai-ocr', e); }
     }
     return {};

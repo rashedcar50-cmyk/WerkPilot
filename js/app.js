@@ -713,8 +713,9 @@ function customers(){
 }
 function applyScheinToCustomerForm(ai){
   if(!ai) return;
-  const demo=/muster(mann|frau|stadt|strasse|straße)|ab-cd\s*123|1hgbh41jxmn109186/i;
-  ['owner_name','address','license_plate','plate','vin'].forEach(k=>{ if(demo.test(String(ai[k]||''))) ai[k]=''; });
+  const demo=/muster(man|mann|frau|stadt|strasse|straße|weg)|ab[\s\-]*cd[\s\-]*123|1hgbh41|hh[\s\-]*ab[\s\-]*1234|john doe/i;
+  ['owner_name','holder','customer_name','address','license_plate','plate','vin','brand','make','model'].forEach(k=>{ if(demo.test(String(ai[k]||''))) ai[k]=''; });
+  ['#n','#ad','#vplate','#pl','#vvin','#vin'].forEach(sel=>{ const el=$(sel); if(el && demo.test(el.value||'')) el.value=''; });
   const ownerRaw=ai.owner_name||ai.holder||ai.customer_name||'';
   const owner=/Vorname|C\.\?\s*1|Anschrift|Firmenname|Kennzeichen/i.test(ownerRaw)?'':ownerRaw;
   const addr=ai.address||[ai.street,ai.postal_code,ai.city].filter(Boolean).join(', ');
