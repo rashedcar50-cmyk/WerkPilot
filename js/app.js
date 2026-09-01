@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.11.9</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.0</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -1110,10 +1110,12 @@ function repairDesk(rid){
   <div class="form-grid">
     <div class="field"><label>${t('before')}</label>${img(before)}
       <input id="phBefore" type="file" accept="image/*" class="hidden" onchange="addRepairPhoto('${r.id}','before',this)">
-      <button type="button" class="btn small" onclick="document.getElementById('phBefore').click()">${t('pickFile')}</button></div>
+      <button type="button" class="btn small" onclick="document.getElementById('phBefore').click()">${t('pickFile')}</button>
+      <button type="button" class="btn small" onclick="openCamera('#phBefore')">📷 ${t('openCam')}</button></div>
     <div class="field"><label>${t('after')}</label>${img(after)}
       <input id="phAfter" type="file" accept="image/*" class="hidden" onchange="addRepairPhoto('${r.id}','after',this)">
-      <button type="button" class="btn small" onclick="document.getElementById('phAfter').click()">${t('pickFile')}</button></div>
+      <button type="button" class="btn small" onclick="document.getElementById('phAfter').click()">${t('pickFile')}</button>
+      <button type="button" class="btn small" onclick="openCamera('#phAfter')">📷 ${t('openCam')}</button></div>
   </div>
   <div class="toolbar">
     <button class="btn" onclick="openRepair('${r.id}')">${t('edit')}</button>
@@ -1668,7 +1670,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       <select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select>
       <select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select>
       <select id="fcust"><option value="walkin" ${!customerId?'selected':''}>${t('walkIn')||t('cashSale')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select>
-      <button type="button" class="btn ok small" id="scanInvCam">📷</button>
+      <button type="button" class="btn ok small" id="scanInvCam" title="${t('openCam')}">📷 ${t('openCam')}</button>
       <input id="scanInvFile" type="file" accept="image/*" capture="environment" class="hidden">
     </div>
     <div class="hy-split">
@@ -1751,7 +1753,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     const v=vehicleOf($('#fv').value);
     if(v && v.customerId && $('#fcust')) $('#fcust').value=v.customerId;
   };
-  if($('#scanInvCam')) $('#scanInvCam').onclick=()=>$('#scanInvFile')?.click();
+  if($('#scanInvCam')) $('#scanInvCam').onclick=()=>openCamera('#scanInvFile');
   if($('#scanInvFile')) $('#scanInvFile').onchange=async function(){
     const f=this.files&&this.files[0]; if(!f) return;
     const hint=$('#scanInvHint'); if(hint) hint.textContent=t('readingSchein');
@@ -2752,7 +2754,8 @@ function simpleModal(title,fields,onSave){
 
 
 login();
-  async function openCamera(){
+  async function openCamera(target){
+if(typeof target==='string') window._camInput=target;
 if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
 return toast(t('camUnsupported')||t('openCam'));
 }
@@ -2805,9 +2808,8 @@ const file=new File([blob],'fahrzeugschein.jpg',{type:'image/jpeg'});
 const dt=new DataTransfer();
 dt.items.add(file);
 
-const input=document.querySelector('#doc');
-input.files=dt.files;
-input.dispatchEvent(new Event('change',{bubbles:true}));
+const input=document.querySelector(window._camInput||'#doc') || document.querySelector('#vphoto,#scanInvFile,#purchaseFile,#phBefore');
+if(input){ input.files=dt.files; input.dispatchEvent(new Event('change',{bubbles:true})); }
 
 close();
 toast(t('shotOk'));
@@ -2820,4 +2822,5 @@ toast(t('camDenied'));
 console.error(e);
 }
 }
+window.openCamera=openCamera;
  
