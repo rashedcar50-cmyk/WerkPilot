@@ -530,7 +530,7 @@ window.WP_INV_DE = {
 })();
 window.t = function(key){
   const store = (typeof db!=='undefined' && db) || window.db || (window.WP && WP.db);
-  let lang = (store && store.settings && store.settings.uiLang) || 'ar';
+  let lang = (store && store.settings && store.settings.uiLang) || 'de';
   if(!(window.WP_ALLOWED_LANGS||['de','ar','en']).includes(lang)) lang='de';
   const pack = (window.WP_I18N && (WP_I18N[lang] || WP_I18N.de)) || {};
   return pack[key] || (WP_I18N.de && WP_I18N.de[key]) || (WP_I18N.en && WP_I18N.en[key]) || key;
@@ -546,7 +546,7 @@ window.stLabel = function(s){
 };
 window.dLabel = function(s){
   if(!s) return '';
-  const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'ar');
+  const lang=((typeof db!=='undefined'&&db&&db.settings&&db.settings.uiLang)||'de');
   const map={
     'تغيير زيت + فلتر':{de:'Ölwechsel + Filter',en:'Oil change + filter',es:'Cambio de aceite + filtro'},
     'صوت من المحرك عند التشغيل':{de:'Geräusch beim Start',en:'Noise at start',es:'Ruido al arrancar'},
@@ -668,7 +668,7 @@ window.docLang = function(){
   return 'de';
 };
 window.applyUiLang = function(){
-  const lang = (db && db.settings && db.settings.uiLang) || 'ar';
+  const lang = (db && db.settings && db.settings.uiLang) || 'de';
   const rtl = window.WP_RTL.includes(lang);
   document.documentElement.lang = lang;
   document.documentElement.dir = rtl ? 'rtl' : 'ltr';

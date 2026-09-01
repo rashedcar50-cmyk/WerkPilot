@@ -27,7 +27,7 @@ function login(){
  <div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="tag">${t('tag')}</div>
  <div class="field"><label>${t('user')}</label><input id="lu" autocomplete="username"></div>
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
- <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'ar')}</select></div>
+ <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'de')}</select></div>
  <button class="btn primary full" id="loginBtn">${t('login')}</button>
  <div class="login-fail" id="loginErr"></div><p class="muted" style="margin-top:14px;font-size:.8rem"><a href="impressum.html">Impressum</a> · <a href="privacy.html">Datenschutz</a></p>
  </div></div>`;
@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.5</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.6</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -63,7 +63,7 @@ function render(){
    <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
    <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="${t('newWorkshop')}">＋</button>`:''}
    <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
-   <div class="top-actions lang-row"><button class="btn ghost small" id="backBtn">${t('prev')}</button><select id="uiLangTop" title="${t('language')}">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span></div>
+   <div class="top-actions lang-row"><button class="btn ghost small" id="backBtn">${t('prev')}</button><select id="uiLangTop" title="${t('language')}">${langOptions(db.settings.uiLang||'de')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span></div>
   </div>
   <div class="content" id="content"></div>
  </main>
@@ -1222,7 +1222,7 @@ function appointments(){
   $('#add').onclick=()=>{
     modal(t('newAppt'),`<div class="form-grid">
       <div class="field"><label>${t('vehicle')}</label><select id="av">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)}</option>`).join('')}</select></div>
-      <div class="field"><label>${t('date')}</label><input id="ad" type="date" value="${todayISO()}"></div>
+      <div class="field"><label>${t('date')}</label><input id="ad" class="latnum" lang="de" value="${todayISO()}" placeholder="2026-09-01"></div>
       <div class="field"><label>${t('time')}</label><input id="at" type="time" value="09:00"></div>
       <div class="field"><label>${t('tech')}</label><input id="atech" value="${esc(t('mechanic'))}"></div>
       <div class="field span2"><label>${t('note')}</label><input id="an"></div>
@@ -2081,7 +2081,7 @@ async function scanPurchaseDocument(){
       <div class="form-grid">
         <div class="field"><label>${t('supplier')}</label><input id="p_supplier"></div>
         <div class="field"><label>${t('invNum')}</label><input id="p_inv"></div>
-        <div class="field"><label>${t('date')}</label><input id="p_date" type="date"></div>
+        <div class="field"><label>${t('date')}</label><input id="p_date" class="latnum" lang="de" value="${todayISO()}" placeholder="2026-09-01"></div>
         <div class="field"><label>${t('total')}</label><input id="p_total" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
         <div class="field"><label>${t('netEuro')}</label><input id="p_sub" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
         <div class="field"><label>${t('taxEuro')}</label><input id="p_tax" class="latnum" inputmode="decimal" lang="de" step="0.01" value="0"></div>
@@ -2582,7 +2582,7 @@ function settings(){
  const arch=(db.archive||[]).slice(0,8).map(a=>`${esc(a.number||'')} · ${money(a.total)}`).join('<br>')||'—';
  $('#content').innerHTML=head(t('settings'))+`<div class="grid"><div class="card"><b>Beleg-Archiv</b><div class="muted">${arch}</div></div><div class="card"><b>Sync-Konflikte</b><div class="muted">${conf}</div></div></div><div class="card"><div class="form-grid">
  <div class="field span2"><div class="alert">${t('activeWs')}: <b>${esc(session.company.name)}</b> · ${esc(session.company.country)}. ${t('wsOnly')}</div></div>
- <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'ar')}</select>
+ <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'de')}</select>
  <div class="hint">${t('langHint')}</div></div>
  <div class="field"><label>${t('font')}</label><input id="font" class="latnum" inputmode="decimal" lang="de" min="13" max="22" value="${db.settings.font}"></div>
  <div class="field"><label>${t('hourly')}</label><input id="hrate" class="latnum" inputmode="decimal" lang="de" step="0.01" value="${w.hourlyRate||85}"></div>
