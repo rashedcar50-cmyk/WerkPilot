@@ -121,8 +121,10 @@
       const list=known[(make||'').toUpperCase()]||[];
       model=list.find(x=>upper.includes(x))||'';
     }
-    const yearMatch=t.match(/B\s*[:.]?\s*(\d{2}\.\d{2}\.(19|20)\d{2})/i) || t.match(/\b(\d{2}\.\d{2}\.(19|20)\d{2})\b/);
-    const firstRegistration=yearMatch ? (yearMatch[1]||yearMatch[0]) : '';
+    const yearMatch=t.match(/(?:^|\n)\s*B\b[^\n]{0,40}?(\d{2}\.\d{2}\.(?:19|20)\d{2})/i)
+      || t.match(/Feld\s*B[^\n]{0,30}(\d{2}\.\d{2}\.(?:19|20)\d{2})/i)
+      || t.match(/Erstzulassung[^\n]{0,40}(\d{2}\.\d{2}\.(?:19|20)\d{2})/i);
+    const firstRegistration=yearMatch ? yearMatch[1] : '';
     const year=firstRegistration.slice(-4);
     return {
       license_plate: plate,
@@ -377,7 +379,7 @@
           temperature:0,
           response_format:{type:'json_object'},
           messages:[
-            {role:'system',content:'Du liest Zulassungsbescheinigung Teil I oder Teil II. JSON only. license_plate=Feld A (z.B. RZ AF125), nie Dokumentnummer WX327209. vin=Feld E 17 Zeichen, Opel=W0L nicht WOL. owner_name=Vorname Nachname aus C.1 oder C.3/C.6 mit Umlaut. hsn=2.1 genau 4 Ziffern. tsn=2.2 nur 2-3 Buchstaben. model=D.3 year aus B. Leere Felder "".'},
+            {role:'system',content:'Zulassungsbescheinigung Teil I oder II. JSON only. year und first_registration IMMER nur Feld B (Datum der Erstzulassung), niemals andere Daten (I, C.4c, Stempel). license_plate=Feld A, nie Dokumentnummer. vin=Feld E. owner_name=C.1 oder C.3/C.6. hsn=2.1 vier Ziffern. tsn=2.2 2-3 Buchstaben. model=D.3. Leere "".'},
             {role:'user',content:[
               {type:'text',text:'Lies Teil I oder Teil II. Feld A ist das Kennzeichen.'},
               {type:'image_url',image_url:{url:img,detail:'high'}}

@@ -46,6 +46,7 @@ assert(p.vin==='WVWZZZ1JZXW000001','ocr vin');
 assert(/B-AK/.test(p.plate||p.license_plate),'ocr plate');
 assert((p.brand||'').indexOf('VOLKSWAGEN')>=0,'ocr make');
 assert(p.year==='2018','ocr year from B date');
+assert(OCR.parse('I 20.10.2016\nB 30.04.2015\nC.4c 25.06.2018').year==='2015','year only from field B');
 assert(p.hsn==='0603','ocr hsn');
 assert(p.tsn==='AAX','ocr tsn');
 const brief='Amtliches Kennzeichen RZ AF125\nC.3.1 KRUEGER GEB. SCHNEIDER\nC.3.2 GABRIELE\nNummer der Zulassungsbescheinigung WX327209\nD.1 OPEL\nD.3 ASTRA SPORTS TOURER\n(2.1) 0035 (2.2) ASL02025\nE W0LPE8EC2F8054488\nB 30.04.2015';
