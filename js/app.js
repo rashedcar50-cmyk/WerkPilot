@@ -123,7 +123,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.64</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.65</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -331,6 +331,11 @@ function toggleDevPanel(){
     <div class="dev-out" id="devOut"></div>
     <div class="dev-req">${reqs.length?reqs.slice(-8).reverse().map(r=>`<div><b>${esc(r.ts)}</b><div>${esc(r.text)}</div></div>`).join(''):'<div class="muted">'+t('noReqs')+'</div>'}</div>`;
   document.body.appendChild(box);
+  const fab=$('#devFab');
+  if(fab){
+    const r=fab.getBoundingClientRect();
+    placeGrokFab(fab, r.left, r.top);
+  }
   $('#devClose').onclick=()=>box.remove();
   const run=()=>{ const v=$('#devAsk').value.trim(); if(!v) return grokOut('Befehl leer'); runGrokCommand(v); };
   $('#devRun').onclick=run;
