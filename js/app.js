@@ -28,7 +28,7 @@ function login(){
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'de')}</select></div>
  <button class="btn primary full" id="loginBtn">${t('login')}</button>
- <div class="login-fail" id="loginErr"></div><p class="muted" style="margin-top:14px;font-size:.8rem"><a href="impressum.html">Impressum</a> · <a href="privacy.html">Datenschutz</a></p>
+ <div class="login-fail" id="loginErr"></div><p class="muted" style="margin-top:14px;font-size:.8rem"><a href="impressum.html">${t('impressum')}</a> · <a href="privacy.html">${t('privacy')}</a></p>
  </div></div>`;
  if(typeof scrubUiLang==='function') scrubUiLang($('#app'));
  window._loginFails = window._loginFails || 0;
@@ -51,7 +51,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.16</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.17</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
