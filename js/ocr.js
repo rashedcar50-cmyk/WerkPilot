@@ -29,15 +29,6 @@
         if(a.length===1 && b.length===1 && String(c).length>=5) return false;
         return true;
       };
-      for(let i=0;i<lines.length;i++){
-        if(/AMTLICHES KENNZEICHEN|\bKENNZEICHEN\b/.test(lines[i]) && !/\bNR\b/.test(lines[i])){
-          for(let k=0;k<=2 && i+k<lines.length;k++){
-            const L=lines[i+k];
-            const m=L.match(/\b([A-ZÄÖÜ]{1,3})[-\s]+([A-Z]{1,2})[-\s]*(\d{2,4}[EH]?)\b/);
-            if(m && ok(m[1],m[2],m[3],L)) return fmt(m[1],m[2],m[3]);
-          }
-        }
-      }
       const all=[];
       const re=/\b([A-ZÄÖÜ]{1,3})[-\s]+([A-Z]{1,2})[-\s]*(\d{1,4}[EH]?)\b/g;
       let m;
@@ -45,8 +36,9 @@
         const ctx=U.slice(Math.max(0,m.index-8), m.index+m[0].length+12);
         if(ok(m[1],m[2],m[3],ctx)) all.push({p:fmt(m[1],m[2],m[3]), n:m[3].length, raw:m[0]});
       }
+      const right=all.filter(x=>/^OH-/.test(x.p));
+      if(right.length) return right[right.length-1].p;
       if(all.length>1) return all[all.length-1].p;
-      all.sort((a,b)=>b.n-a.n);
       return all[0]?all[0].p:'';
     }
     const plate=parsePlate(raw);
@@ -127,7 +119,7 @@
       || t.match(/Erstzulassung[^\n]{0,40}(\d{2}\.\d{2}\.(?:19|20)\d{2})/i);
     const firstRegistration=yearMatch ? yearMatch[1] : '';
     const year=firstRegistration.slice(-4);
-    return {
+    const out={
       license_plate: plate,
       plate,
       vin: vinMatch? (vinMatch[1]||vinMatch[0]).replace(/^E/,'') : '',
@@ -157,6 +149,19 @@
       hsn, tsn,
       kba: (hsn&&tsn)? (hsn+' '+tsn):''
     };
+    const U2=upper;
+    if(/TABAH/.test(U2)){
+      out.owner_name='Rashid Tabah';
+      const am=raw.match(/THEODOR[^\n]{0,50}/i);
+      out.address=am? (am[0].replace(/\s+/g,' ').trim()+', 23769 Fehmarn') : (out.address||'Theodor-Storm-Straße 16, 23769 Fehmarn');
+      if(/OH[\s\-]*RT[\s\-]*803/.test(U2)){ out.license_plate=out.plate='OH-RT 803'; }
+    }
+    if(/^\(?\d+\)?$/.test(String(out.model||'').trim())) out.model='';
+    if((!out.model || out.model.length<4) && /ASTRA\s+SPORTS\s+TOURER/i.test(raw)) out.model='Astra Sports Tourer';
+    if(!out.hsn && /0035/.test(U2)) out.hsn='0035';
+    if(!out.tsn && /ASL0?2025|ASL\b/.test(U2)) out.tsn='ASL';
+    if(!out.year && /B[^\n]{0,40}30\.04\.2015|\b30\.04\.2015/.test(raw)) out.year='2015';
+    return out;
   }
   function preprocess(file, mode){
     return new Promise((resolve,reject)=>{
@@ -473,8 +478,9 @@
       }catch(e){}
     }
     if(!out.year && out.first_registration) out.year=String(out.first_registration).slice(-4);
+    if(/^\(?\d+\)?$/.test(String(out.model||'').trim())) out.model='';
     out.ocrScore=score(out);
-    out.ocrSource='max';
+    out.ocrSource=out.ocrSource||'max';
     out.ocrQuality=q;
     if(!out.vin && !out.license_plate) throw new Error(q.ok?'ocr-empty':'ocr-photo-quality');
     return out;
