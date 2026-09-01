@@ -113,6 +113,8 @@ const sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
 const ver=(idx.match(/CUR='([\d.]+)'/)||[])[1];
 assert(!!ver,'index has version');
 assert(idx.includes('js/app.js?v='+ver),'index cache-busts app.js');
+assert(idx.includes('js/quality.js?v='+ver),'index loads quality.js');
+assert(/legalGaps/.test(i18n),'i18n has legalGaps');
 assert(sw.includes(ver),'sw cache version matches index');
 
 const app=fs.readFileSync(path.join(root,'js/app.js'),'utf8');

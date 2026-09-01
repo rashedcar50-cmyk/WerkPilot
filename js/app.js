@@ -141,7 +141,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.66</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.67</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -735,6 +735,7 @@ function dashboard(){
  </div>
  ${low.length?`<div class="alert tap" onclick="goPage('inventory')"><b>${t('stockAlert')}:</b> ${low.map(x=>esc(dLabel(x.name))+' ('+x.qty+')').join(' · ')}</div>`:''}
  ${due.length?`<div class="alert tap" onclick="goPage('vehicles')"><b>${t('maintDue')}:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' km').join(' · ')}</div>`:''}
+ ${(window.WP&&WP.Quality&&WP.Quality.workshopLegalGaps().length)?`<div class="alert tap" onclick="goPage('settings')"><b>${t('legalGaps')}:</b> ${esc(WP.Quality.workshopLegalGaps().join(', '))}</div>`:''}
  ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
  return `<div class="card" style="margin-top:12px"><b>${t('vatReport')}</b>
  <div class="grid" style="margin-top:8px">
@@ -1997,6 +1998,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     </div>
   </div>`,()=>{
     const lines=collectInvoiceRows();
+    if(window.WP&&WP.Quality) WP.Quality.legalToast();
     if(!lines.length) return toast(t('needLine'));
     if(lines.some(l=>!l.name)) return toast(t('needDesc'));
     if(lines.some(l=>!(Number(l.qty)>0))) return toast(t('needQtyPrice'));
