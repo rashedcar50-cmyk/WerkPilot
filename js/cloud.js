@@ -164,7 +164,7 @@ async function loadRepairsFromCloud(){
     mergeByCompany('repairs', data.map(r=>({
       id:'r_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de', vehicleId:r.vehicle_id||'',
       description:r.description||'', complaint:r.complaint||'', tech:r.tech||'', hours:r.hours||0,
-      status:r.status||'استلام', km:r.km||'', fuel:r.fuel||'', date:r.repair_date||'',
+      status:r.status||'intake', km:r.km||'', fuel:r.fuel||'', date:r.repair_date||'',
       jobs: r.jobs? (typeof r.jobs==='string'? JSON.parse(r.jobs||'[]'):r.jobs):[],
       parts: r.parts? (typeof r.parts==='string'? JSON.parse(r.parts||'[]'):r.parts):[],
       photos: r.photos? (typeof r.photos==='string'? JSON.parse(r.photos||'[]'):r.photos):[]
@@ -197,7 +197,7 @@ async function loadAppointmentsFromCloud(){
 async function upsertAppointmentCloud(a){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={company_id:a.companyId||'de',vehicle_id:a.vehicleId||'',customer_id:a.customerId||'',appt_date:a.date||null,appt_time:a.time||'',tech:a.tech||'',note:a.note||'',status:a.status||'مؤكد'};
+    const row={company_id:a.companyId||'de',vehicle_id:a.vehicleId||'',customer_id:a.customerId||'',appt_date:a.date||null,appt_time:a.time||'',tech:a.tech||'',note:a.note||'',status:a.status||'confirmed'};
     if(a.cloudId){ await sb.from('appointments').update(row).eq('id',a.cloudId); }
     else { const {data,error}=await sb.from('appointments').insert(row).select('id').single(); if(!error&&data?.id){a.cloudId=data.id;save();} }
   }catch(e){console.warn(e)}
@@ -209,7 +209,7 @@ async function loadInvoicesFromCloud(){
     if(error||!Array.isArray(data)||!data.length) return false;
     mergeByCompany('invoices', data.map(r=>({
       id:'i_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de', vehicleId:r.vehicle_id||'',
-      repairId:r.repair_id||'', number:r.number||'', type:r.type||'فاتورة',
+      repairId:r.repair_id||'', number:r.number||'', type:r.type||'Rechnung',
       parts:r.parts||0, labor:r.labor||0, discount:r.discount||0, tax:r.tax||19,
       net:r.net||0, total:r.total||0, payment:r.payment||'', paid:!!r.paid,
       date:r.issued_at||'', updatedAt:r.updated_at||r.issued_at||'', lines: r.lines? (typeof r.lines==='string'?JSON.parse(r.lines||'[]'):r.lines):[]

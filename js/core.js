@@ -4,20 +4,20 @@ const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const storeKey='baymeister_v1';
 const seed={
  users:[
-  {u:'admin',p:'1980D',name:'المدير',role:'manager'},
+  {u:'admin',p:'1980D',name:'Admin',role:'manager'},
   {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'},
-  {u:'accountant',p:'1978B',name:'المحاسب',role:'accountant'},
+  {u:'accountant',p:'1978B',name:'Buchhaltung',role:'accountant'},
   {u:'ismail',p:'1977A',name:'Ismail',role:'mechanic'},
-  {u:'warehouse',p:'1979C',name:'أمين المستودع',role:'warehouse'}
+  {u:'warehouse',p:'1979C',name:'Lager',role:'warehouse'}
  ],
  companies:[
   {id:'de',name:'TST — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
  customers:[
-  {id:'c_demo1',companyId:'de',name:'أحمد الخليل',phone:'+49 170 1112233',email:'ahmad@example.de',address:'Berlin, Germany'},
+  {id:'c_demo1',companyId:'de',name:'Ahmad Al-Khalil',phone:'+49 170 1112233',email:'ahmad@example.de',address:'Berlin, Germany'},
   {id:'c_demo2',companyId:'de',name:'Maria Schmidt',phone:'+49 151 4455667',email:'maria@example.de',address:'Hamburg, Germany'},
-  {id:'c_demo3',companyId:'de',name:'يوسف منصور',phone:'+49 160 9988776',email:'youssef@example.de',address:'München, Germany'}
+  {id:'c_demo3',companyId:'de',name:'Youssef Mansour',phone:'+49 160 9988776',email:'youssef@example.de',address:'München, Germany'}
  ],
  vehicles:[
   {id:'v_demo1',companyId:'de',customerId:'c_demo1',plate:'B-AK 1234',vin:'WVWZZZ1JZYW123456',make:'VW',model:'Golf 7',year:'2018',engine:'CJZA',paint:'LC9X',km:86500,nextServiceKm:90000},
@@ -25,35 +25,35 @@ const seed={
   {id:'v_demo3',companyId:'de',customerId:'c_demo3',plate:'M-YM 900',vin:'WDD2050041A123456',make:'Mercedes',model:'C 200',year:'2020',engine:'M264',paint:'197',km:54000,nextServiceKm:60000}
  ],
  repairs:[
-  {id:'r_demo1',companyId:'de',vehicleId:'v_demo1',description:'تغيير زيت + فلتر',complaint:'صوت من المحرك عند التشغيل',km:86500,fuel:'نصف',tech:'الميكانيكي',hours:1.5,status:'قيد التنفيذ',jobs:['تغيير زيت','تغيير فلتر زيت'],parts:[{sku:'OIL-5W30',name:'زيت محرك 5W30 5L',qty:1,price:35},{sku:'FIL-OIL-VW',name:'فلتر زيت VW',qty:1,price:9}],photos:[],date:new Date().toISOString().slice(0,10)},
-  {id:'r_demo2',companyId:'de',vehicleId:'v_demo2',description:'فحص فرامل أمامية',complaint:'صرير عند الفرملة',km:112000,fuel:'ربع',tech:'الميكانيكي',hours:2,status:'انتظار قطع',jobs:['فحص فرامل','تغيير فحمات إن لزم'],parts:[{sku:'BRK-PAD-F',name:'فحمات فرامل أمامية',qty:1,price:55}],photos:[],date:new Date().toISOString().slice(0,10)}
+  {id:'r_demo1',companyId:'de',vehicleId:'v_demo1',description:'Ölwechsel + Filter',complaint:'Geräusch beim Start',km:86500,fuel:'half',tech:'Ismail',hours:1.5,status:'working',jobs:['Ölwechsel','Ölfilter'],parts:[{sku:'OIL-5W30',name:'Motoröl 5W30 5L',qty:1,price:35},{sku:'FIL-OIL-VW',name:'Ölfilter VW',qty:1,price:9}],photos:[],date:new Date().toISOString().slice(0,10)},
+  {id:'r_demo2',companyId:'de',vehicleId:'v_demo2',description:'Vorderbremsen prüfen',complaint:'Quietschen beim Bremsen',km:112000,fuel:'quarter',tech:'Ismail',hours:2,status:'wait_parts',jobs:['Bremsen prüfen'],parts:[{sku:'BRK-PAD-F',name:'Bremsbeläge vorn',qty:1,price:55}],photos:[],date:new Date().toISOString().slice(0,10)}
  ],
  appointments:[
-  {id:'ap_demo1',companyId:'de',vehicleId:'v_demo1',customerId:'c_demo1',date:new Date().toISOString().slice(0,10),time:'09:30',tech:'الميكانيكي',note:'تسليم بعد تغيير الزيت',status:'مؤكد'}
+  {id:'ap_demo1',companyId:'de',vehicleId:'v_demo1',customerId:'c_demo1',date:new Date().toISOString().slice(0,10),time:'09:30',tech:'Ismail',note:'Abholung nach Ölwechsel',status:'confirmed'}
  ],
  estimates:[],
  invoices:[
-  {id:'i_demo1',companyId:'de',vehicleId:'v_demo1',number:'RE-2026-0001',type:'فاتورة',parts:45,labor:80,discount:0,tax:19,net:125,total:148.75,payment:'بطاقة',paid:true,date:new Date().toISOString(),lines:[{name:'زيت + فلتر',qty:1,price:45},{name:'أجور عمل',qty:1,price:80}]}
+  {id:'i_demo1',companyId:'de',vehicleId:'v_demo1',number:'RE-2026-0001',type:'Rechnung',parts:45,labor:80,discount:0,tax:19,net:125,total:148.75,payment:'Karte',paid:true,date:new Date().toISOString(),lines:[{name:'Öl + Filter',qty:1,price:45,kind:'parts'},{name:'Arbeitswert',qty:1,price:80,kind:'labor'}]}
  ],
  purchases:[
-  {id:'p_demo1',companyId:'de',supplier:'carparts-cat.com',invoice_number:'CP-10021',item:'فلتر زيت',qty:10,price:6.5,subtotal:65,tax_amount:12.35,total_amount:77.35,date:new Date().toISOString().slice(0,10),payment_status:'paid',notes:'طلب تجريبي',receipt_url:''}
+  {id:'p_demo1',companyId:'de',supplier:'carparts-cat.com',invoice_number:'CP-10021',item:'Ölfilter',qty:10,price:6.5,subtotal:65,tax_amount:12.35,total_amount:77.35,date:new Date().toISOString().slice(0,10),payment_status:'paid',notes:'Demo',receipt_url:''}
  ],
  inventory:[
-  {id:'inv_demo1',companyId:'de',sku:'OIL-5W30',name:'زيت محرك 5W30 5L',qty:12,buy:22,sell:35,minQty:4},
-  {id:'inv_demo2',companyId:'de',sku:'FIL-OIL-VW',name:'فلتر زيت VW',qty:25,buy:4.5,sell:9,minQty:6},
-  {id:'inv_demo3',companyId:'de',sku:'BRK-PAD-F',name:'فحمات فرامل أمامية',qty:8,buy:28,sell:55,minQty:4},
-  {id:'inv_demo4',companyId:'de',sku:'BAT-12V-70',name:'بطارية 12V 70Ah',qty:2,buy:85,sell:140,minQty:3}
+  {id:'inv_demo1',companyId:'de',sku:'OIL-5W30',name:'Motoröl 5W30 5L',qty:12,buy:22,sell:35,minQty:4},
+  {id:'inv_demo2',companyId:'de',sku:'FIL-OIL-VW',name:'Ölfilter VW',qty:25,buy:4.5,sell:9,minQty:6},
+  {id:'inv_demo3',companyId:'de',sku:'BRK-PAD-F',name:'Bremsbeläge vorn',qty:8,buy:28,sell:55,minQty:4},
+  {id:'inv_demo4',companyId:'de',sku:'BAT-12V-70',name:'Batterie 12V 70Ah',qty:2,buy:85,sell:140,minQty:3}
  ],
  employees:[
-  {id:'e_demo1',companyId:'de',name:'الميكانيكي',role:'فني',phone:'+49 170 0000001',salary:2800},
-  {id:'e_demo2',companyId:'de',name:'أمين المستودع',role:'مستودع',phone:'+49 170 0000002',salary:2400}
+  {id:'e_demo1',companyId:'de',name:'Ismail',role:'Techniker',phone:'+49 170 0000001',salary:2800},
+  {id:'e_demo2',companyId:'de',name:'Lager',role:'Lager',phone:'+49 170 0000002',salary:2400}
  ],
  expenses:[
-  {id:'x_demo1',companyId:'de',date:new Date().toISOString().slice(0,10),note:'إيجار الورشة',amount:1200,category:'تشغيل'}
+  {id:'x_demo1',companyId:'de',date:new Date().toISOString().slice(0,10),note:'Miete Werkstatt',amount:1200,category:'Betrieb'}
  ],
  journal:[],
  audit:[],
- settings:{theme:'light',font:16,uiLang:'ar',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:''}
+ settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:''}
 };
 let db=load(), session=null;
 if(window.WP){ WP.db=db; WP.session=session; }
@@ -146,10 +146,10 @@ function save(){
     try{
       db=slimForStorage(db);
       persistJson(storeKey, db);
-      if(typeof toast==='function') toast('الحفظ تم بعد تخفيف الصور/السجل');
+      if(typeof toast==='function') toast(typeof t==='function'?t('saveSlim'):'Saved');
     }catch(err2){
       console.error('save failed', err2);
-      if(typeof toast==='function') toast('تعذر الحفظ المحلي — صدّر نسخة احتياطية الآن');
+      if(typeof toast==='function') toast(typeof t==='function'?t('saveFail'):'Save failed');
     }
   }
 }
