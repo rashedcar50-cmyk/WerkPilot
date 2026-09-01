@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.11.7</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.11.8</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2723,8 +2723,10 @@ function studio(){
 function simpleModal(title,fields,onSave){
  modal(title,`<div class="form-grid">${fields.map(([k,l,typ='text'])=>{
    const num=typ==='number';
-   const extra=num?'class="latnum" inputmode="decimal" lang="de"':'';
-   return `<div class="field"><label>${l}</label><input id="f_${k}" type="${num?'text':typ}" ${extra}></div>`;
+   const dat=typ==='date';
+   const extra=(num||dat)?'class="latnum" lang="de" inputmode="'+(dat?'numeric':'decimal')+'"':'';
+   const val=dat?` value="${new Date().toISOString().slice(0,10)}" placeholder="2026-09-01"`:'';
+   return `<div class="field"><label>${l}</label><input id="f_${k}" type="${(num||dat)?'text':typ}" ${extra}${val}></div>`;
  }).join('')}</div>`,()=>{
   const o={};fields.forEach(([k])=>o[k]=$('#f_'+k).value);closeModal();onSave(o);
  });
