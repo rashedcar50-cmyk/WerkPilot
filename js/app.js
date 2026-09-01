@@ -20,7 +20,6 @@ function nav(){
  ];
 }
 
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
@@ -52,7 +51,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.10</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.11</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -153,17 +152,17 @@ function archiveBeleg(inv){
   }catch(e){ console.warn('archive',e); }
 }
 function helpPage(){
-  $('#content').innerHTML=head(t('help')||'Hilfe')+`<div class="card" dir="ltr" lang="de">
-    <h2>Werkivo — Kurz-Anleitung</h2>
+  $('#content').innerHTML=head(t('help')||'Hilfe')+`<div class="card">
+    <h2>${t('helpTitle')}</h2>
     <ol>
-      <li>Anmelden (Mechaniker: ismail / 1977A).</li>
-      <li>Fahrzeugschein fotografieren — Kunde und Fahrzeug werden angelegt.</li>
-      <li>km-Stand prüfen, Auftrag oder Rechnung öffnen.</li>
-      <li>Positionen wie in Henry: Nummer, Menge, Enter.</li>
-      <li>Speichern → Vorschau → Drucken / PDF (Belegnummer bleibt).</li>
+      <li>${t('help1')}</li>
+      <li>${t('help2')}</li>
+      <li>${t('help3')}</li>
+      <li>${t('help4')}</li>
+      <li>${t('help5')}</li>
     </ol>
-    <p>Rechnung bleibt immer Deutsch. Programmsprache ändert nur die Bedienung.</p>
-    <p class="muted">Archiv: ${((db.archive)||[]).length} Belege · Konflikte: ${((db.conflicts)||[]).length}</p>
+    <p>${t('helpInv')}</p>
+    <p class="muted">${t('archive')||'Archiv'}: ${((db.archive)||[]).length}</p>
   </div>`;
 }
 

@@ -478,7 +478,7 @@ window.WP_INV_DE = {
       devPh:'Example: add VIN field on the job card',saveReq:'Save request',copyAll:'Copy all',closeBtn:'Close',
       noReqs:'No requests yet.',exportFull:'Export full JSON',importJson:'Import JSON',reseed:'Reload demo data',
       devNotesLbl:'Dev notes',notesSaved:'Notes saved',invalidFile:'Invalid file',pdfSaved:'PDF saved',
-      reportWord:'Report',mechanic:'Technician',saveSlim:'Saved after reducing photos',saveFail:'Local save failed — export a backup now',loggedInAs:'Signed in as'
+      reportWord:'Report',mechanic:'Technician',saveSlim:'Saved after reducing photos',saveFail:'Local save failed — export a backup now',loggedInAs:'Signed in as',helpTitle:'Werkivo — short guide',help1:'Sign in (mechanic: ismail / 1977A).',help2:'Photograph the registration — customer and vehicle are created.',help3:'Check mileage, open a job or invoice.',help4:'Lines like Henry: number, qty, Enter.',help5:'Save → preview → print / PDF (number stays).',helpInv:'The invoice stays German. UI language only changes the screens.'
     },
     de:{
       pdfFailLib:'PDF-Bibliothek konnte nicht geladen werden',pdfNotLoaded:'PDF-Bibliothek fehlt — Seite aktualisieren',
@@ -500,7 +500,7 @@ window.WP_INV_DE = {
       devPh:'Beispiel: VIN-Feld auf der Auftragskarte',saveReq:'Anfrage speichern',copyAll:'Alles kopieren',closeBtn:'Schließen',
       noReqs:'Noch keine Anfragen.',exportFull:'Komplettes JSON exportieren',importJson:'JSON importieren',reseed:'Demodaten laden',
       devNotesLbl:'Entwickler-Notizen',notesSaved:'Notizen gespeichert',invalidFile:'Ungültige Datei',pdfSaved:'PDF gespeichert',
-      reportWord:'Bericht',mechanic:'Techniker',saveSlim:'Gespeichert nach Verkleinern der Fotos',saveFail:'Lokales Speichern fehlgeschlagen — jetzt Backup exportieren',loggedInAs:'Sie sind angemeldet als'
+      reportWord:'Bericht',mechanic:'Techniker',saveSlim:'Gespeichert nach Verkleinern der Fotos',saveFail:'Lokales Speichern fehlgeschlagen — jetzt Backup exportieren',loggedInAs:'Sie sind angemeldet als',helpTitle:'Werkivo — Kurz-Anleitung',help1:'Anmelden (Mechaniker: ismail / 1977A).',help2:'Fahrzeugschein fotografieren — Kunde und Fahrzeug werden angelegt.',help3:'km-Stand prüfen, Auftrag oder Rechnung öffnen.',help4:'Positionen wie in Henry: Nummer, Menge, Enter.',help5:'Speichern → Vorschau → Drucken / PDF (Belegnummer bleibt).',helpInv:'Die Rechnung bleibt immer Deutsch. Die Programmsprache ändert nur die Bedienung.'
     },
     ar:{
       pdfFailLib:'تعذر تحميل مكتبة PDF',pdfNotLoaded:'مكتبة PDF غير محمّلة — حدّث الصفحة',
@@ -522,7 +522,7 @@ window.WP_INV_DE = {
       devPh:'مثال: أضف خانة رقم الهيكل على بطاقة الأمر',saveReq:'حفظ الطلب',copyAll:'نسخ الكل',closeBtn:'إغلاق',
       noReqs:'ما في طلبات بعد.',exportFull:'تصدير JSON كامل',importJson:'استيراد JSON',reseed:'إعادة بيانات التجربة',
       devNotesLbl:'ملاحظات تطوير',notesSaved:'تم حفظ الملاحظات',invalidFile:'ملف غير صالح',pdfSaved:'تم حفظ PDF',
-      reportWord:'تقرير',mechanic:'الميكانيكي',saveSlim:'الحفظ تم بعد تخفيف الصور',saveFail:'تعذر الحفظ المحلي — صدّر نسخة احتياطية',loggedInAs:'مسجّل الدخول باسم'
+      reportWord:'تقرير',mechanic:'الميكانيكي',saveSlim:'الحفظ تم بعد تخفيف الصور',saveFail:'تعذر الحفظ المحلي — صدّر نسخة احتياطية',loggedInAs:'مسجّل الدخول باسم',helpTitle:'Werkivo — دليل مختصر',help1:'تسجيل الدخول (الميكانيكي: ismail / 1977A).',help2:'صوّر ورقة السيارة — ينحفظ العميل والسيارة.',help3:'راجع الكم وافتح أمر أو فاتورة.',help4:'البنود مثل Henry: الرقم، الكمية، Enter.',help5:'حفظ ثم معاينة ثم طباعة / PDF (الرقم يبقى).',helpInv:'الفاتورة تبقى بالألمانية. لغة البرنامج للواجهة فقط.'
     }
   };
   Object.keys(z).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], z[c]); });
