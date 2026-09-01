@@ -143,8 +143,11 @@ function touch(row){
   return row;
 }
 let _saveTimer=null;
+let _rowsMemo=null,_rowsCid=null;
+function flushRows(){ _rowsMemo=null; _rowsCid=null; }
 function persistNow(){
   try{
+    flushRows();
     persistJson(storeKey, db);
     try{ persistJson(storeKey+'_bak', db); }catch(e){}
     window.db=db;
@@ -221,7 +224,26 @@ function askConfirm(title, detail, onYes){
 }
 window.askConfirm=askConfirm;
 function audit(action,detail=''){db.audit.unshift({id:id('a'),ts:new Date().toISOString(),user:session?.user?.name||'system',company:session?.company?.id||'',action,detail});save()}
-function companyRows(name){return (db[name]||[]).filter(x=>x.companyId===session.company.id)}
+function companyRows(name){
+  const cid=session&&session.company&&session.company.id;
+  if(!cid) return [];
+  if(_rowsCid!==cid || !_rowsMemo){ _rowsMemo=Object.create(null); _rowsCid=cid; }
+  if(_rowsMemo[name]) return _rowsMemo[name];
+  return _rowsMemo[name]=(db[name]||[]).filter(x=>x && x.companyId===cid);
+}
+function rowById(col, rid){
+  if(!rid) return null;
+  const list=companyRows(col);
+  const key='#'+col;
+  if(!_rowsMemo[key]){
+    const m=Object.create(null);
+    list.forEach(x=>{ if(x&&x.id) m[x.id]=x; });
+    _rowsMemo[key]=m;
+  }
+  return _rowsMemo[key][rid]||null;
+}
+window.flushRows=flushRows;
+window.rowById=rowById;
 function visibleCompanies(){
   const u=session?.user;
   if(!u) return db.companies||[];

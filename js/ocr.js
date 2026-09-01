@@ -439,14 +439,21 @@
     if(!q.ok) console.warn('ocr-quality', q.issues);
     const imgColor=await colorJpeg(file);
     const imgA=await preprocess(file,'contrast');
-    const [gpt, cloud, space, device] = await Promise.all([
-      openaiRead(imgColor),
+    let out=await openaiRead(imgColor);
+    if(score(out)>=72 && out.owner_name && (out.vin||out.license_plate) && (out.hsn||out.model||out.brand)){
+      if(!out.year && out.first_registration) out.year=String(out.first_registration).slice(-4);
+      out.ocrScore=score(out);
+      out.ocrSource='openai';
+      out.ocrQuality=q;
+      return out;
+    }
+    const [cloud, space, device] = await Promise.all([
       cloudRead(imgColor),
       spaceRead(imgColor),
       deviceText(file)
     ]);
     let local=merge(space, parse(device));
-    let out=merge(gpt, merge(local, cloud));
+    out=merge(out, merge(local, cloud));
     if(!out.owner_name || !(out.vin||out.license_plate)){
       try{
         await (W.loadOcr? W.loadOcr(): Promise.resolve());

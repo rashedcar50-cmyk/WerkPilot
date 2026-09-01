@@ -26,6 +26,14 @@ const migrated=E.migrate({settings:{uiLang:'xx'},repairs:[{status:'استلام'
 assert(migrated.settings.uiLang==='de','migrate unknown lang → de');
 assert(migrated.repairs[0].status==='intake','migrate repair status');
 assert(migrated.appointments[0].status==='confirmed','migrate appt status');
+const ix=E.index({
+  customers:[{id:'c1',companyId:'de',name:'A'},{id:'c2',companyId:'es',name:'B'}],
+  vehicles:[{id:'v1',companyId:'de',customerId:'c1'},{id:'v2',companyId:'de',customerId:'c1'}],
+  invoices:[{id:'i1',companyId:'de'}]
+},'de');
+assert(!!ix.customers.c1 && !ix.customers.c2,'index filters company');
+assert(ix.vehiclesByCustomer.c1.length===2,'index vehicles by customer');
+assert(!!ix.invoices.i1,'index invoice');
 
 vm.runInContext(fs.readFileSync(path.join(root,'js/ocr.js'),'utf8'), sandbox);
 const OCR=sandbox.window.WP.OCR;

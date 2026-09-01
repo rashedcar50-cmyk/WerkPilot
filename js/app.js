@@ -64,12 +64,48 @@ function login(){
  };
 }
 
-function render(){
+function bindShellEvents(){
+ $$('[data-page]').forEach(b=>b.onclick=()=>goPage(b.dataset.page));
+ if($('#backBtn')) $('#backBtn').onclick=goBack;
+ const lo=$('#logout');
+ if(lo) lo.onclick=()=>{audit('logout');session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
+ if($('#company')) $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render(true))};
+ if($('#addWorkshop')) $('#addWorkshop').onclick=newWorkshopModal;
+ if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{db.settings.uiLang=e.target.value;save(true);applyUiLang();render(true);};
+ if($('#menu')) $('#menu').onclick=()=>$('#side').classList.toggle('open');
+ if($('#moreBtn')) $('#moreBtn').onclick=()=>$('#toolsSlot') && $('#toolsSlot').classList.toggle('open');
+ const qs=$('#qsearch');
+ if(qs){
+  qs.onkeydown=e=>{
+   if(e.key==='Enter'){
+     const q=qs.value.trim();
+     if(!q) return;
+     showSearchResults(q);
+   }
+  };
+ }
+}
+function markActivePage(){
+ $$('[data-page]').forEach(b=>b.classList.toggle('active', b.dataset.page===session.page));
+}
+function render(force){
  applyUiLang();
+ if(typeof flushRows==='function') flushRows();
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
+ const lang=db.settings.uiLang||'de';
+ const uid=session&&session.user&&session.user.u;
+ const cid=session&&session.company&&session.company.id;
+ const shell=$('#app')&&$('#app').querySelector('.shell');
+ if(!force && shell && $('#content') && WP._uiLang===lang && WP._uid===uid && WP._cid===cid){
+  markActivePage();
+  page();
+  mountDevDock();
+  return;
+ }
+ WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.37</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.38</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -94,24 +130,7 @@ function render(){
   ${[['dashboard',t('todayShort')],['repairs',t('ordersShort')],['vehicles',t('carsShort')],['appointments',t('apptShort')],['invoices',t('invShort')]].filter(([k])=>roleCan(k)).map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </nav>
 </div>`;
- $$('[data-page]').forEach(b=>b.onclick=()=>goPage(b.dataset.page));
- if($('#backBtn')) $('#backBtn').onclick=goBack;
- $('#logout').onclick=()=>{audit('logout');session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
- $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render())};
- if($('#addWorkshop')) $('#addWorkshop').onclick=newWorkshopModal;
- if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{db.settings.uiLang=e.target.value;save();applyUiLang();render();};
- $('#menu').onclick=()=>$('#side').classList.toggle('open');
- if($('#moreBtn')) $('#moreBtn').onclick=()=>$('#toolsSlot') && $('#toolsSlot').classList.toggle('open');
- const qs=$('#qsearch');
- if(qs){
-  qs.onkeydown=e=>{
-   if(e.key==='Enter'){
-     const q=qs.value.trim();
-     if(!q) return;
-     showSearchResults(q);
-   }
-  };
- }
+ bindShellEvents();
  page();
  mountDevDock();
 }

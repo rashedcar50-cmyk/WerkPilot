@@ -56,7 +56,32 @@
     row.updatedAt=new Date().toISOString();
     return row;
   }
-  W.Engine={norm,is,isOpen,flow,validateVehicle,validateInvoice,migrate,touch,ALIAS,OPEN};
+  function index(store, companyId){
+    const out={
+      customers:Object.create(null),
+      vehicles:Object.create(null),
+      vehiclesByCustomer:Object.create(null),
+      invoices:Object.create(null)
+    };
+    const take=(arr, map)=>{
+      (arr||[]).forEach(row=>{
+        if(!row||!row.id) return;
+        if(companyId && row.companyId && row.companyId!==companyId) return;
+        map[row.id]=row;
+      });
+    };
+    take(store&&store.customers, out.customers);
+    take(store&&store.vehicles, out.vehicles);
+    take(store&&store.invoices, out.invoices);
+    Object.keys(out.vehicles).forEach(id=>{
+      const v=out.vehicles[id];
+      const cid=v.customerId;
+      if(!cid) return;
+      (out.vehiclesByCustomer[cid]=out.vehiclesByCustomer[cid]||[]).push(v);
+    });
+    return out;
+  }
+  W.Engine={norm,is,isOpen,flow,validateVehicle,validateInvoice,migrate,touch,index,ALIAS,OPEN};
 })(window.WP=window.WP||{});
 window.normStatus=function(s){ return (WP.Engine&&WP.Engine.norm(s))||s; };
 window.isOpenStatus=function(s){ return !!(WP.Engine&&WP.Engine.isOpen(s)); };
