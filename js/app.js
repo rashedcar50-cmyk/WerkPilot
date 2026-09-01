@@ -141,7 +141,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.73</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.74</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -778,42 +778,7 @@ function customers(){
  if(canEdit() && $('#scanCust')) $('#scanCust').onclick=()=>customerModal();
 }
 function applyScheinToCustomerForm(ai){
-  if(!ai) return;
-  const demo=/muster(man|mann|frau|stadt|strasse|straße|weg)|ab[\s\-]*cd[\s\-]*123|1hgbh41|hh[\s\-]*ab[\s\-]*1234|john doe/i;
-  ['owner_name','holder','customer_name','address','license_plate','plate','vin','brand','make','model'].forEach(k=>{ if(demo.test(String(ai[k]||''))) ai[k]=''; });
-  ['#n','#ad','#vplate','#pl','#vvin','#vin'].forEach(sel=>{ const el=$(sel); if(el && demo.test(el.value||'')) el.value=''; });
-  const ownerRaw=ai.owner_name||ai.holder||ai.customer_name||'';
-  const owner=/Vorname|C\.\?\s*1|Anschrift|Firmenname|Kennzeichen/i.test(ownerRaw)?'':ownerRaw;
-  const addr=ai.address||[ai.street,ai.postal_code,ai.city].filter(Boolean).join(', ');
-  if(owner && $('#n')) $('#n').value=owner;
-  if(addr && $('#ad')) $('#ad').value=addr;
-  const plate=ai.license_plate||ai.plate||'';
-  const set=(sel,val)=>{ const el=$(sel); if(el && val!=null && val!=='') el.value=val; };
-  set('#n', owner);
-  set('#ad', addr);
-  set('#vplate', plate); set('#pl', plate);
-  set('#vvin', ai.vin); set('#vin', ai.vin);
-  set('#vhsn', ai.hsn); set('#hsn', ai.hsn);
-  set('#vtsn', ai.tsn); set('#tsn', ai.tsn);
-  set('#vmake', ai.brand||ai.make); set('#mk', ai.brand||ai.make);
-  set('#vmodel', ai.model); set('#mo', ai.model);
-  set('#vyear', ai.year); set('#yr', ai.year);
-  const hsnVal=($('#vhsn')&&$('#vhsn').value)||($('#hsn')&&$('#hsn').value)||ai.hsn||'';
-  const tsnVal=($('#vtsn')&&$('#vtsn').value)||($('#tsn')&&$('#tsn').value)||ai.tsn||'';
-  if(hsnVal && typeof lookupKbaLocal==='function'){
-    const loc=lookupKbaLocal(hsnVal,tsnVal);
-    if(loc.make && $('#vmake') && !$('#vmake').value) set('#vmake', loc.make), set('#mk', loc.make);
-    if(loc.model && $('#vmodel') && !$('#vmodel').value) set('#vmodel', loc.model), set('#mo', loc.model);
-  }
-  if(hsnVal && tsnVal && typeof lookupKbaFree==='function'){
-    lookupKbaFree(hsnVal,tsnVal).then(info=>{
-      if(!info) return;
-      if(info.make && $('#vmake') && !$('#vmake').value) $('#vmake').value=info.make;
-      if(info.make && $('#mk') && !$('#mk').value) $('#mk').value=info.make;
-      if(info.model && $('#vmodel') && !$('#vmodel').value) $('#vmodel').value=info.model;
-      if(info.model && $('#mo') && !$('#mo').value) $('#mo').value=info.model;
-    }).catch(()=>{});
-  }
+  if(window.WP && WP.Scan && WP.Scan.apply) return WP.Scan.apply(ai);
 }
 function afterCustomerVehicle(c,v){
   if(!v){ render(); return; }

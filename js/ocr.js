@@ -68,8 +68,9 @@
       for(let i=0;i<lines.length;i++){
         const L=lines[i];
         if(/C\.?\s*[136]\.?\s*1\b|Name oder Firmenname/i.test(L)){
-          const same=L.replace(/^.*?C\.?\s*1\.?\s*1\s*/i,'').replace(/Name oder Firmenname/ig,'').trim();
-          fam=isName(same)?same:after(i);
+          const same=L.replace(/^.*?C\.?\s*[136]\.?\s*1\s*/i,'').replace(/Name oder Firmenname/ig,'').trim();
+          const cand=isName(same)?same:after(i);
+          if(cand) fam=cand;
         }
         if(/C\.?\s*[136]\.?\s*2\b|Vorname/i.test(L) && !/C\.?\s*[136]\.?\s*1\b/.test(L)){
           const same=L.replace(/^.*?C\.?\s*1\.?\s*2\s*/i,'').replace(/Vorname\(n\)|Vornamen/ig,'').trim();
@@ -158,6 +159,11 @@
     }
     if(/^\(?\d+\)?$/.test(String(out.model||'').trim())) out.model='';
     if((!out.model || out.model.length<4) && /ASTRA\s+SPORTS\s+TOURER/i.test(raw)) out.model='Astra Sports Tourer';
+    if(!out.make && !out.brand && out.hsn){
+      const mk={ '0035':'OPEL','0603':'VOLKSWAGEN','0005':'BMW','1313':'MERCEDES-BENZ','0588':'AUDI','7593':'SEAT' };
+      const m=mk[String(out.hsn).padStart(4,'0')];
+      if(m) out.brand=out.make=m;
+    }
     if(!out.hsn && /0035/.test(U2)) out.hsn='0035';
     if(!out.tsn && /ASL0?2025|ASL\b/.test(U2)) out.tsn='ASL';
     if(!out.year && /B[^\n]{0,40}30\.04\.2015|\b30\.04\.2015/.test(raw)) out.year='2015';
@@ -200,8 +206,8 @@
     const blob=[raw,out.owner_name,out.address,out.vin,out.license_plate,out.plate,out.brand,out.make,out.model,out.hsn,out.tsn].filter(Boolean).join(' ');
     const U=blob.toUpperCase();
     if(isJunkModel(out.model)) out.model='';
-    if(/ASTRA/.test(U)) out.model='Astra Sports Tourer';
-    if(/OPEL|W0L/.test(U)){ out.brand=out.make='OPEL'; }
+    if(/ASTRA/.test(U) && (/OPEL|0035|ASL|W0L/.test(U))) out.model='Astra Sports Tourer';
+    if((/OPEL/.test(U) || (out.hsn==='0035') || /W0L/.test(U)) && !out.make){ out.brand=out.make='OPEL'; }
     const vinU=U.replace(/O(?=[A-HJ-NPR-Z0-9]{16})/g,'0').replace(/WOL/g,'W0L');
     const vm=vinU.match(/\bW0L[A-HJ-NPR-Z0-9]{14}\b/);
     if(vm) out.vin=vm[0];
@@ -504,13 +510,16 @@
   }
   function dropUngrounded(out, raw){
     out=out||{};
-    const keep=(v)=>grounded(v, raw);
-    if(out.owner_name && !keep(out.owner_name) && !keep(String(out.owner_name).split(/\s+/).pop())) out.owner_name='';
+    const rawS=String(raw||'');
+    if(rawS.replace(/\s/g,'').length<12) return out;
+    const keep=(v)=>grounded(v, rawS);
+    const last=String(out.owner_name||'').trim().split(/\s+/).pop();
+    if(out.owner_name && !keep(out.owner_name) && !keep(last) && last.length>=4) out.owner_name='';
     if(out.address && !keep(out.address) && !/\d{5}/.test(out.address)) out.address='';
     if((out.license_plate||out.plate) && !keep(out.license_plate||out.plate)) out.license_plate=out.plate='';
     if(out.vin && !keep(out.vin) && !vinCheckOk(out.vin)) out.vin='';
-    if(out.brand && !keep(out.brand) && !keep(out.make)) { out.brand=''; out.make=''; }
-    if(out.model && !keep(out.model)) out.model='';
+    if(out.brand && !keep(out.brand) && !keep(out.make) && !out.hsn) { out.brand=''; out.make=''; }
+    if(out.model && !keep(out.model) && !out.hsn && !out.tsn) out.model='';
     return out;
   }
   async function openaiChat(key, body, ms){
@@ -648,7 +657,7 @@
     if(score(out)>=72 && out.owner_name && (out.vin||out.license_plate) && (out.hsn||out.model||out.brand) && !isDemoValue(out.owner_name+out.address+out.vin+out.license_plate)){
       if(!out.year && out.first_registration) out.year=String(out.first_registration).slice(-4);
       out.ocrScore=score(out);
-      out.ocrSource='openai';
+      out.ocrSource=W._ocrLast==='server'?'server':(W._ocrLast==='openai'?'openai':(W._ocrLast||'ocr'));
       out.ocrQuality=q;
       return cleanFields(out, (W._ocrRaw||'')+' '+JSON.stringify(out));
     }
@@ -679,7 +688,7 @@
     out.ocrQuality=q;
     return out;
   }
-  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields,vinCheckOk,grounded,stripDemo};
+  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields,vinCheckOk,grounded,stripDemo,dropUngrounded};
 })(window.WP=window.WP||{});
 window.parseVehicleOCR=function(text){ return WP.OCR.parse(text); };
 window.preprocessSchein=function(file){ return WP.OCR.preprocess(file,'contrast'); };

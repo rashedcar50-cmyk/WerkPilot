@@ -114,6 +114,8 @@ const ver=(idx.match(/CUR='([\d.]+)'/)||[])[1];
 assert(!!ver,'index has version');
 assert(idx.includes('js/app.js?v='+ver),'index cache-busts app.js');
 assert(idx.includes('js/quality.js?v='+ver),'index loads quality.js');
+assert(idx.includes('js/scan.js?v='+ver),'index loads scan.js');
+assert(OCR.dropUngrounded({owner_name:'Daniel Test',brand:'SEAT'},'').owner_name==='Daniel Test','empty raw keeps owner');
 assert(/legalGaps/.test(i18n),'i18n has legalGaps');
 assert(sw.includes(ver),'sw cache version matches index');
 
