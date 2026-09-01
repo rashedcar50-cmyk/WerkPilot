@@ -33,6 +33,13 @@ async function openProCamera(opts){
     </div>`;
   document.body.appendChild(box);
   const video=box.querySelector('#pcVideo');
+  if(video){
+    video.setAttribute('playsinline','');
+    video.setAttribute('webkit-playsinline','');
+    video.muted=true;
+    video.setAttribute('muted','');
+    video.autoplay=true;
+  }
   let stream=null, track=null, blobFile=null;
   const stop=()=>{ try{ if(stream) stream.getTracks().forEach(tr=>tr.stop()); }catch(e){} };
   const close=()=>{ stop(); box.remove(); };
@@ -42,7 +49,12 @@ async function openProCamera(opts){
       video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} }
     }).catch(()=>navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:'environment' } }));
     video.srcObject=stream;
-    await video.play().catch(()=>{});
+    await new Promise(res=>{
+      if(video.readyState>=2) return res();
+      video.onloadedmetadata=()=>res();
+      setTimeout(res, 800);
+    });
+    try{ await video.play(); }catch(e){}
     track=stream.getVideoTracks()[0];
     const caps=track.getCapabilities ? track.getCapabilities() : {};
     if(caps.zoom){
