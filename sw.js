@@ -1,9 +1,9 @@
-const CACHE='baymeister-v1.12.21';
+const CACHE='baymeister-v1.12.22';
 const PRECACHE=[
   './','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png',
-  './css/app.css?v=1.12.21','./i18n.js?v=1.12.21','./supabase-config.js',
-  './js/config.js?v=1.12.21','./js/engine.js?v=1.12.21','./js/core.js?v=1.12.21','./js/ocr.js?v=1.12.21','./js/cloud.js?v=1.12.21',
-  './js/lookup.js?v=1.12.21','./js/app.js?v=1.12.21'
+  './css/app.css?v=1.12.22','./i18n.js?v=1.12.22','./supabase-config.js',
+  './js/config.js?v=1.12.22','./js/engine.js?v=1.12.22','./js/core.js?v=1.12.22','./js/ocr.js?v=1.12.22','./js/cloud.js?v=1.12.22',
+  './js/lookup.js?v=1.12.22','./js/app.js?v=1.12.22'
 ];
 self.addEventListener('install', e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRECACHE).catch(()=>{})));
@@ -15,8 +15,22 @@ self.addEventListener('activate', e=>{
 });
 self.addEventListener('fetch', e=>{
   const req=e.request;
-  if(req.method!=='GET') return;
   const url=new URL(req.url);
+  if(req.method==='POST' && /share-target/i.test(url.pathname)){
+    e.respondWith((async()=>{
+      try{
+        const data=await req.formData();
+        const file=data.get('image')||data.get('file')||[...data.values()].find(v=>v&&v.type&&String(v.type).startsWith('image/'));
+        if(file && file.size){
+          const cache=await caches.open('share-inbox');
+          await cache.put('latest', new Response(file,{headers:{'content-type':file.type||'image/jpeg','x-filename':file.name||'whatsapp.jpg'}}));
+        }
+      }catch(err){}
+      return Response.redirect('./index.html?share=1', 303);
+    })());
+    return;
+  }
+  if(req.method!=='GET') return;
   if(url.origin!==location.origin) return;
   if(/tesseract|jspdf|html2canvas|supabase\.co/i.test(url.href)) return;
   e.respondWith((async()=>{

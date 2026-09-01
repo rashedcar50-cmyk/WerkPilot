@@ -42,7 +42,14 @@ function login(){
   window._loginFails=0;
   session={user:u,company:db.companies[0],page:'dashboard'};
   audit('login');
-  syncAllCloud().finally(()=>{ WP.run("afterLogin", session); render(); });
+  syncAllCloud().finally(async ()=>{
+    WP.run("afterLogin", session);
+    if(/share=1/.test(location.search) || await consumeSharedWhatsApp()){
+      session.page='customers';
+      render();
+      setTimeout(()=>customerModal(), 200);
+    } else render();
+  });
  };
 }
 
@@ -51,7 +58,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.21</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.22</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -577,6 +584,7 @@ function customerModal(existing){
   <div class="toolbar">
     <button type="button" class="btn primary" id="custCam">📷 ${t('openCam')}</button>
     <button type="button" class="btn" id="custPick">${t('pickFile')}</button>
+    <button type="button" class="btn" id="custWa">${t('fromWhatsApp')}</button>
   </div>
   <div class="hint">${t('ocrHint')}</div>
   <img id="ocrImg" class="ocr-preview hidden">
@@ -626,7 +634,9 @@ function customerModal(existing){
  bindVinEnter('#vvin',{vin:'#vvin',make:'#vmake',model:'#vmodel',year:'#vyear'});
  bindKbaEnter('#vhsn','#vtsn',{make:'#vmake',model:'#vmodel',year:'#vyear'});
  if($('#custPick')) $('#custPick').onclick=()=>$('#doc') && $('#doc').click();
+ if($('#custWa')) $('#custWa').onclick=()=>pickWhatsApp('#doc');
  if($('#custCam')) $('#custCam').onclick=()=>openCamera('#doc');
+ setTimeout(()=>applySharedFileTo('#doc'), 50);
  if($('#doc')) $('#doc').onchange=async e=>{
    const f=e.target.files && e.target.files[0]; if(!f) return;
    if($('#ocrImg')){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); }
@@ -1036,6 +1046,7 @@ function scanScheinStartRepair(mode){
     <input id="doc" type="file" accept="image/*" class="hidden">
     <div class="toolbar">
       <button type="button" class="btn primary" id="pickGallery">${t('pickFile')||t('pickSchein')}</button>
+      <button type="button" class="btn" id="pickWa">${t('fromWhatsApp')}</button>
       <button type="button" class="btn" onclick="openCamera()">📷 ${t('openCam')}</button>
     </div>
     <div class="hint">${t('ocrHint')}</div>
@@ -1117,6 +1128,8 @@ function scanScheinStartRepair(mode){
   }, t('readPaper'));
   $('#doc').onchange=()=>{const f=$('#doc').files[0]; if(f){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); window._scheinReady=false; }};
   if($('#pickGallery')) $('#pickGallery').onclick=()=>$('#doc').click();
+  if($('#pickWa')) $('#pickWa').onclick=()=>pickWhatsApp('#doc');
+  setTimeout(()=>applySharedFileTo('#doc'), 50);
 }
 window.scanScheinStartRepair=scanScheinStartRepair;
 function repairStatusClass(st){
@@ -2471,6 +2484,36 @@ async function openProCamera(opts){
 }
 window.openProCamera=openProCamera;
 window.openCamera=function(target){ return openProCamera({target:typeof target==='string'?target:'#doc'}); };
+function pickWhatsApp(sel){
+  window._camInput=sel||'#doc';
+  toast(t('waPickHint'));
+  const el=document.querySelector(sel||'#doc');
+  if(el) el.click();
+}
+window.pickWhatsApp=pickWhatsApp;
+function applySharedFileTo(sel){
+  const file=window._sharedWaFile; if(!file) return false;
+  const input=document.querySelector(sel||'#doc');
+  if(!input) return false;
+  const dt=new DataTransfer(); dt.items.add(file);
+  input.files=dt.files;
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+  window._sharedWaFile=null;
+  return true;
+}
+window.applySharedFileTo=applySharedFileTo;
+async function consumeSharedWhatsApp(){
+  try{
+    const cache=await caches.open('share-inbox');
+    const res=await cache.match('latest');
+    if(!res) return false;
+    const blob=await res.blob();
+    await cache.delete('latest');
+    window._sharedWaFile=new File([blob],'whatsapp.jpg',{type:blob.type||'image/jpeg'});
+    return true;
+  }catch(e){ return false; }
+}
+window.consumeSharedWhatsApp=consumeSharedWhatsApp;
 
 function inventory(){
  const rows=companyRows('inventory');
@@ -2504,6 +2547,7 @@ modal(t('scanExp'),`
 <input id="doc" type="file" accept="image/*" class="hidden">
 <div class="toolbar">
 <button type="button" class="btn" id="pickExp">${t('pickFile')}</button>
+<button type="button" class="btn" id="pickExpWa">${t('fromWhatsApp')}</button>
 <button type="button" class="btn primary" onclick="openCamera()">📷 ${t('openCam')}</button>
 </div>
 <div class="hint">${t('ocrHint')}</div>
@@ -2585,6 +2629,7 @@ $('#msave').disabled=false;
 }
 },t('readAdd2'));
 if($('#pickExp')) $('#pickExp').onclick=()=>$('#doc').click();
+if($('#pickExpWa')) $('#pickExpWa').onclick=()=>pickWhatsApp('#doc');
 }
 
 function journal(){
