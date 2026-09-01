@@ -63,7 +63,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.34</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.35</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -730,6 +730,9 @@ function editVehicle(vid){ const v=db.vehicles.find(x=>x.id===vid); if(v) vehicl
 window.editVehicle=editVehicle;
 function vehicleModal(prefill={}){
  const customers=companyRows('customers');
+ prefill.make=prefill.make||prefill.brand||'';
+ prefill.paint=prefill.paint||prefill.color||'';
+ prefill.engine=prefill.engine||prefill.engine_code||'';
  if(!prefill.hsn && prefill.kba){ const p=String(prefill.kba).trim().split(/\s+/); prefill.hsn=p[0]||''; prefill.tsn=p[1]||''; }
  modal(t('addVehicle'),`<div class="form-grid">
  <div class="field"><label>${t('customer')}</label><select id="cu"><option value="">—</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
@@ -952,7 +955,9 @@ function findOrCreateFromSchein(ai){
       plate, vin, make:ai.brand||ai.make||'', model:ai.model||'', year:ai.year||'',
       engine:ai.engine_code||ai.engine||'', paint:ai.color||ai.paint||'',
       engine_displacement_cm3:ai.engine_displacement_cm3||'', fuel_type:ai.fuel_type||'',
-      engine_power_kw:ai.engine_power_kw||'', km:0, nextServiceKm:0, photo:'',
+      engine_power_kw:ai.engine_power_kw||'', hsn:ai.hsn||'', tsn:ai.tsn||'', kba:ai.kba||((ai.hsn||'')+' '+(ai.tsn||'')).trim(),
+      maxWeight:ai.maxWeight||'', seats:ai.seats||'', vehicleClass:ai.vehicleClass||'',
+      km:0, nextServiceKm:0, photo:'',
       ocrSource:'fahrzeugschein'};
     db.vehicles.push(v); upsertVehicleCloud(v);
   } else if(c && v.customerId!==c.id && !v.customerId){

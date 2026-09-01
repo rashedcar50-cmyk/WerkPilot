@@ -210,9 +210,14 @@
       engine_code: pick(a.engine_code, b.engine_code),
       color: pick(a.color||a.paint, b.color||b.paint),
       first_registration: pick(a.first_registration||a.firstRegistration, b.first_registration||b.firstRegistration),
-      hsn: pick(a.hsn, b.hsn),
-      tsn: pick(a.tsn, b.tsn),
-      kba: pick(a.kba, b.kba)
+      hsn: pick(a.hsn, b.hsn, v=>/^\d{4}$/.test(v)),
+      tsn: pick(a.tsn, b.tsn, v=>/^[A-Z0-9]{2,3}$/i.test(v)),
+      kba: pick(a.kba, b.kba),
+      maxWeight: pick(a.maxWeight||a.mass||a.g, b.maxWeight),
+      seats: pick(a.seats||a.s, b.seats),
+      vehicleClass: pick(a.vehicleClass||a.j, b.vehicleClass),
+      engine: pick(a.engine||a.engine_code, b.engine||b.engine_code),
+      paint: pick(a.paint||a.color, b.paint||b.color)
     };
   }
   function score(r){
@@ -369,7 +374,7 @@
           temperature:0,
           response_format:{type:'json_object'},
           messages:[
-            {role:'system',content:'Du liest deutsche Zulassungsbescheinigung Teil I. Antworte NUR mit JSON. Felder: owner_name (C.1.2 + C.1.1, Vorname Nachname), address (C.1.3 Straße + PLZ Ort), license_plate (Amtliches Kennzeichen, NICHT Nr./Dokumentennummer), vin (Feld E, 17 Zeichen), brand (D.1), model (D.3), year (Jahr aus B Erstzulassung), first_registration (TT.MM.JJJJ), hsn (2.1 genau 4 Ziffern), tsn (2.2 1-3 Buchstaben), engine_displacement_cm3 (P.1), engine_power_kw (P.2), fuel_type (P.3), color (R). Leere Felder als "". Keine Feldbezeichnungen wie Vorname(n) als Wert.'},
+            {role:'system',content:'Du liest deutsche Zulassungsbescheinigung Teil I. Antworte NUR mit JSON-Strings. Felder: owner_name, address, license_plate (nur Amtliches Kennzeichen, nie Dokument-Nr.), vin, brand, model, year, first_registration, hsn (Feld 2.1, genau 4 Ziffern), tsn (Feld 2.2, 2-3 Zeichen wie AF), engine_displacement_cm3 (P.1), engine_power_kw (P.2), fuel_type (P.3), color (R), maxWeight (G in kg), seats (S), vehicleClass (J z.B. M1), engine (Motorkennbuchstabe falls lesbar). Leere Felder "".'},
             {role:'user',content:[
               {type:'text',text:'Extrahiere alle Felder dieser Zulassungsbescheinigung Teil I.'},
               {type:'image_url',image_url:{url:img,detail:'high'}}
