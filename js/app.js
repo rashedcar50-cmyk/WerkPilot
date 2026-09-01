@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.58</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.59</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -732,11 +732,6 @@ function applyScheinToCustomerForm(ai){
   set('#vmake', ai.brand||ai.make); set('#mk', ai.brand||ai.make);
   set('#vmodel', ai.model); set('#mo', ai.model);
   set('#vyear', ai.year); set('#yr', ai.year);
-  if($('#vplate') && !$('#vplate').value && /Fehmarn|Theodor-Storm|Tabah/i.test(($('#ad')&&$('#ad').value)||ai.address||owner||'')) $('#vplate').value='OH-RT 803';
-  if($('#pl') && !$('#pl').value && /Fehmarn|Theodor-Storm|Tabah/i.test(($('#ad')&&$('#ad').value)||ai.address||owner||'')) $('#pl').value='OH-RT 803';
-  if($('#n') && (!$('#n').value || /KAPLAN/i.test($('#n').value)) && /Fehmarn|Theodor-Storm|W0L|Astra|Tabah/i.test(($('#ad')&&$('#ad').value)||ai.address||ai.vin||ai.model||'')) $('#n').value='Rashid Tabah';
-  const src=ai.ocrSource==='openai'?'OpenAI GPT-4o-mini':(ai.ocrSource||'OCR');
-  toast((t('scheinFilled')||t('saved'))+' · '+src);
 }
 function afterCustomerVehicle(c,v){
   if(!v){ render(); return; }
@@ -817,20 +812,9 @@ function customerModal(existing){
  if($('#doc')) $('#doc').onchange=async e=>{
    const f=e.target.files && e.target.files[0]; if(!f) return;
    if($('#ocrImg')){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); }
-   if($('#ocrStatus')) $('#ocrStatus').textContent=t('readingSchein');
-   try{
-     let ai=null;
-     try{ ai=await readScheinAI(f); }catch(err){
-       try{ await WP.loadOcr(); }catch(x){}
-       let text='';
-       if(window.Tesseract){ const res=await Tesseract.recognize(f,'deu+eng'); text=res?.data?.text||''; }
-       const parsed=typeof parseVehicleOCR==='function'?parseVehicleOCR(text):{};
-       ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:parsed.owner||''};
-     }
-     applyScheinToCustomerForm(ai);
-     const src=ai&&ai.ocrSource==='openai'?'OpenAI':(ai&&ai.ocrSource==='no-key'?'kein OpenAI-Key':((ai&&ai.ocrSource)||'OCR'));
-     if($('#ocrStatus')) $('#ocrStatus').textContent=(t('scheinFilled')||'')+' · '+src;
-   }catch(err){ if($('#ocrStatus')) $('#ocrStatus').textContent=t('readFailClear'); }
+   window._scheinBusy=true;
+   try{ await ingestScheinFile(f); }
+   finally{ window._scheinBusy=false; }
  };
 }
 function editCustomer(cid){ const c=db.customers.find(x=>x.id===cid); if(c) customerModal(c); }
@@ -2573,13 +2557,8 @@ async function openProCamera(opts){
   try{
     stream=await navigator.mediaDevices.getUserMedia({
       audio:false,
-      video:{
-        facingMode:{ideal:'environment'},
-        width:{ideal:3840},
-        height:{ideal:2160},
-        focusMode:'continuous'
-      }
-    });
+      video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} }
+    }).catch(()=>navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:'environment' } }));
     video.srcObject=stream;
     await video.play().catch(()=>{});
     track=stream.getVideoTracks()[0];
@@ -2639,9 +2618,11 @@ window.openProCamera=openProCamera;
 window.openCamera=function(target){ return openProCamera({target:typeof target==='string'?target:'#doc'}); };
 async function ingestScheinFile(file){
   if(!file) return;
+  if($('#ocrStatus')) $('#ocrStatus').textContent=t('readingSchein')||t('readingAI');
   toast(t('readingSchein')||t('readingAI'));
   try{
-    const ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(file): readScheinAI(file));
+    let ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(file): readScheinAI(file));
+    if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
     if($('#n')||$('#vplate')) applyScheinToCustomerForm(ai);
     if($('#pl')&&$('#vin')){
       if(ai.license_plate||ai.plate) $('#pl').value=ai.license_plate||ai.plate;
@@ -2685,10 +2666,11 @@ function pickWhatsApp(sel){
       const f=this.files&&this.files[0];
       if(!f) return;
       const target=document.querySelector(window._camInput||'#doc');
+      let forwarded=false;
       if(target){
-        try{ const dt=new DataTransfer(); dt.items.add(f); target.files=dt.files; target.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){}
+        try{ const dt=new DataTransfer(); dt.items.add(f); target.files=dt.files; target.dispatchEvent(new Event('change',{bubbles:true})); forwarded=true; }catch(e){}
       }
-      await ingestScheinFile(f);
+      if(!forwarded && !window._scheinBusy) await ingestScheinFile(f);
       this.value='';
     });
   }

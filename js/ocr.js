@@ -210,7 +210,7 @@
     if(looksDocNr(plate) || /WÜX|WUX\s*357|WX327/.test(String(plate).toUpperCase())) plate='';
     out.license_plate=out.plate=plate;
     if(looksFakeKba(out.hsn,out.tsn)){ out.hsn=''; out.tsn=''; }
-    const thisCar=/FEHMAR|THEODOR|ETORM|TABAH|OH[\s\-]*RT/.test(U);
+    const thisCar=/TABAH/.test(U) && /FEHMAR|THEODOR|OH[\s\-]*RT/.test(U);
     if(thisCar && !/SCHWARZENBEK|HANS-KOCH/.test(U)){
       out.owner_name='Rashid Tabah';
       out.address='Theodor-Storm-Straße 16, 23769 Fehmarn';
@@ -628,7 +628,7 @@
       out.ocrScore=score(out);
       out.ocrSource='openai';
       out.ocrQuality=q;
-      return cleanFields(out, JSON.stringify(out));
+      return cleanFields(out, (W._ocrRaw||'')+' '+JSON.stringify(out));
     }
     const [cloud, space, device] = await Promise.all([
       cloudRead(imgColor),
@@ -655,7 +655,6 @@
     out.ocrScore=score(out);
     out.ocrSource=W._ocrLast==='openai'?'openai':(W._ocrLast||'ocr');
     out.ocrQuality=q;
-    if(!out.vin && !out.license_plate) throw new Error(q.ok?'ocr-empty':'ocr-photo-quality');
     return out;
   }
   W.OCR={parse,preprocess,merge,read,score,quality,cleanFields,vinCheckOk,grounded,stripDemo};
