@@ -228,5 +228,51 @@ input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidde
 .wa-wait{position:fixed;left:12px;right:12px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:140;background:#1C212B;color:#fff;border-radius:16px;padding:14px;box-shadow:0 12px 30px #0006}
 .wa-wait b{display:block;margin-bottom:4px;color:#E8A54B}
 
+.nav-scrim{display:none}
+body.nav-open{overflow:hidden;touch-action:none}
+
+@media(max-width:900px){
+  html,body{height:100%;}
+  body{padding-bottom:env(safe-area-inset-bottom)}
+  .henry-skin{grid-template-columns:1fr;grid-template-rows:32px 1fr}
+  .henry-top{font-size:11px;min-height:32px;padding:4px 10px}
+  .topbar{min-height:56px;padding:8px 10px;padding-top:calc(8px + env(safe-area-inset-top,0px));background:#eef2f7ee}
+  .ico-btn{width:44px;height:44px;line-height:44px;font-size:1.2rem}
+  .page-title{align-items:stretch;gap:10px}
+  .page-title h1{font-size:1.28rem;line-height:1.2}
+  .page-title .toolbar,.page-title > div{width:100%}
+  .page-title .btn,.toolbar .btn{min-height:44px;flex:1 1 auto}
+  .toolbar{gap:8px}
+  input,select,textarea,.btn{min-height:44px;font-size:16px}
+  .btn.small{min-height:40px}
+  .nav button{min-height:48px;padding:12px 14px;font-size:1rem}
+  .nav-scrim.on{display:block;position:fixed;inset:0;background:#1c212b66;z-index:35;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+  .sidebar{z-index:50}
+  .tools-slot{z-index:55}
+  .content{padding:12px 12px calc(96px + env(safe-area-inset-bottom))}
+  .card{padding:14px}
+  .metric{font-size:1.45rem}
+  .grid{gap:10px}
+  .modal-back{padding:0;align-items:stretch}
+  .modal,.modal.wide,.modal.full{width:100%;max-width:100%;height:100dvh;max-height:100dvh;border-radius:0;padding:14px 14px calc(18px + env(safe-area-inset-bottom))}
+  .modal-head{position:sticky;top:0;background:var(--panel);z-index:4;padding-bottom:8px}
+  .form-grid{grid-template-columns:1fr;gap:10px}
+  .hy-entry,.henry-quick-row,.hy-bar{flex-wrap:wrap}
+  .hy-entry input,.hy-entry select,.hy-bar input,.hy-bar select{min-height:40px;min-width:0;flex:1 1 140px}
+  .hy-split{grid-template-columns:1fr}
+  .table-wrap{-webkit-overflow-scrolling:touch;margin:0 -4px 12px}
+  table{min-width:480px}
+  .toast{bottom:calc(78px + env(safe-area-inset-bottom))}
+  .bottom-nav{height:auto;min-height:56px;padding:6px 2px calc(8px + env(safe-area-inset-bottom));box-shadow:0 -8px 24px #1c212b14}
+  .bottom-nav button{min-height:48px;font-size:.7rem;font-weight:700;border-radius:10px}
+  .bottom-nav button.active{background:#f3e6cf}
+  .dev-fab{width:48px;height:48px;z-index:80}
+  .searchbox{min-width:0;max-width:none;width:100%}
+  .share-bar .btn{min-height:40px}
+  .today-item{align-items:center;padding:12px 4px}
+  .repair-card .row{flex-wrap:wrap}
+  .steps button{min-height:40px}
+}
+
 .btn-wa{background:#128C7E;color:#fff;display:inline-flex;align-items:center;gap:6px;font-weight:800}
 .btn-wa svg{flex-shrink:0}

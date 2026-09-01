@@ -72,6 +72,8 @@ function login(){
 function closeMobileMenus(){
   const side=$('#side'); if(side) side.classList.remove('open');
   const slot=$('#toolsSlot'); if(slot) slot.classList.remove('open');
+  const scrim=$('#navScrim'); if(scrim) scrim.classList.remove('on');
+  document.body.classList.remove('nav-open');
 }
 function bindShellEvents(){
  $$('[data-page]').forEach(b=>b.onclick=()=>{ closeMobileMenus(); goPage(b.dataset.page); });
@@ -81,15 +83,31 @@ function bindShellEvents(){
  if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render(true))};
  if($('#addWorkshop')) $('#addWorkshop').onclick=()=>{ closeMobileMenus(); newWorkshopModal(); };
  if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{closeMobileMenus();db.settings.uiLang=e.target.value;save(true);applyUiLang();render(true);};
- if($('#menu')) $('#menu').onclick=()=>{ const slot=$('#toolsSlot'); if(slot) slot.classList.remove('open'); $('#side').classList.toggle('open'); };
- if($('#moreBtn')) $('#moreBtn').onclick=e=>{ e.stopPropagation(); const side=$('#side'); if(side) side.classList.remove('open'); $('#toolsSlot') && $('#toolsSlot').classList.toggle('open'); };
+ if($('#menu')) $('#menu').onclick=()=>{
+   const slot=$('#toolsSlot'); if(slot) slot.classList.remove('open');
+   const side=$('#side');
+   const open=!side.classList.contains('open');
+   side.classList.toggle('open', open);
+   const scrim=$('#navScrim'); if(scrim) scrim.classList.toggle('on', open);
+   document.body.classList.toggle('nav-open', open);
+ };
+ if($('#moreBtn')) $('#moreBtn').onclick=e=>{
+   e.stopPropagation();
+   const side=$('#side'); if(side) side.classList.remove('open');
+   const slot=$('#toolsSlot'); if(!slot) return;
+   const open=!slot.classList.contains('open');
+   slot.classList.toggle('open', open);
+   const scrim=$('#navScrim'); if(scrim) scrim.classList.toggle('on', open);
+   document.body.classList.toggle('nav-open', open);
+ };
+ if($('#navScrim')) $('#navScrim').onclick=closeMobileMenus;
  if(!window._menuHideBound){
    window._menuHideBound=true;
    document.addEventListener('click', function(ev){
      const slot=$('#toolsSlot');
      if(!slot || !slot.classList.contains('open')) return;
      if(slot.contains(ev.target) || (ev.target.closest && ev.target.closest('#moreBtn'))) return;
-     slot.classList.remove('open');
+     closeMobileMenus();
    });
  }
  const qs=$('#qsearch');
@@ -123,12 +141,13 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.65</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.66</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
  ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </div></aside>
+ <div class="nav-scrim" id="navScrim"></div>
  <main class="main">
   <div class="topbar">
    <button class="ico-btn mobile-menu" id="menu" type="button" aria-label="Menu">☰</button>
