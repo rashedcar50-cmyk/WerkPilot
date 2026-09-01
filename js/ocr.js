@@ -15,10 +15,39 @@
     const t=raw.replace(/[ \t]+/g,' ').replace(/\n+/g,'\n');
     const upper=t.toUpperCase().replace(/O(?=[A-HJ-NPR-Z0-9]{16})/g,'0');
     const vinMatch=upper.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
-    const plateMatch=upper.match(/\b([A-ZÄÖÜ]{1,3})[-\s]?([A-Z]{1,2})[-\s]?(\d{1,4}[EH]?)\b/);
-    const plate=plateMatch ? (plateMatch[1]+'-'+plateMatch[2]+' '+plateMatch[3]) : '';
+    function parsePlate(src){
+      const U=String(src||'').toUpperCase();
+      const lines=U.split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+      const fmt=(a,b,c)=>a+'-'+b+' '+c;
+      const ok=(a,b,c,ctx)=>{
+        if(!a||!b||!c) return false;
+        if(/^\d$/.test(c) && /[-\/]\d/.test(ctx||'')) return false;
+        if(/\/\d/.test(ctx||'')) return false;
+        if((ctx||'').split(/[-\/]/).length>=4) return false;
+        return true;
+      };
+      for(let i=0;i<lines.length;i++){
+        if(/AMTLICHES KENNZEICHEN|\bKENNZEICHEN\b/.test(lines[i]) && !/\bNR\b/.test(lines[i])){
+          for(let k=0;k<=2 && i+k<lines.length;k++){
+            const L=lines[i+k];
+            const m=L.match(/\b([A-ZÄÖÜ]{1,3})[-\s]+([A-Z]{1,2})[-\s]*(\d{2,4}[EH]?)\b/);
+            if(m && ok(m[1],m[2],m[3],L)) return fmt(m[1],m[2],m[3]);
+          }
+        }
+      }
+      const all=[];
+      const re=/\b([A-ZÄÖÜ]{1,3})[-\s]+([A-Z]{1,2})[-\s]*(\d{1,4}[EH]?)\b/g;
+      let m;
+      while((m=re.exec(U))){
+        const ctx=U.slice(Math.max(0,m.index-8), m.index+m[0].length+12);
+        if(ok(m[1],m[2],m[3],ctx)) all.push({p:fmt(m[1],m[2],m[3]), n:m[3].length, raw:m[0]});
+      }
+      all.sort((a,b)=>b.n-a.n);
+      return all[0]?all[0].p:'';
+    }
+    const plate=parsePlate(raw);
     const hsn=(upper.match(/\bHSN\s*[:.]?\s*(\d{4})\b/)||upper.match(/\b2\.1\s*[:.]?\s*(\d{4})\b/)||[])[1]||'';
-    const tsn=(upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{3})\b/)||upper.match(/\b2\.2\s*[:.]?\s*([A-Z0-9]{3})\b/)||[])[1]||'';
+    const tsn=(upper.match(/\b2\.2\s*[:.]?\s*([A-Z]{1,3})(?![A-Z0-9])/)||upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{2,3})\b/)||[])[1]||'';
     function ownerFromLines(src){
       const lines=String(src||'').split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
       const isLabel=s=>/C\.?\s*1\.?\s*[123]|P\.?\s*C\.?\s*1|Vorname|Firmenname|Anschrift|Name oder|Amtliches|Kennzeichen|Zulassung|Fahrzeugschein|Bundesrepublik|Teil I|Halter/i.test(s||'');

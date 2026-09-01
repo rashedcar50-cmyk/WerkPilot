@@ -50,7 +50,11 @@ const real=OCR.parse(messy);
 assert(/Daniel/i.test(real.owner_name||'') && /Scholty/i.test(real.owner_name||''),'ocr real holder not label');
 assert(!/Vorname/i.test(real.owner_name||''),'ocr rejects Vorname label');
 assert(/21493/.test(real.address||'') && /Albert/i.test(real.address||''),'ocr real address');
-assert(/RZ/.test(real.plate||real.license_plate||''),'ocr real plate');
+assert((real.plate||real.license_plate||'').indexOf('FS')>=0 && (real.plate||'').indexOf('1802')>=0,'ocr real plate');
+assert((real.plate||'').indexOf('RZ-K')<0,'ocr plate not document nr');
+const docn=OCR.parse('Nr. RZ-K-0-118/26-00016\nAmtliches Kennzeichen\nRZ FS1802');
+assert(/FS 1802|FS1802/.test((docn.plate||docn.license_plate||'').replace('-','')),'ocr prefers Kennzeichen over Nr');
+
 assert(real.vin==='VSSZZZ6JZCR007669','ocr real vin');
 assert(/SEAT/i.test(real.brand||real.make||''),'ocr real make');
 
