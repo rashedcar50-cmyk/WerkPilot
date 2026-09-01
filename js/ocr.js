@@ -347,6 +347,45 @@
     else if(given && !mapped.owner_name) mapped.owner_name=given;
     return merge(mapped, fromAnyText(js));
   }
+  function openaiKey(){
+    try{
+      return (window.db && db.settings && db.settings.openaiKey)
+        || (typeof localStorage!=='undefined' && localStorage.getItem('werkivo_openai'))
+        || window.OPENAI_KEY
+        || '';
+    }catch(e){ return ''; }
+  }
+  async function openaiRead(img){
+    const key=openaiKey();
+    if(!key) return {};
+    const controller=new AbortController();
+    const to=setTimeout(()=>controller.abort(), 25000);
+    try{
+      const res=await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST', signal:controller.signal,
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+        body:JSON.stringify({
+          model:'gpt-4o-mini',
+          temperature:0,
+          response_format:{type:'json_object'},
+          messages:[
+            {role:'system',content:'Du liest deutsche Zulassungsbescheinigung Teil I. Antworte NUR mit JSON. Felder: owner_name (C.1.2 + C.1.1, Vorname Nachname), address (C.1.3 Straße + PLZ Ort), license_plate (Amtliches Kennzeichen, NICHT Nr./Dokumentennummer), vin (Feld E, 17 Zeichen), brand (D.1), model (D.3), year (Jahr aus B Erstzulassung), first_registration (TT.MM.JJJJ), hsn (2.1 genau 4 Ziffern), tsn (2.2 1-3 Buchstaben), engine_displacement_cm3 (P.1), engine_power_kw (P.2), fuel_type (P.3), color (R). Leere Felder als "". Keine Feldbezeichnungen wie Vorname(n) als Wert.'},
+            {role:'user',content:[
+              {type:'text',text:'Extrahiere alle Felder dieser Zulassungsbescheinigung Teil I.'},
+              {type:'image_url',image_url:{url:img,detail:'high'}}
+            ]}
+          ]
+        })
+      });
+      clearTimeout(to);
+      const js=await res.json().catch(()=>({}));
+      if(!res.ok){ console.warn('openai-ocr', js); return {}; }
+      const txt=(js.choices&&js.choices[0]&&js.choices[0].message&&js.choices[0].message.content)||'{}';
+      let data={};
+      try{ data=JSON.parse(txt); }catch(e){ data=parse(txt); }
+      return merge(normalizeCloud(data), parse([data.owner_name,data.address,data.license_plate,data.vin,data.brand,data.model].filter(Boolean).join('\n')));
+    }catch(e){ clearTimeout(to); console.warn('openai-ocr', e); return {}; }
+  }
   async function spaceRead(img){
     try{
       const key=(window.db && db.settings && db.settings.ocrSpaceKey) || 'K81772188988957';
@@ -395,13 +434,14 @@
     if(!q.ok) console.warn('ocr-quality', q.issues);
     const imgColor=await colorJpeg(file);
     const imgA=await preprocess(file,'contrast');
-    const [cloud, space, device] = await Promise.all([
+    const [gpt, cloud, space, device] = await Promise.all([
+      openaiRead(imgColor),
       cloudRead(imgColor),
       spaceRead(imgColor),
       deviceText(file)
     ]);
     let local=merge(space, parse(device));
-    let out=merge(local, cloud);
+    let out=merge(gpt, merge(local, cloud));
     if(!out.owner_name || !(out.vin||out.license_plate)){
       try{
         await (W.loadOcr? W.loadOcr(): Promise.resolve());

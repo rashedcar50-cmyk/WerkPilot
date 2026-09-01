@@ -63,7 +63,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.33</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.34</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2659,6 +2659,7 @@ function integrations(){
  <div class="card"><b>TSE / Kasse</b><p class="muted">${t('tseHint')}</p></div>
  <div class="card"><b>Matthies Katy</b>
   <p class="muted">${t('katyHintInt')}</p>
+  <div class="field"><label>OpenAI API Key (GPT-4o-mini)</label><input id="oaKey" type="password" value="${esc(db.settings.openaiKey||'')}" placeholder="sk-..."></div>
   <div class="field"><label>Vincario API Key</label><input id="vinKey" value="${esc(db.settings.vincarioKey||'')}"></div>
   <div class="field"><label>Vincario Secret</label><input id="vinSec" value="${esc(db.settings.vincarioSecret||'')}" type="password"></div>
   <div class="field"><label>${t('katyUser')}</label><input id="katyU" value="${esc(db.settings.katyUser||'')}"></div>
@@ -2675,6 +2676,10 @@ function integrations(){
  const btn=$('#plOpen');
  if(btn) btn.onclick=()=>openPartsLink($('#plCar').value);
  if($('#katySave')) $('#katySave').onclick=()=>{
+   if($('#oaKey')){
+     db.settings.openaiKey=$('#oaKey').value.trim();
+     try{ localStorage.setItem('werkivo_openai', db.settings.openaiKey); }catch(e){}
+   }
    if($('#vinKey')) db.settings.vincarioKey=$('#vinKey').value.trim();
    if($('#vinSec')) db.settings.vincarioSecret=$('#vinSec').value.trim();
    db.settings.katyUser=$('#katyU').value.trim();
