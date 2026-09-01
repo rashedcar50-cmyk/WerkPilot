@@ -2481,22 +2481,22 @@ function reports(){
 function integrations(){
  const cars=companyRows('vehicles');
  $('#content').innerHTML=head(t('integrationsTitle'))+`<div class="grid">
- <div class="card"><b>PartsLink24</b><p class="muted">افتح الموقع مع VIN السيارة المحددة.</p>
+ <div class="card"><b>PartsLink24</b><p class="muted">${t('plHint')}</p>
   <select id="plCar">${cars.map(v=>`<option value="${v.id}">${esc(v.plate||'')} · ${esc(v.vin||'')}</option>`).join('')}</select>
-  <button class="btn primary" style="margin-top:8px" id="plOpen">فتح PartsLink24</button>
+  <button class="btn primary" style="margin-top:8px" id="plOpen">${t('plOpen')}</button>
  </div>
- <div class="card"><b>واتساب الورشة</b><p class="muted">إرسال جاهزية السيارة من شاشة أوامر الإصلاح.</p></div>
- <div class="card"><b>TSE / Kasse</b><p class="muted">نقطة تكامل جاهزة. الربط الحقيقي يحتاج مزوداً معتمداً.</p></div>
- <div class="card"><b>Matthies Katy / ماتيس</b>
-  <p class="muted">سجّل دخولك مرة. بعدها اكتب رقم القطعة بالفاتورة وبنجيب الاسم والسعر من المخزون أو من القطع المحفوظة. الربط السعري المباشر مع سيرفر Katy يحتاج واجهة رسمية من Matthies.</p>
-  <div class="field"><label>Vincario API Key</label><input id="vinKey" value="${esc(db.settings.vincarioKey||'')}" placeholder="للبيانات الأوروبية الدقيقة"></div>
+ <div class="card"><b>${t('waTitle')}</b><p class="muted">${t('waHint')}</p></div>
+ <div class="card"><b>TSE / Kasse</b><p class="muted">${t('tseHint')}</p></div>
+ <div class="card"><b>Matthies Katy</b>
+  <p class="muted">${t('katyHintInt')}</p>
+  <div class="field"><label>Vincario API Key</label><input id="vinKey" value="${esc(db.settings.vincarioKey||'')}"></div>
   <div class="field"><label>Vincario Secret</label><input id="vinSec" value="${esc(db.settings.vincarioSecret||'')}" type="password"></div>
-  <div class="field"><label>مستخدم Katy</label><input id="katyU" value="${esc(db.settings.katyUser||'')}"></div>
-  <div class="field"><label>كلمة سر Katy</label><input id="katyP" type="password" value="${esc(db.settings.katyPass||'')}"></div>
-  <div class="toolbar"><button class="btn primary" id="katySave">حفظ الدخول</button>
-  <button class="btn" id="katyGo">فتح Katy</button>
-  <button class="btn" id="henryGo">فتح Henry</button></div>
-  <p class="hint">استورد قائمة القطع من Henry (CSV أو Excel محفوظ كـ CSV: رقم؛اسم؛سعر). بعدها رقم القطعة بالفاتورة بيعبّي الباقي تلقائي.</p>
+  <div class="field"><label>${t('katyUser')}</label><input id="katyU" value="${esc(db.settings.katyUser||'')}"></div>
+  <div class="field"><label>${t('katyPass')}</label><input id="katyP" type="password" value="${esc(db.settings.katyPass||'')}"></div>
+  <div class="toolbar"><button class="btn primary" id="katySave">${t('saveLogin')}</button>
+  <button class="btn" id="katyGo">${t('openKaty')}</button>
+  <button class="btn" id="henryGo">${t('openHenry')}</button></div>
+  <p class="hint">${t('henryImportHint')}</p>
   <input id="henryFile" type="file" accept=".csv,.txt,.tsv">
  </div>
  </div>`;
@@ -2508,7 +2508,7 @@ function integrations(){
    db.settings.katyUser=$('#katyU').value.trim();
    db.settings.katyPass=$('#katyP').value;
    db.settings.katyLogged=true;
-   save(); toast('تم حفظ دخول Katy على هذا الجهاز');
+   save(); toast(t('katySaved'));
  };
  if($('#katyGo')) $('#katyGo').onclick=()=>{
    db.settings.katyLogged=true; save();
@@ -2518,7 +2518,7 @@ function integrations(){
  if($('#henryFile')) $('#henryFile').onchange=e=>{
    const f=e.target.files[0]; if(!f) return;
    const r=new FileReader();
-   r.onload=()=>{ const n=importHenryArticles(r.result); toast('تم استيراد '+n+' قطعة من Henry'); };
+   r.onload=()=>{ const n=importHenryArticles(r.result); toast(t('imported')+' '+n); };
    r.readAsText(f);
  };
 }

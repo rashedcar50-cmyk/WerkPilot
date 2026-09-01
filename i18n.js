@@ -447,6 +447,14 @@ window.WP_INV_DE = {
   };
   Object.keys(w).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], w[c]); });
 })();
+(function(){
+  const extra={
+    en:{plHint:'Open PartsLink24 with the selected VIN.',plOpen:'Open PartsLink24',waTitle:'Workshop WhatsApp',waHint:'Send ready-for-pickup from the repair order.',tseHint:'Interface ready. Live TSE needs a certified provider.',katyHintInt:'Save login once. Type the part number on the invoice to fill name and price.',katyUser:'Katy user',katyPass:'Katy password',saveLogin:'Save login',openKaty:'Open Katy',openHenry:'Open Henry',henryImportHint:'Import Henry CSV (number;name;price).',katySaved:'Login saved on this device',imported:'Imported'},
+    de:{plHint:'PartsLink24 mit der VIN des gewählten Fahrzeugs öffnen.',plOpen:'PartsLink24 öffnen',waTitle:'Werkstatt-WhatsApp',waHint:'Abholbereit-Nachricht aus dem Reparaturauftrag senden.',tseHint:'Schnittstelle vorbereitet. Live-TSE braucht einen zertifizierten Anbieter.',katyHintInt:'Einmal anmelden. Teilenummer in der Rechnung eingeben — Name und Preis kommen aus Lager oder Henry-Import.',katyUser:'Katy-Benutzer',katyPass:'Katy-Passwort',saveLogin:'Anmeldung speichern',openKaty:'Katy öffnen',openHenry:'Henry öffnen',henryImportHint:'Henry-Liste importieren (CSV: Nummer;Name;Preis).',katySaved:'Anmeldung auf diesem Gerät gespeichert',imported:'Importiert'},
+    ar:{plHint:'افتح الموقع مع VIN السيارة المحددة.',plOpen:'فتح PartsLink24',waTitle:'واتساب الورشة',waHint:'إرسال جاهزية السيارة من أوامر الإصلاح.',tseHint:'نقطة تكامل جاهزة. الربط الحقيقي يحتاج مزوداً معتمداً.',katyHintInt:'سجّل دخولك مرة. رقم القطعة بالفاتورة يعبّي الاسم والسعر.',katyUser:'مستخدم Katy',katyPass:'كلمة سر Katy',saveLogin:'حفظ الدخول',openKaty:'فتح Katy',openHenry:'فتح Henry',henryImportHint:'استورد قائمة Henry (CSV).',katySaved:'تم حفظ الدخول على هذا الجهاز',imported:'تم الاستيراد'}
+  };
+  Object.keys(extra).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], extra[c]); });
+})();
 window.t = function(key){
   const store = (typeof db!=='undefined' && db) || window.db || (window.WP && WP.db);
   let lang = (store && store.settings && store.settings.uiLang) || 'ar';
