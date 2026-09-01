@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.11.5</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.11.6</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2365,7 +2365,7 @@ function inventory(){
    const lowFlag=Number(x.qty||0)<=Number(x.minQty||3);
    return [esc(x.sku),esc(dLabel(x.name)),x.qty,x.minQty||3,money(x.buy),money(x.sell), lowFlag?`<span class="status warn">${t('shortStock')}</span>`:`<span class="status ok">${t('inStock')}</span>`];
  }), 'inventory');
- $('#add').onclick=()=>simpleModal(t('newPart'),[['sku',t('skuCol')],['name',t('name')],['qty',t('qty'),'number'],['minQty',t('minQty'),'number'],['buy',t('buy'),'number'],['sell',t('sell'),'number']],o=>{o.companyId=session.company.id;o.id=id('i');o.qty=Number(o.qty||0);o.minQty=Number(o.minQty||3);db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
+ $('#add').onclick=()=>simpleModal(t('newPart'),[['sku',t('skuCol')],['name',t('colDesc')||'Bezeichnung'],['qty',t('qty'),'number'],['minQty',t('minQty'),'number'],['buy',t('buy'),'number'],['sell',t('sell'),'number']],o=>{o.companyId=session.company.id;o.id=id('i');o.qty=Number(o.qty||0);o.minQty=Number(o.minQty||3);db.inventory.push(o);save();upsertInventoryCloud(o);audit('inventory.create',o.name);render()});
 }
 function employees(){
  const rows=companyRows('employees');
@@ -2721,7 +2721,11 @@ function studio(){
 }
 
 function simpleModal(title,fields,onSave){
- modal(title,`<div class="form-grid">${fields.map(([k,l,t='text'])=>`<div class="field"><label>${l}</label><input id="f_${k}" type="${t}"></div>`).join('')}</div>`,()=>{
+ modal(title,`<div class="form-grid">${fields.map(([k,l,typ='text'])=>{
+   const num=typ==='number';
+   const extra=num?'class="latnum" inputmode="decimal" lang="de"':'';
+   return `<div class="field"><label>${l}</label><input id="f_${k}" type="${num?'text':typ}" ${extra}></div>`;
+ }).join('')}</div>`,()=>{
   const o={};fields.forEach(([k])=>o[k]=$('#f_'+k).value);closeModal();onSave(o);
  });
 }
