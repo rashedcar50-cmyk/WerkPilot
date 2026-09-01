@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.47</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.48</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -139,13 +139,85 @@ function render(force){
  page();
  mountDevDock();
 }
+function grokPosLoad(){
+  try{ return JSON.parse(localStorage.getItem('werkivo_gpos')||'null'); }catch(e){ return null; }
+}
+function grokPosSave(x,y){
+  try{ localStorage.setItem('werkivo_gpos', JSON.stringify({x,y})); }catch(e){}
+}
+function placeGrokFab(fab, x, y){
+  const w=fab.offsetWidth||48, h=fab.offsetHeight||48;
+  const maxX=Math.max(8, window.innerWidth-w-8);
+  const maxY=Math.max(8, window.innerHeight-h-8);
+  x=Math.min(maxX, Math.max(8, x));
+  y=Math.min(maxY, Math.max(8, y));
+  fab.style.left=x+'px';
+  fab.style.top=y+'px';
+  fab.style.right='auto';
+  fab.style.bottom='auto';
+  const pan=$('#devPanel');
+  if(pan){
+    const pw=Math.min(400, window.innerWidth-16);
+    let px=x-pw+w; if(px<8) px=8;
+    let py=y+h+8;
+    if(py+160>window.innerHeight) py=Math.max(8, y-Math.min(pan.offsetHeight||280, window.innerHeight-16)-8);
+    pan.style.left=px+'px';
+    pan.style.top=py+'px';
+    pan.style.right='auto';
+  }
+  return {x,y};
+}
 function mountDevDock(){
   if(typeof isDev!=='function' || !isDev()) return;
   if($('#devFab')) return;
   const fab=document.createElement('button');
-  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok — volle Steuerung'; fab.type='button'; fab.textContent='G';
+  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok — lange drücken zum Verschieben'; fab.type='button'; fab.textContent='G';
   document.body.appendChild(fab);
-  fab.onclick=()=>toggleDevPanel();
+  const saved=grokPosLoad();
+  requestAnimationFrame(()=>{
+    if(saved && typeof saved.x==='number') placeGrokFab(fab, saved.x, saved.y);
+  });
+  let pressTimer=null, dragging=false, moved=false, sx=0, sy=0, ox=0, oy=0;
+  const point=e=>{
+    const t=e.touches&&e.touches[0] || e.changedTouches&&e.changedTouches[0] || e;
+    return {x:t.clientX, y:t.clientY};
+  };
+  const start=e=>{
+    const p=point(e);
+    sx=p.x; sy=p.y; moved=false; dragging=false;
+    const r=fab.getBoundingClientRect(); ox=r.left; oy=r.top;
+    pressTimer=setTimeout(()=>{
+      dragging=true;
+      fab.classList.add('dragging');
+      if(navigator.vibrate) try{ navigator.vibrate(20); }catch(err){}
+    }, 380);
+  };
+  const move=e=>{
+    const p=point(e);
+    if(Math.abs(p.x-sx)>8 || Math.abs(p.y-sy)>8){
+      moved=true;
+      if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; dragging=true; fab.classList.add('dragging'); }
+    }
+    if(!dragging) return;
+    e.preventDefault();
+    placeGrokFab(fab, ox+(p.x-sx), oy+(p.y-sy));
+  };
+  const end=e=>{
+    if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; }
+    fab.classList.remove('dragging');
+    if(dragging && moved){
+      const r=fab.getBoundingClientRect();
+      grokPosSave(r.left, r.top);
+      dragging=false;
+      return;
+    }
+    dragging=false;
+    if(!moved) toggleDevPanel();
+  };
+  fab.addEventListener('pointerdown', start);
+  window.addEventListener('pointermove', move, {passive:false});
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
 }
 function grokOut(msg){
   const el=$('#devOut'); if(el) el.textContent=String(msg||'');
