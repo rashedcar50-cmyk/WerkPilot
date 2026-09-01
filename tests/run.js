@@ -57,6 +57,11 @@ const br=OCR.parse(brief);
 assert(/RZ/.test(br.plate||br.license_plate||'') && !/WX327/.test(br.plate||br.license_plate||''),'brief plate not document nr');
 assert((br.vin||'').indexOf('W0LPE8EC2F8054488')>=0 || (br.vin||'').indexOf('W0LPE')>=0,'brief vin field E');
 assert(br.hsn==='0035','brief hsn 4 digits');
+const cleaned=OCR.cleanFields({license_plate:'WÜX 357206',plate:'WÜX 357206',vin:'12345678901234567',hsn:'1234',tsn:'5678',owner_name:'KAPLAN',address:'Theodor-Storm-Straße 16, 23769 Fehmarn',brand:'Mercedes-Benz',model:'C-Class'},'TABAH FEHMARN OH-RT 803 W0LPE8EC2F8054488');
+assert(!/WÜX|WX327|357206/.test(cleaned.plate||cleaned.license_plate||''),'clean drops document plate');
+assert((cleaned.vin||'')==='W0LPE8EC2F8054488' || !(cleaned.vin||'').startsWith('1234'),'clean drops fake vin');
+assert(/Tabah/i.test(cleaned.owner_name||''),'clean kaplan+fehmarn → Tabah');
+assert(/OH-RT 803/.test(cleaned.plate||cleaned.license_plate||''),'clean fehmarn plate OH-RT 803');
 
 const named=OCR.parse('C.1.1 Tabah\nC.1.2 Rashid\nC.1.3 Hans-Koch-Ring 12\nE WVWZZZ1JZXW000001\nA RZ-TB 76');
 assert(/Tabah/i.test(named.owner_name||''),'ocr owner family C.1.1');
