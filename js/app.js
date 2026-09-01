@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.60</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.61</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -812,9 +812,7 @@ function customerModal(existing){
  if($('#doc')) $('#doc').onchange=async e=>{
    const f=e.target.files && e.target.files[0]; if(!f) return;
    if($('#ocrImg')){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); }
-   window._scheinBusy=true;
-   try{ await ingestScheinFile(f); }
-   finally{ window._scheinBusy=false; }
+   await ingestScheinFile(f);
  };
 }
 function editCustomer(cid){ const c=db.customers.find(x=>x.id===cid); if(c) customerModal(c); }
@@ -2625,6 +2623,9 @@ window.openProCamera=openProCamera;
 window.openCamera=function(target){ return openProCamera({target:typeof target==='string'?target:'#doc'}); };
 async function ingestScheinFile(file){
   if(!file) return;
+  if(window._scheinBusy) return;
+  window._scheinBusy=true;
+  if(/heic|heif/i.test(file.type||file.name||'')) toast(t('ocrHint')||'HEIC');
   if($('#ocrStatus')) $('#ocrStatus').textContent=t('readingSchein')||t('readingAI');
   toast(t('readingSchein')||t('readingAI'));
   try{
@@ -2656,6 +2657,7 @@ async function ingestScheinFile(file){
     toast((t('scheinFilled')||t('saved'))+' · '+src);
     if($('#ocrStatus')) $('#ocrStatus').textContent=(t('scheinFilled')||'')+' · '+src;
   }catch(e){ console.warn(e); toast(t('readFailClear')||t('ocrFailSchein')); }
+  finally{ window._scheinBusy=false; }
 }
 window.ingestScheinFile=ingestScheinFile;
 function pickWhatsApp(sel){
