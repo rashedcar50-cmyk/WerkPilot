@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.59</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.60</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -950,7 +950,8 @@ function scanVehicleDocument(){
   try{
    const url=URL.createObjectURL(f);$('#ocrImg').src=url;$('#ocrImg').classList.remove('hidden');
    $('#ocrStatus').textContent = t('readingAI');
-   const ai = await (WP.OCR && WP.OCR.read ? WP.OCR.read(f) : readScheinAI(f));
+   let ai = await (WP.OCR && WP.OCR.read ? WP.OCR.read(f) : readScheinAI(f));
+   if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
    const {c,v}=findOrCreateFromSchein(ai);
    closeModal();
    vehicleModal(v);
@@ -1123,8 +1124,10 @@ function findOrCreateFromSchein(ai){
 }
 async function scheinFileToCustomerVehicle(file){
   let ai;
-  try{ ai=await readScheinAI(file); }
-  catch(err){
+  try{
+    ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(file): readScheinAI(file));
+    if(WP.OCR&&WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
+  }catch(err){
     const compressed=await compressVehiclePhoto(file);
     let text='';
     try{ await WP.loadOcr(); }catch(e){}
@@ -1133,7 +1136,8 @@ async function scheinFileToCustomerVehicle(file){
       text=res?.data?.text||'';
     }
     const parsed=parseVehicleOCR(text||'');
-    ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:''};
+    ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:parsed.owner_name||parsed.owner||''};
+    if(WP.OCR&&WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai);
     if(!ai.license_plate && !ai.vin) throw err;
   }
   const {c,v}=findOrCreateFromSchein(ai);
@@ -1211,8 +1215,10 @@ function scanScheinStartRepair(mode){
     $('#msave').disabled=true;
     try{
       let ai;
-      try{ ai=await readScheinAI(f); }
-      catch(err){
+      try{
+        ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(f): readScheinAI(f));
+        if(WP.OCR&&WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
+      }catch(err){
         const compressed=await compressVehiclePhoto(f);
         let text='';
         try{ await WP.loadOcr(); }catch(e){}
@@ -1221,7 +1227,8 @@ function scanScheinStartRepair(mode){
           text=res?.data?.text||'';
         }
         const parsed=parseVehicleOCR(text||'');
-        ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:''};
+        ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:parsed.owner_name||parsed.owner||''};
+        if(WP.OCR&&WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai);
         if(!ai.license_plate && !ai.vin) throw err;
       }
       window._scheinAI=ai; window._scheinReady=true;
