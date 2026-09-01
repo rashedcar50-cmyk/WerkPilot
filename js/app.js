@@ -2043,8 +2043,8 @@ async function scanPurchaseDocument(){
       <div class="toolbar" style="margin-top:8px">
         <button type="button" class="btn" id="btnPickFile">${t('pickFile')}</button>
         <button type="button" class="btn" id="btnOpenCam">💻 ${t('openCam')}</button>
-        <button type="button" class="btn primary" id="btnRead" disabled>⚡ ${t('readData')}</button>
-        <button type="button" class="btn ghost" id="btnPreview" disabled>👁️ ${t('preview')}</button>
+        <button type="button" class="btn primary" id="btnRead">⚡ ${t('readData')}</button>
+        <button type="button" class="btn ghost" id="btnPreview">👁️ ${t('preview')}</button>
       </div>
       <div class="hint" id="purchaseFileName"></div>
       <img id="purchaseImg" class="ocr-preview hidden" style="margin-top:12px;max-height:280px;cursor:pointer">
@@ -2157,7 +2157,7 @@ async function scanPurchaseDocument(){
       }
       btnRead.disabled = false;
       btnPreview.disabled = false;
-      status.textContent = t('readData');
+      status.textContent = t('ocrHint');
     }
 
     fileInput.onchange = ()=>{
@@ -2181,7 +2181,7 @@ async function scanPurchaseDocument(){
         setTimeout(()=>URL.revokeObjectURL(url), 60000);
         return;
       }
-      toast('لا توجد صورة للعرض');
+      toast(t('pickScheinFirst'));
     }
     btnPreview.onclick = openFullPreview;
     img.onclick = openFullPreview;
@@ -2208,7 +2208,7 @@ async function scanPurchaseDocument(){
         status.textContent = t('readingInv2');
         const imageData = await compressImageForOCR(f, 1280, 0.72);
         const approxKB = Math.round((imageData.length * 0.75) / 1024);
-        status.textContent = `⚡ جاري قراءة البيانات (~${approxKB}KB)...`;
+        status.textContent = t('readingInv2')+' (~'+approxKB+'KB)';
 
         let ai = {};
         try{
