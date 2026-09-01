@@ -176,10 +176,17 @@ function bindVinEnter(inputId, ids){
 const HSN_MAKE={
 '0005':'BMW','0575':'BMW','7909':'BMW','0588':'Audi','0590':'Audi','0591':'Audi','7967':'Audi','0603':'Volkswagen','0604':'Volkswagen','1313':'Mercedes-Benz','0710':'Mercedes-Benz','0999':'Mercedes-Benz','8008':'Skoda','8040':'Skoda','7593':'SEAT','7315':'SEAT','0035':'Opel','0039':'Ford','8566':'Ford','5013':'Toyota','8252':'Hyundai','8253':'Kia','7107':'Renault','4136':'Peugeot','3004':'Citroen','0583':'Porsche','0606':'MAN','0600':'Smart'
 };
+const TSN_MODEL={
+  'ASL':'Astra Sports Tourer','AAX':'Golf','ABC':'Corsa'
+};
 function lookupKbaLocal(hsn,tsn){
   hsn=String(hsn||'').replace(/\D/g,'').padStart(4,'0');
   tsn=String(tsn||'').trim().toUpperCase();
-  return {hsn,tsn,kba:(hsn+' '+tsn).trim(),make:HSN_MAKE[hsn]||''};
+  const t3=tsn.slice(0,3);
+  let model='';
+  if(hsn==='0035' && t3==='ASL') model='Astra Sports Tourer';
+  else if(TSN_MODEL[t3] && HSN_MAKE[hsn]) model=TSN_MODEL[t3];
+  return {hsn,tsn,kba:(hsn+' '+tsn).trim(),make:HSN_MAKE[hsn]||'',model};
 }
 function parseHsnTsnHtml(html, hsn, tsn){
   const key=(hsn+'/'+tsn).toUpperCase();

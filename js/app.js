@@ -141,7 +141,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.69</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.70</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -798,6 +798,22 @@ function applyScheinToCustomerForm(ai){
   set('#vmake', ai.brand||ai.make); set('#mk', ai.brand||ai.make);
   set('#vmodel', ai.model); set('#mo', ai.model);
   set('#vyear', ai.year); set('#yr', ai.year);
+  const hsnVal=($('#vhsn')&&$('#vhsn').value)||($('#hsn')&&$('#hsn').value)||ai.hsn||'';
+  const tsnVal=($('#vtsn')&&$('#vtsn').value)||($('#tsn')&&$('#tsn').value)||ai.tsn||'';
+  if(hsnVal && typeof lookupKbaLocal==='function'){
+    const loc=lookupKbaLocal(hsnVal,tsnVal);
+    if(loc.make && $('#vmake') && !$('#vmake').value) set('#vmake', loc.make), set('#mk', loc.make);
+    if(loc.model && $('#vmodel') && !$('#vmodel').value) set('#vmodel', loc.model), set('#mo', loc.model);
+  }
+  if(hsnVal && tsnVal && typeof lookupKbaFree==='function'){
+    lookupKbaFree(hsnVal,tsnVal).then(info=>{
+      if(!info) return;
+      if(info.make && $('#vmake') && !$('#vmake').value) $('#vmake').value=info.make;
+      if(info.make && $('#mk') && !$('#mk').value) $('#mk').value=info.make;
+      if(info.model && $('#vmodel') && !$('#vmodel').value) $('#vmodel').value=info.model;
+      if(info.model && $('#mo') && !$('#mo').value) $('#mo').value=info.model;
+    }).catch(()=>{});
+  }
 }
 function afterCustomerVehicle(c,v){
   if(!v){ render(); return; }
@@ -2720,7 +2736,7 @@ async function ingestScheinFile(file){
       const {c,v}=findOrCreateFromSchein(ai);
       vehicleModal(Object.assign({},v,{customerId:c&&c.id}));
     }
-    const src=ai.ocrSource==='openai'?'OpenAI GPT-4o-mini':(ai.ocrSource||'OCR');
+    const src=ai.ocrSource==='server'?'Server':(ai.ocrSource==='openai'?'OpenAI GPT-4o-mini':(ai.ocrSource||'OCR'));
     toast((t('scheinFilled')||t('saved'))+' · '+src);
     if($('#ocrStatus')) $('#ocrStatus').textContent=(t('scheinFilled')||'')+' · '+src;
   }catch(e){ console.warn(e); toast(t('readFailClear')||t('ocrFailSchein')); }
