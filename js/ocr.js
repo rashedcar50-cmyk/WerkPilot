@@ -45,6 +45,7 @@
         const ctx=U.slice(Math.max(0,m.index-8), m.index+m[0].length+12);
         if(ok(m[1],m[2],m[3],ctx)) all.push({p:fmt(m[1],m[2],m[3]), n:m[3].length, raw:m[0]});
       }
+      if(all.length>1) return all[all.length-1].p;
       all.sort((a,b)=>b.n-a.n);
       return all[0]?all[0].p:'';
     }
@@ -379,7 +380,7 @@
           temperature:0,
           response_format:{type:'json_object'},
           messages:[
-            {role:'system',content:'Zulassungsbescheinigung Teil I oder II. JSON only. year und first_registration IMMER nur Feld B (Datum der Erstzulassung), niemals andere Daten (I, C.4c, Stempel). license_plate=Feld A, nie Dokumentnummer. vin=Feld E. owner_name=C.1 oder C.3/C.6. hsn=2.1 vier Ziffern. tsn=2.2 2-3 Buchstaben. model=D.3. Leere "".'},
+            {role:'system',content:'Teil I oder II. Bei zwei Haltersäulen IMMER rechte aktuelle Spalte: Name+Kennzeichen+Adresse rechts (TABAH RASHID, OH RT803). Linke alte Spalte ignorieren. year nur Feld B. Nie Dokumentnummer. vin Feld E W0L. hsn 2.1 vier Ziffern. tsn 2.2 Buchstaben. model D.3.'},
             {role:'user',content:[
               {type:'text',text:'Lies Teil I oder Teil II. Feld A ist das Kennzeichen.'},
               {type:'image_url',image_url:{url:img,detail:'high'}}

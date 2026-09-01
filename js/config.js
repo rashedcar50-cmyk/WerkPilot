@@ -1,6 +1,6 @@
 /* BayMeister kernel — flags, hooks, safe errors */
 window.WP = window.WP || {};
-WP.version = '1.12.41';
+WP.version = '1.12.42';
 WP.build = '2026-09-01';
 WP.features = {
   cloud: true,
