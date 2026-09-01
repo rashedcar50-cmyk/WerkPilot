@@ -123,7 +123,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.62</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.63</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -190,16 +190,18 @@ function mountDevDock(){
   requestAnimationFrame(()=>{
     if(saved && typeof saved.x==='number') placeGrokFab(fab, saved.x, saved.y);
   });
-  let pressTimer=null, dragging=false, moved=false, sx=0, sy=0, ox=0, oy=0;
+  let pressTimer=null, dragging=false, moved=false, armed=false, sx=0, sy=0, ox=0, oy=0;
   const point=e=>{
     const t=e.touches&&e.touches[0] || e.changedTouches&&e.changedTouches[0] || e;
     return {x:t.clientX, y:t.clientY};
   };
   const start=e=>{
-    if(e.cancelable) try{ e.preventDefault(); }catch(err){}
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    armed=true;
     const p=point(e);
     sx=p.x; sy=p.y; moved=false; dragging=false;
     const r=fab.getBoundingClientRect(); ox=r.left; oy=r.top;
+    if(pressTimer) clearTimeout(pressTimer);
     pressTimer=setTimeout(()=>{
       dragging=true;
       fab.classList.add('dragging');
@@ -207,16 +209,20 @@ function mountDevDock(){
     }, 380);
   };
   const move=e=>{
+    if(!armed) return;
     const p=point(e);
-    if(Math.abs(p.x-sx)>8 || Math.abs(p.y-sy)>8){
+    if(Math.abs(p.x-sx)>10 || Math.abs(p.y-sy)>10){
       moved=true;
-      if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; dragging=true; fab.classList.add('dragging'); }
+      if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; }
+      dragging=true; fab.classList.add('dragging');
     }
     if(!dragging) return;
-    e.preventDefault();
+    if(e.cancelable) e.preventDefault();
     placeGrokFab(fab, ox+(p.x-sx), oy+(p.y-sy));
   };
-  const end=e=>{
+  const end=()=>{
+    if(!armed) return;
+    armed=false;
     if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; }
     fab.classList.remove('dragging');
     if(dragging && moved){
@@ -228,9 +234,18 @@ function mountDevDock(){
     dragging=false;
     if(!moved) toggleDevPanel();
   };
-  ['pointerdown','touchstart'].forEach(ev=>fab.addEventListener(ev, start, {passive:false}));
-  ['pointermove','touchmove'].forEach(ev=>window.addEventListener(ev, move, {passive:false}));
-  ['pointerup','pointercancel','touchend','touchcancel'].forEach(ev=>window.addEventListener(ev, end));
+  if(window.PointerEvent){
+    fab.addEventListener('pointerdown', start);
+    window.addEventListener('pointermove', move, {passive:false});
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }else{
+    fab.addEventListener('touchstart', start, {passive:true});
+    window.addEventListener('touchmove', move, {passive:false});
+    window.addEventListener('touchend', end);
+    fab.addEventListener('mousedown', start);
+    window.addEventListener('mouseup', end);
+  }
 }
 function grokOut(msg){
   const el=$('#devOut'); if(el) el.textContent=String(msg||'');
