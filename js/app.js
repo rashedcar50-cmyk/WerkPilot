@@ -141,7 +141,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.68</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.69</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2936,11 +2936,11 @@ function integrations(){
  </div>
  <div class="card"><b>${t('waTitle')}</b><p class="muted">${t('waHint')}</p></div>
  <div class="card"><b>TSE / Kasse</b><p class="muted">${t('tseHint')}</p></div>
- <div class="card"><b>OpenAI</b>
-  <p class="muted">GPT-4o-mini für Fahrzeugschein. Schlüssel beginnt mit sk-</p>
-  <div class="field"><label>OpenAI API Key</label><input id="oaKey" type="password" autocomplete="off" value="${esc((typeof readOpenAI==='function'?readOpenAI():'')||db.settings.openaiKey||'')}" placeholder="sk-..."></div>
-  <p class="hint" id="oaState">${(function(){ const k=typeof readOpenAI==='function'?readOpenAI():(db.settings.openaiKey||''); return k?('Dauerhaft gespeichert · …'+k.slice(-4)):'Kein Schlüssel — einmal einfügen'; })()}</p>
-  <button type="button" class="btn primary full" id="oaSave">OpenAI dauerhaft speichern</button>
+ <div class="card"><b>OpenAI / Schlüssel-Server</b>
+  <p class="muted">Der Schlüssel liegt auf dem Supabase-Server (Funktion schein-ocr). Das Handy schickt nur das Bild, nicht den Schlüssel. Notfall-Schlüssel nur für den Entwickler:</p>
+  <div class="field"><label>Notfall-Schlüssel (Gerät)</label><input id="oaKey" type="password" autocomplete="off" value="${esc((typeof readOpenAI==='function'?readOpenAI():'')||db.settings.openaiKey||'')}" placeholder="sk-… nur falls Server fehlt"></div>
+  <p class="hint" id="oaState">${(function(){ const k=typeof readOpenAI==='function'?readOpenAI():(db.settings.openaiKey||''); return k?('Gerät · …'+k.slice(-4)):'Server zuerst — Gerät leer'; })()}</p>
+  <button type="button" class="btn primary full" id="oaSave">Notfall-Schlüssel speichern</button>
  </div>
  <div class="card"><b>Matthies Katy</b>
   <p class="muted">${t('katyHintInt')}</p>

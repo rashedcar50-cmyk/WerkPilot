@@ -527,12 +527,34 @@
       return {ok:res.ok, status:res.status, js};
     }catch(e){ clearTimeout(to); return {ok:false, status:0, js:{error:{message:String(e)}}}; }
   }
+  async function serverRead(img){
+    if(!window.SUPABASE_URL || !window.SUPABASE_KEY) return null;
+    const controller=new AbortController();
+    const to=setTimeout(()=>controller.abort(), 32000);
+    try{
+      const response=await fetch(`${window.SUPABASE_URL}/functions/v1/schein-ocr`,{
+        method:'POST', signal:controller.signal,
+        headers:{'Content-Type':'application/json','apikey':window.SUPABASE_KEY,'Authorization':'Bearer '+window.SUPABASE_KEY},
+        body:JSON.stringify({image:img})
+      });
+      clearTimeout(to);
+      const js=await response.json().catch(()=>({}));
+      if(response.status===404 || js.error==='no-server-key') return null;
+      if(!response.ok){ W._ocrLast='server-http-'+response.status; return {}; }
+      W._ocrLast='server';
+      W._ocrRaw=js.raw||'';
+      const fields=js.fields||js;
+      return dropUngrounded(stripDemo(cleanFields(normalizeCloud(fields), W._ocrRaw)), W._ocrRaw);
+    }catch(e){ clearTimeout(to); return null; }
+  }
   async function openaiRead(img){
-    const key=openaiKey();
-    if(!key){ W._ocrLast='no-key'; return {}; }
     let url=String(img||'');
     if(url && url.indexOf('data:image/')!==0) url='data:image/jpeg;base64,'+url.replace(/^data:[^;]+;base64,/,'');
     url=await shrinkDataUrl(url, 1600, 0.78);
+    const fromServer=await serverRead(url);
+    if(fromServer && (fromServer.owner_name || fromServer.vin || fromServer.license_plate || fromServer.plate)) return fromServer;
+    const key=openaiKey();
+    if(!key){ if(!fromServer) W._ocrLast=W._ocrLast||'no-key'; return fromServer||{}; }
     const tr=await openaiChat(key,{
       model:'gpt-4o-mini', temperature:0,
       messages:[
