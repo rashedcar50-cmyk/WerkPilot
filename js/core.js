@@ -75,6 +75,7 @@ function load(){
   if(!['ar','de','en','es','tr','sr','ru','pl'].includes(merged.settings.uiLang)) merged.settings.uiLang='de';
   restoreOpenAI(merged);
   if(window.WP && WP.Engine) WP.Engine.migrate(merged);
+  restoreOpenAI(merged);
 
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
   if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'});

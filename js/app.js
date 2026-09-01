@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.49</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.50</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2862,9 +2862,9 @@ function integrations(){
  <div class="card"><b>TSE / Kasse</b><p class="muted">${t('tseHint')}</p></div>
  <div class="card"><b>OpenAI</b>
   <p class="muted">GPT-4o-mini für Fahrzeugschein. Schlüssel beginnt mit sk-</p>
-  <div class="field"><label>OpenAI API Key</label><input id="oaKey" type="password" autocomplete="off" value="${esc(db.settings.openaiKey||'')}" placeholder="sk-..."></div>
-  <p class="hint" id="oaState">${db.settings.openaiKey?'Schlüssel gespeichert':'Kein Schlüssel'}</p>
-  <button type="button" class="btn primary full" id="oaSave">OpenAI speichern</button>
+  <div class="field"><label>OpenAI API Key</label><input id="oaKey" type="password" autocomplete="off" value="${esc((typeof readOpenAI==='function'?readOpenAI():'')||db.settings.openaiKey||'')}" placeholder="sk-..."></div>
+  <p class="hint" id="oaState">${(function(){ const k=typeof readOpenAI==='function'?readOpenAI():(db.settings.openaiKey||''); return k?('Dauerhaft gespeichert · …'+k.slice(-4)):'Kein Schlüssel — einmal einfügen'; })()}</p>
+  <button type="button" class="btn primary full" id="oaSave">OpenAI dauerhaft speichern</button>
  </div>
  <div class="card"><b>Matthies Katy</b>
   <p class="muted">${t('katyHintInt')}</p>
@@ -2897,8 +2897,9 @@ function integrations(){
      if($('#katyP')) db.settings.katyPass=$('#katyP').value;
      db.settings.katyLogged=true;
      save(true);
-     if($('#oaState')) $('#oaState').textContent=db.settings.openaiKey?'Schlüssel gespeichert':'Kein Schlüssel';
-     toast(t('katySaved')||'Gespeichert');
+     const now=typeof readOpenAI==='function'?readOpenAI():(db.settings.openaiKey||'');
+     if($('#oaState')) $('#oaState').textContent=now?('Dauerhaft gespeichert · …'+now.slice(-4)):'Kein Schlüssel';
+     toast(now?'OpenAI dauerhaft gespeichert':(t('katySaved')||'Gespeichert'));
      return true;
    }catch(e){
      console.error(e);
@@ -2907,6 +2908,12 @@ function integrations(){
    }
  }
  if($('#oaSave')) $('#oaSave').onclick=e=>{ e.preventDefault(); persistIntegrations(); };
+ if($('#oaKey')){
+   const keep=()=>{ const v=$('#oaKey').value.trim(); if(v.indexOf('sk-')===0){ writeOpenAI(v); if($('#oaState')) $('#oaState').textContent='Dauerhaft gespeichert · …'+v.slice(-4); } };
+   $('#oaKey').addEventListener('change', keep);
+   $('#oaKey').addEventListener('blur', keep);
+   $('#oaKey').addEventListener('paste', ()=>setTimeout(keep, 80));
+ }
  if($('#katySave')) $('#katySave').onclick=e=>{ e.preventDefault(); persistIntegrations(); };
  if($('#katyGo')) $('#katyGo').onclick=()=>{
    db.settings.katyLogged=true; save();
