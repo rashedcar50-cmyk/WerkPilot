@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.7</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.8</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -1210,7 +1210,7 @@ function repairEditModal(rid){
   if(!r) return toast(t('jobMissing'));
   repairModal(r);
 }
-window.openRepair=repairEditModal;
+window.openRepair=openRepairDesk;
 function appointments(){
   const rows=companyRows('appointments').slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
   $('#content').innerHTML=head(t('appointmentsTitle'))+
@@ -1556,11 +1556,11 @@ function lookupKatyArticle(sku){
   if(!sku) return null;
   const up=sku.toUpperCase();
   const inv=(db.inventory||[]).find(x=>String(x.sku||'').toUpperCase()===up || String(x.name||'').toUpperCase()===up);
-  if(inv) return {sku:inv.sku||sku,name:inv.name,qty:1,price:Number(inv.sell||inv.buy||0),source:'مخزون'};
+  if(inv) return {sku:inv.sku||sku,name:inv.name,qty:1,price:Number(inv.sell||inv.buy||0),source:'stock'};
   const cache=(db.katyCache||[]).find(x=>String(x.sku||'').toUpperCase()===up);
   if(cache) return {sku:cache.sku,name:cache.name,qty:1,price:Number(cache.price||0),source:'Katy'};
   const fromInv=(db.invoices||[]).flatMap(i=>i.lines||[]).find(l=>String(l.sku||'').toUpperCase()===up);
-  if(fromInv) return {sku:fromInv.sku,name:fromInv.name,qty:1,price:Number(fromInv.price||0),source:'فاتورة سابقة'};
+  if(fromInv) return {sku:fromInv.sku,name:fromInv.name,qty:1,price:Number(fromInv.price||0),source:'invoice'};
   return null;
 }
 function rememberKatyArticle(art){
@@ -2749,7 +2749,7 @@ function simpleModal(title,fields,onSave){
   window.openCameraForPurchase = typeof openCameraForPurchase !== 'undefined' ? openCameraForPurchase : null;
   window.convertRepairToInvoice = convertRepairToInvoice;
   window.whatsappReady = whatsappReady;
-  window.openRepair = function(rid){ repairEditModal(rid); };
+  window.openRepair = function(rid){ openRepairDesk(rid); };
   window.openPartsLink = openPartsLink;
 
 

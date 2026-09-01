@@ -471,7 +471,7 @@ function openPartsLink(vid){
 window.convertRepairToInvoice=convertRepairToInvoice;
 window.whatsappReady=whatsappReady;
 window.openPartsLink=openPartsLink;
-window.openRepair=function(rid){ repairEditModal(rid); };
+window.openRepair=function(rid){ if(typeof openRepairDesk==='function') openRepairDesk(rid); else if(typeof repairEditModal==='function') repairEditModal(rid); };
 
 
 function customerName(cid){
