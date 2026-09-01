@@ -141,7 +141,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.74</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.75</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -1007,138 +1007,9 @@ function scanVehicleDocument(){
  if($('#pickDoc')) $('#pickDoc').onclick=()=>$('#doc').click();
 }
 
-function fieldAfter(text, keys){
-  for(const k of keys){
-    const re=new RegExp(k+'\\s*[:.]?\\s*([^\\n]{2,80})','i');
-    const m=text.match(re);
-    if(m) return m[1].replace(/\s{2,}/g,' ').trim();
-  }
-  return '';
-}
-function parseVehicleOCR(text){
-  const raw=String(text||'').replace(/\r/g,'\n');
-  const t=raw.replace(/[ \t]+/g,' ').replace(/\n+/g,'\n');
-  const upper=t.toUpperCase();
-  const vinMatch=upper.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
-  const plateMatch=upper.match(/\b([A-ZÄÖÜ]{1,3})[-\s]?([A-Z]{1,2})[-\s]?(\d{1,4}[EH]?)\b/);
-  const plate=plateMatch ? (plateMatch[1]+'-'+plateMatch[2]+' '+plateMatch[3]) : '';
-  const d1=fieldAfter(t,['D\\.1','Marke','Hersteller']);
-  const d3=fieldAfter(t,['D\\.3','Handelsbezeichnung']);
-  const makes=['VOLKSWAGEN','VW','BMW','MERCEDES-BENZ','MERCEDES','AUDI','OPEL','FORD','TOYOTA','RENAULT','PEUGEOT','CITROEN','SKODA','SEAT','FIAT','HYUNDAI','KIA','PORSCHE','MAZDA','NISSAN','HONDA','VOLVO','DACIA','TESLA','MINI','SMART','JEEP','SUZUKI','CUPRA'];
-  const makeFromList=makes.find(x=>upper.includes(x))||'';
-  const make=(d1.match(new RegExp(makes.join('|'),'i'))||[makeFromList])[0] || d1.split(/[/,]/)[0].trim();
-  const model=(d3||'').replace(new RegExp('^'+String(make||'')+'\\s*','i'),'').trim();
-  const yearMatch=t.match(/B\s*[:.]?\s*(\d{2}\.\d{2}\.(19|20)\d{2})/i) || t.match(/\b(\d{2}\.\d{2}\.(19|20)\d{2})\b/);
-  const firstRegistration=yearMatch ? (yearMatch[1]||yearMatch[0]) : '';
-  const year=firstRegistration.slice(-4);
-  const owner=fieldAfter(t,['C\\.1\\.1','Halter','Name oder Firmenname']);
-  const address=fieldAfter(t,['C\\.1\\.3','Anschrift']);
-  const engine=fieldAfter(t,['P\\.1','Hubraum']);
-  const kw=fieldAfter(t,['P\\.2','Nennleistung']);
-  const fuel=fieldAfter(t,['P\\.3','Kraftstoff']);
-  const paint=fieldAfter(t,['Farbe des Fahrzeugs']);
-  return {
-    vin: vinMatch? vinMatch[0] : '',
-    plate,
-    make: String(make||'').trim(),
-    model: String(model||'').trim().slice(0,40),
-    year,
-    firstRegistration,
-    owner_name: String(owner||'').replace(/C\.1\.\d/g,'').trim(),
-    address,
-    engine_displacement_cm3: (engine.match(/\d{3,5}/)||[''])[0],
-    engine_power_kw: (kw.match(/\d{2,3}/)||[''])[0],
-    fuel_type: fuel,
-    paint,
-    engine: ''
-  };
-}
-function preprocessSchein(file){
-  return new Promise((resolve,reject)=>{
-    const img=new Image();
-    const url=URL.createObjectURL(file);
-    img.onload=()=>{
-      const max=1800;
-      let w=img.width,h=img.height;
-      if(Math.max(w,h)>max){const s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s);}
-      const c=document.createElement('canvas'); c.width=w; c.height=h;
-      const ctx=c.getContext('2d');
-      ctx.drawImage(img,0,0,w,h);
-      const data=ctx.getImageData(0,0,w,h);
-      const d=data.data;
-      for(let i=0;i<d.length;i+=4){
-        let g=d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11;
-        g=(g-128)*1.35+128;
-        g=g<40?0:g>220?255:g;
-        d[i]=d[i+1]=d[i+2]=g;
-      }
-      ctx.putImageData(data,0,0);
-      URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg',0.88));
-    };
-    img.onerror=reject;
-    img.src=url;
-  });
-}
-function mergeSchein(ai, local){
-  const pick=(a,b,ok)=>{
-    const x=(a||'').toString().trim();
-    const y=(b||'').toString().trim();
-    if(ok){ if(ok(x)) return x; if(ok(y)) return y; }
-    return x||y||'';
-  };
-  ai=ai||{}; local=local||{};
-  return {
-    license_plate: pick(ai.license_plate||ai.plate, local.plate, v=>/[A-ZÄÖÜ]{1,3}-?[A-Z]{1,2}\s?\d{1,4}/i.test(v)),
-    vin: pick(ai.vin, local.vin, v=>/^[A-HJ-NPR-Z0-9]{17}$/i.test(v)),
-    brand: pick(ai.brand||ai.make, local.make),
-    model: pick(ai.model, local.model),
-    year: pick(ai.year, local.year, v=>/^(19|20)\d{2}$/.test(v)),
-    owner_name: pick(ai.owner_name||ai.holder||ai.customer_name, local.owner_name),
-    address: pick(ai.address||ai.owner_address, local.address),
-    engine_displacement_cm3: pick(ai.engine_displacement_cm3, local.engine_displacement_cm3),
-    engine_power_kw: pick(ai.engine_power_kw, local.engine_power_kw),
-    fuel_type: pick(ai.fuel_type, local.fuel_type),
-    engine_code: pick(ai.engine_code||ai.engine, local.engine),
-    color: pick(ai.color||ai.paint, local.paint),
-    first_registration: pick(ai.first_registration, local.firstRegistration)
-  };
-}
 async function readScheinAI(file){
-  if(window.WP && WP.OCR && WP.OCR.read){
-    return WP.OCR.read(file);
-  }
-  const imageData = await preprocessSchein(file);
-  let ai={};
-  try{
-    const response = await fetch(`${window.SUPABASE_URL}/functions/v1/vehicle-ocr`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': window.SUPABASE_KEY,
-        'Authorization': `Bearer ${window.SUPABASE_KEY}`
-      },
-      body: JSON.stringify({
-        image: imageData,
-        country: 'DE',
-        document: 'Zulassungsbescheinigung Teil I',
-        fields: ['A Kennzeichen','B Erstzulassung','C.1.1 Halter','C.1.3 Anschrift','D.1 Marke','D.3 Handelsbezeichnung','E VIN','P.1 Hubraum','P.2 kW','P.3 Kraftstoff','R Farbe']
-      })
-    });
-    const js = await response.json();
-    if (response.ok) ai = js; else console.warn(js);
-  }catch(e){ console.warn('vehicle-ocr', e); }
-  let local={};
-  try{
-    try{ await WP.loadOcr(); }catch(e){}
-    if(window.Tesseract){
-      const res=await Tesseract.recognize(imageData,'deu+eng');
-      local=parseVehicleOCR(res&&res.data&&res.data.text||'');
-    }
-  }catch(e){ console.warn('tesseract', e); }
-  const merged=mergeSchein(ai, local);
-  if(!merged.vin && !merged.license_plate) throw new Error(t('ocrFailSchein'));
-  return merged;
+  if(window.WP && WP.OCR && WP.OCR.read) return WP.OCR.read(file);
+  throw new Error('ocr-module-missing');
 }
 function findOrCreateFromSchein(ai){
   const plate = (ai.license_plate || ai.plate || '').trim();
