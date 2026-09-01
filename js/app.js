@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.11.1</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.11.2</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -1108,8 +1108,12 @@ function repairDesk(rid){
   <p>${t('labor')}: ${money(repairLaborTotal(r))} · ${t('parts')}: ${money(repairPartsTotal(r))}</p>
   <h3>${t('photosBA')}</h3>
   <div class="form-grid">
-    <div class="field"><label>${t('before')}</label>${img(before)}<input type="file" accept="image/*" onchange="addRepairPhoto('${r.id}','before',this)"></div>
-    <div class="field"><label>${t('after')}</label>${img(after)}<input type="file" accept="image/*" onchange="addRepairPhoto('${r.id}','after',this)"></div>
+    <div class="field"><label>${t('before')}</label>${img(before)}
+      <input id="phBefore" type="file" accept="image/*" class="hidden" onchange="addRepairPhoto('${r.id}','before',this)">
+      <button type="button" class="btn small" onclick="document.getElementById('phBefore').click()">${t('pickFile')}</button></div>
+    <div class="field"><label>${t('after')}</label>${img(after)}
+      <input id="phAfter" type="file" accept="image/*" class="hidden" onchange="addRepairPhoto('${r.id}','after',this)">
+      <button type="button" class="btn small" onclick="document.getElementById('phAfter').click()">${t('pickFile')}</button></div>
   </div>
   <div class="toolbar">
     <button class="btn" onclick="openRepair('${r.id}')">${t('edit')}</button>
