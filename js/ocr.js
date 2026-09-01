@@ -415,37 +415,73 @@
         || '';
     }catch(e){ return ''; }
   }
+  function shrinkDataUrl(dataUrl, max=1280, q=0.68){
+    return new Promise(resolve=>{
+      try{
+        const img=new Image();
+        img.onload=()=>{
+          let w=img.width,h=img.height;
+          if(Math.max(w,h)>max){ const s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+          const c=document.createElement('canvas'); c.width=Math.max(1,w); c.height=Math.max(1,h);
+          c.getContext('2d').drawImage(img,0,0,w,h);
+          resolve(c.toDataURL('image/jpeg', q));
+        };
+        img.onerror=()=>resolve(dataUrl);
+        img.src=dataUrl;
+      }catch(e){ resolve(dataUrl); }
+    });
+  }
   async function openaiRead(img){
     const key=openaiKey();
     if(!key){ W._ocrLast='no-key'; return {}; }
-    const controller=new AbortController();
-    const to=setTimeout(()=>controller.abort(), 25000);
-    try{
-      const res=await fetch('https://api.openai.com/v1/chat/completions',{
-        method:'POST', signal:controller.signal,
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-        body:JSON.stringify({
-          model:'gpt-4o-mini',
-          temperature:0,
-          response_format:{type:'json_object'},
+    let url=String(img||'');
+    if(url && url.indexOf('data:image/')!==0) url='data:image/jpeg;base64,'+url.replace(/^data:[^;]+;base64,/,'');
+    url=await shrinkDataUrl(url, 1280, 0.68);
+    const sys='Antworte NUR als JSON mit keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration. Teil I/II. Rechte aktuelle Haltersäule. year nur Feld B. Nie Dokumentnummer.';
+    const attempts=[
+      {model:'gpt-4o-mini', detail:'low', json:true},
+      {model:'gpt-4o-mini', detail:'low', json:false},
+      {model:'gpt-4o-mini', detail:'auto', json:true}
+    ];
+    for(const att of attempts){
+      const controller=new AbortController();
+      const to=setTimeout(()=>controller.abort(), 28000);
+      try{
+        const body={
+          model:att.model, temperature:0,
           messages:[
-            {role:'system',content:'Teil I oder II. Bei zwei Haltersäulen IMMER rechte aktuelle Spalte: Name+Kennzeichen+Adresse rechts (TABAH RASHID, OH RT803). Linke alte Spalte ignorieren. year nur Feld B. Nie Dokumentnummer. vin Feld E W0L. hsn 2.1 vier Ziffern. tsn 2.2 Buchstaben. model D.3.'},
+            {role:'system',content:sys},
             {role:'user',content:[
-              {type:'text',text:'Lies Teil I oder Teil II. Feld A ist das Kennzeichen.'},
-              {type:'image_url',image_url:{url:img,detail:'high'}}
+              {type:'text',text:'JSON Felder füllen. Kennzeichen Feld A rechts.'},
+              {type:'image_url',image_url:{url:url,detail:att.detail}}
             ]}
           ]
-        })
-      });
-      clearTimeout(to);
-      const js=await res.json().catch(()=>({}));
-      if(!res.ok){ W._ocrLast='http-'+(res.status||0); console.warn('openai-ocr', js); return {}; }
-      W._ocrLast='openai';
-      const txt=(js.choices&&js.choices[0]&&js.choices[0].message&&js.choices[0].message.content)||'{}';
-      let data={};
-      try{ data=JSON.parse(txt); }catch(e){ data=parse(txt); }
-      return merge(normalizeCloud(data), parse([data.owner_name,data.address,data.license_plate,data.vin,data.brand,data.model].filter(Boolean).join('\n')));
-    }catch(e){ clearTimeout(to); console.warn('openai-ocr', e); return {}; }
+        };
+        if(att.json) body.response_format={type:'json_object'};
+        const res=await fetch('https://api.openai.com/v1/chat/completions',{
+          method:'POST', signal:controller.signal,
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+          body:JSON.stringify(body)
+        });
+        clearTimeout(to);
+        const js=await res.json().catch(()=>({}));
+        if(!res.ok){
+          const err=(js.error&& (js.error.code||js.error.message))||res.status;
+          W._ocrLast='http-'+res.status;
+          W._ocrDetail=String(err).slice(0,80);
+          console.warn('openai-ocr', att, js);
+          if(res.status===401 || res.status===403) return {};
+          continue;
+        }
+        W._ocrLast='openai';
+        W._ocrDetail='';
+        const txt=(js.choices&&js.choices[0]&&js.choices[0].message&&js.choices[0].message.content)||'{}';
+        let data={};
+        try{ data=JSON.parse(txt); }catch(e){ data=parse(txt); }
+        return merge(normalizeCloud(data), parse([data.owner_name,data.address,data.license_plate,data.vin,data.brand,data.model].filter(Boolean).join('\n')));
+      }catch(e){ clearTimeout(to); W._ocrLast='net'; console.warn('openai-ocr', e); }
+    }
+    return {};
   }
   async function spaceRead(img){
     try{
