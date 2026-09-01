@@ -48,13 +48,13 @@ WP.loadOcr = function(){
 window.t = window.t || function(k){ return k; };
 window.applyUiLang = window.applyUiLang || function(){
   try{
-    const lang=(window.db&&db.settings&&db.settings.uiLang)||'ar';
+    const lang=(window.db&&db.settings&&db.settings.uiLang)||'de';
     document.documentElement.lang=lang;
     document.documentElement.dir=(window.WP_RTL&&WP_RTL.includes(lang))?'rtl':'ltr';
   }catch(e){}
 };
 window.langOptions = window.langOptions || function(sel){
-  return ['ar','de','en'].map(c=>`<option value="${c}" ${c===(sel||'ar')?'selected':''}>${c}</option>`).join('');
+  return ['de','ar','en'].map(c=>`<option value="${c}" ${c===(sel||'de')?'selected':''}>${c}</option>`).join('');
 };
 window.docLang = window.docLang || function(){ return 'de'; };
 window.WP_RTL = window.WP_RTL || ['ar','fa','ur','he'];

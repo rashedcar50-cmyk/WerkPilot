@@ -63,7 +63,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.28</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.29</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2882,11 +2882,11 @@ function simpleModal(title,fields,onSave){
  });
 }
 
-   const SUPABASE_URL = window.SUPABASE_URL;
-  const SUPABASE_KEY = window.SUPABASE_KEY;
-  // جعله عالمياً عشان دوال المشتريات تقدر تستخدمه
-  window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  const supabaseClient = window.supabaseClient;
+  try{
+    if(window.supabase && window.SUPABASE_URL && window.SUPABASE_KEY){
+      window.supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+    }
+  }catch(e){ console.warn('supabase init', e); }
 
   // تعريض الدوال المستخدمة من onclick
   window.viewReceipt = typeof viewReceipt !== 'undefined' ? viewReceipt : null;
