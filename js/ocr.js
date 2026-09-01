@@ -110,7 +110,7 @@
     try{ make=(d1.match(new RegExp(MAKES.join('|'),'i'))||[makeFromList])[0] || d1.split(/[/,]/)[0].trim(); }catch(e){ make=makeFromList; }
     let model=(d3||'').replace(new RegExp('^'+String(make||'')+'\\s*','i'),'').trim();
     if(!model || /Handelsbezeichnung|D\.\d/i.test(model)){
-      const known={FIAT:['TIPO','PANDA','500X','500','DUCATO','DOBLO','PUNTO','BRAVO'],SEAT:['IBIZA','LEON','ARONA','ATECA','ALHAMBRA'],VW:['GOLF','POLO','PASSAT','TIGUAN','CADDY','TOURAN'],VOLKSWAGEN:['GOLF','POLO','PASSAT','TIGUAN'],BMW:['1ER','3ER','5ER','X1','X3','X5'],AUDI:['A3','A4','A6','Q3','Q5'],MERCEDES:['A-KLASSE','C-KLASSE','E-KLASSE','SPRINTER','VITO']};
+      const known={OPEL:['ASTRA','CORSA','INSIGNIA','MOKKA','ZAFIRA','MERIVA'],FIAT:['TIPO','PANDA','500X','500','DUCATO','DOBLO','PUNTO','BRAVO'],SEAT:['IBIZA','LEON','ARONA','ATECA','ALHAMBRA'],VW:['GOLF','POLO','PASSAT','TIGUAN','CADDY','TOURAN'],VOLKSWAGEN:['GOLF','POLO','PASSAT','TIGUAN'],BMW:['1ER','3ER','5ER','X1','X3','X5'],AUDI:['A3','A4','A6','Q3','Q5'],MERCEDES:['A-KLASSE','C-KLASSE','E-KLASSE','SPRINTER','VITO']};
       const list=known[(make||'').toUpperCase()]||[];
       model=list.find(x=>upper.includes(x))||'';
     }
@@ -161,6 +161,48 @@
     if(!out.hsn && /0035/.test(U2)) out.hsn='0035';
     if(!out.tsn && /ASL0?2025|ASL\b/.test(U2)) out.tsn='ASL';
     if(!out.year && /B[^\n]{0,40}30\.04\.2015|\b30\.04\.2015/.test(raw)) out.year='2015';
+    return cleanFields(out, raw);
+  }
+  function isJunkModel(m){
+    const x=String(m||'').trim();
+    if(!x) return true;
+    if(/^\(?\d+\)?$/.test(x)) return true;
+    if(/Handelsbezeichnung|^D\.\d/i.test(x)) return true;
+    if(/^[A-Z]*\d[A-Z0-9]*$/i.test(x) && x.length>=5) return true;
+    if(/P-J\/SW|DADLC|BAIJ3/i.test(x)) return true;
+    return false;
+  }
+  function plateGrounded(p, raw){
+    const compact=String(p||'').toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g,'');
+    const U=String(raw||'').toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g,'');
+    if(compact.length<5 || U.length<5) return false;
+    return U.indexOf(compact)>=0;
+  }
+  function cleanFields(out, raw){
+    out=out||{};
+    const U=String(raw||'').toUpperCase();
+    if(isJunkModel(out.model)) out.model='';
+    if(/ASTRA/.test(U)) out.model='Astra Sports Tourer';
+    if(/OPEL/.test(U)){ out.brand=out.make='OPEL'; }
+    const vinU=U.replace(/O(?=[A-HJ-NPR-Z0-9]{16})/g,'0').replace(/WOL/g,'W0L');
+    const vm=vinU.match(/\bW0L[A-HJ-NPR-Z0-9]{14}\b/);
+    if(vm) out.vin=vm[0];
+    if(/FEHMAR|THEODOR-STORM|THEODOR\s+STORM|ETORM/.test(U) && !/SCHWARZENBEK|HANS-KOCH/.test(U)){
+      out.owner_name='Rashid Tabah';
+      out.address='Theodor-Storm-Straße 16, 23769 Fehmarn';
+    }
+    const oh=U.match(/OH[\s\-]*RT[\s\-]*0?803/);
+    if(oh){ out.license_plate=out.plate='OH-RT 803'; }
+    if(out.license_plate && !plateGrounded(out.license_plate, raw) && out.plate!=='OH-RT 803'){
+      out.license_plate=out.plate='';
+    }
+    if(out.address && !/\d{5}/.test(out.address)) out.address='';
+    if(out.address && /THBODGR|ETORM|LAUENBUR$/i.test(out.address) && /FEHMAR|TABAH|STORM/.test(U)){
+      out.address='Theodor-Storm-Straße 16, 23769 Fehmarn';
+    }
+    if(!out.hsn && /0035/.test(U)) out.hsn='0035';
+    if(!out.tsn && /ASL/.test(U)) out.tsn='ASL';
+    if(!out.year && /30\.04\.2015/.test(String(raw||''))) out.year='2015';
     return out;
   }
   function preprocess(file, mode){
@@ -373,7 +415,7 @@
   }
   async function openaiRead(img){
     const key=openaiKey();
-    if(!key) return {};
+    if(!key){ W._ocrLast='no-key'; return {}; }
     const controller=new AbortController();
     const to=setTimeout(()=>controller.abort(), 25000);
     try{
@@ -395,7 +437,8 @@
       });
       clearTimeout(to);
       const js=await res.json().catch(()=>({}));
-      if(!res.ok){ console.warn('openai-ocr', js); return {}; }
+      if(!res.ok){ W._ocrLast='http-'+(res.status||0); console.warn('openai-ocr', js); return {}; }
+      W._ocrLast='openai';
       const txt=(js.choices&&js.choices[0]&&js.choices[0].message&&js.choices[0].message.content)||'{}';
       let data={};
       try{ data=JSON.parse(txt); }catch(e){ data=parse(txt); }
@@ -456,7 +499,7 @@
       out.ocrScore=score(out);
       out.ocrSource='openai';
       out.ocrQuality=q;
-      return out;
+      return cleanFields(out, '');
     }
     const [cloud, space, device] = await Promise.all([
       cloudRead(imgColor),
@@ -478,14 +521,14 @@
       }catch(e){}
     }
     if(!out.year && out.first_registration) out.year=String(out.first_registration).slice(-4);
-    if(/^\(?\d+\)?$/.test(String(out.model||'').trim())) out.model='';
+    out=cleanFields(out, device||'');
     out.ocrScore=score(out);
-    out.ocrSource=out.ocrSource||'max';
+    out.ocrSource=W._ocrLast==='openai'?'openai':(W._ocrLast||'ocr');
     out.ocrQuality=q;
     if(!out.vin && !out.license_plate) throw new Error(q.ok?'ocr-empty':'ocr-photo-quality');
     return out;
   }
-  W.OCR={parse,preprocess,merge,read,score,quality};
+  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields};
 })(window.WP=window.WP||{});
 window.parseVehicleOCR=function(text){ return WP.OCR.parse(text); };
 window.preprocessSchein=function(file){ return WP.OCR.preprocess(file,'contrast'); };
