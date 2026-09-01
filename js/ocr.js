@@ -46,7 +46,7 @@
     const tsn=(upper.match(/2[\s.,]*2\s*[:.]?\s*([A-Z]{1,3})(?![A-Z0-9])/)||upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{2,3})\b/)||[])[1]||'';
     function ownerFromLines(src){
       const lines=String(src||'').split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
-      const isLabel=s=>/C\.?\s*1\.?\s*[123]|P\.?\s*C\.?\s*1|Vorname|Firmenname|Anschrift|Name oder|Amtliches|Kennzeichen|Zulassung|Fahrzeugschein|Bundesrepublik|Teil I|Halter/i.test(s||'');
+      const isLabel=s=>/C\.?\s*[136]\.?\s*[123]|P\.?\s*C\.?\s*1|Vorname|Firmenname|Anschrift|Name oder|Amtliches|Kennzeichen|Zulassung|Fahrzeugschein|Bundesrepublik|Teil I+|Halter|Europäische|Gemeinschaft/i.test(s||'');
       const isName=s=>{
         const x=String(s||'').replace(/^[\s.:°*P]+/,'').replace(/\(n\)/g,'').trim();
         if(x.length<2 || x.length>48) return false;
@@ -84,8 +84,12 @@
         }
       }
       if(!fam){
-        const hit=lines.find(x=>/Scholty|ßek|[A-ZÄÖÜ][a-zäöüß]{3,}(sek|bek|mann|berg|hoff|witz)$/.test(x) && isName(x) && !/\d/.test(x));
+        const hit=lines.find(x=>/Scholty|ßek|Tabah|[A-ZÄÖÜ][a-zäöüß]{3,}(sek|bek|mann|berg|hoff|witz)$/.test(x) && isName(x) && !/\d/.test(x));
         if(hit) fam=hit;
+      }
+      if(!fam){
+        const nm=lines.find(x=>/^[A-ZÄÖÜ][a-zäöüß]{2,}(?:\s+[A-ZÄÖÜ][a-zäöüß]{2,}){1,3}$/.test(x) && isName(x));
+        if(nm) fam=nm;
       }
       let name=[given,fam].filter(Boolean).join(' ').replace(/\s{2,}/g,' ').trim();
       const addr=[street,city].filter(Boolean).join(', ').replace(/\s{2,}/g,' ').trim();
@@ -553,7 +557,9 @@
       W._ocrLast='server';
       W._ocrRaw=js.raw||'';
       const fields=js.fields||js;
-      return dropUngrounded(stripDemo(cleanFields(normalizeCloud(fields), W._ocrRaw)), W._ocrRaw);
+      const parsed=W._ocrRaw?parse(W._ocrRaw):{};
+      const merged=merge(normalizeCloud(fields), parsed);
+      return dropUngrounded(stripDemo(cleanFields(merged, W._ocrRaw)), W._ocrRaw);
     }catch(e){ clearTimeout(to); return null; }
   }
   async function openaiRead(img){

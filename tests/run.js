@@ -123,6 +123,9 @@ assert(idx.includes('js/repairs.js?v='+ver),'index loads repairs.js');
 assert(idx.includes('js/invoice-edit.js?v='+ver),'index loads invoice-edit.js');
 assert(OCR.dropUngrounded({owner_name:'Daniel Test',brand:'SEAT'},'').owner_name==='Daniel Test','empty raw keeps owner');
 assert(/legalGaps/.test(i18n),'i18n has legalGaps');
+const man=fs.readFileSync(path.join(root,'manifest.json'),'utf8');
+assert(/shortcuts/.test(man),'manifest has shortcuts');
+assert(fs.existsSync(path.join(root,'privacy.html')),'privacy page for stores');
 assert(sw.includes(ver),'sw cache version matches index');
 
 const app=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
