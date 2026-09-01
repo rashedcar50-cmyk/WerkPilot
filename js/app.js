@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.44</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.45</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2729,16 +2729,21 @@ function integrations(){
  </div>
  <div class="card"><b>${t('waTitle')}</b><p class="muted">${t('waHint')}</p></div>
  <div class="card"><b>TSE / Kasse</b><p class="muted">${t('tseHint')}</p></div>
+ <div class="card"><b>OpenAI</b>
+  <p class="muted">GPT-4o-mini für Fahrzeugschein. Schlüssel beginnt mit sk-</p>
+  <div class="field"><label>OpenAI API Key</label><input id="oaKey" type="password" autocomplete="off" value="${esc(db.settings.openaiKey||'')}" placeholder="sk-..."></div>
+  <p class="hint" id="oaState">${db.settings.openaiKey?'Schlüssel gespeichert':'Kein Schlüssel'}</p>
+  <button type="button" class="btn primary full" id="oaSave">OpenAI speichern</button>
+ </div>
  <div class="card"><b>Matthies Katy</b>
   <p class="muted">${t('katyHintInt')}</p>
-  <div class="field"><label>OpenAI API Key (GPT-4o-mini)</label><input id="oaKey" type="password" value="${esc(db.settings.openaiKey||'')}" placeholder="sk-..."></div>
   <div class="field"><label>Vincario API Key</label><input id="vinKey" value="${esc(db.settings.vincarioKey||'')}"></div>
   <div class="field"><label>Vincario Secret</label><input id="vinSec" value="${esc(db.settings.vincarioSecret||'')}" type="password"></div>
   <div class="field"><label>${t('katyUser')}</label><input id="katyU" value="${esc(db.settings.katyUser||'')}"></div>
   <div class="field"><label>${t('katyPass')}</label><input id="katyP" type="password" value="${esc(db.settings.katyPass||'')}"></div>
-  <div class="toolbar"><button class="btn primary" id="katySave">${t('saveLogin')}</button>
-  <button class="btn" id="katyGo">${t('openKaty')}</button>
-  <button class="btn" id="henryGo">${t('openHenry')}</button></div>
+  <div class="toolbar"><button type="button" class="btn primary" id="katySave">${t('saveLogin')}</button>
+  <button type="button" class="btn" id="katyGo">${t('openKaty')}</button>
+  <button type="button" class="btn" id="henryGo">${t('openHenry')}</button></div>
   <p class="hint">${t('henryImportHint')}</p>
   <input id="henryFile" type="file" accept=".csv,.txt,.tsv" class="hidden">
   <button type="button" class="btn" id="henryPick">${t('pickFile')}</button>
@@ -2747,18 +2752,30 @@ function integrations(){
  </div>`;
  const btn=$('#plOpen');
  if(btn) btn.onclick=()=>openPartsLink($('#plCar').value);
- if($('#katySave')) $('#katySave').onclick=()=>{
-   if($('#oaKey')){
-     db.settings.openaiKey=$('#oaKey').value.trim();
-     try{ localStorage.setItem('werkivo_openai', db.settings.openaiKey); }catch(e){}
+ function persistIntegrations(){
+   try{
+     db.settings=db.settings||{};
+     if($('#oaKey')){
+       db.settings.openaiKey=$('#oaKey').value.trim();
+       try{ localStorage.setItem('werkivo_openai', db.settings.openaiKey); }catch(e){}
+     }
+     if($('#vinKey')) db.settings.vincarioKey=$('#vinKey').value.trim();
+     if($('#vinSec')) db.settings.vincarioSecret=$('#vinSec').value.trim();
+     if($('#katyU')) db.settings.katyUser=$('#katyU').value.trim();
+     if($('#katyP')) db.settings.katyPass=$('#katyP').value;
+     db.settings.katyLogged=true;
+     save(true);
+     if($('#oaState')) $('#oaState').textContent=db.settings.openaiKey?'Schlüssel gespeichert':'Kein Schlüssel';
+     toast(t('katySaved')||'Gespeichert');
+     return true;
+   }catch(e){
+     console.error(e);
+     toast(t('saveFail')||'Speichern fehlgeschlagen');
+     return false;
    }
-   if($('#vinKey')) db.settings.vincarioKey=$('#vinKey').value.trim();
-   if($('#vinSec')) db.settings.vincarioSecret=$('#vinSec').value.trim();
-   db.settings.katyUser=$('#katyU').value.trim();
-   db.settings.katyPass=$('#katyP').value;
-   db.settings.katyLogged=true;
-   save(); toast(t('katySaved'));
- };
+ }
+ if($('#oaSave')) $('#oaSave').onclick=e=>{ e.preventDefault(); persistIntegrations(); };
+ if($('#katySave')) $('#katySave').onclick=e=>{ e.preventDefault(); persistIntegrations(); };
  if($('#katyGo')) $('#katyGo').onclick=()=>{
    db.settings.katyLogged=true; save();
    openKatySearch('');
