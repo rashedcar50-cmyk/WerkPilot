@@ -1,6 +1,6 @@
 /* BayMeister kernel — flags, hooks, safe errors */
 window.WP = window.WP || {};
-WP.version = '1.8.0';
+WP.version = '1.12.37';
 WP.build = '2026-09-01';
 WP.features = {
   cloud: true,
@@ -54,7 +54,11 @@ window.applyUiLang = window.applyUiLang || function(){
   }catch(e){}
 };
 window.langOptions = window.langOptions || function(sel){
-  return ['de','ar','en'].map(c=>`<option value="${c}" ${c===(sel||'de')?'selected':''}>${c}</option>`).join('');
+  const langs=(window.WP_LANGS&&WP_LANGS.length)?WP_LANGS:[['de','Deutsch'],['ar','العربية'],['en','English']];
+  return langs.map(function(pair){
+    const c=pair[0], label=pair[1]||c;
+    return `<option value="${c}" ${c===(sel||'de')?'selected':''}>${label}</option>`;
+  }).join('');
 };
 window.docLang = window.docLang || function(){ return 'de'; };
 window.WP_RTL = window.WP_RTL || ['ar','fa','ur','he'];

@@ -142,7 +142,8 @@ function touch(row){
   if(row && typeof row==='object') row.updatedAt=new Date().toISOString();
   return row;
 }
-function save(){
+let _saveTimer=null;
+function persistNow(){
   try{
     persistJson(storeKey, db);
     try{ persistJson(storeKey+'_bak', db); }catch(e){}
@@ -159,6 +160,13 @@ function save(){
     }
   }
 }
+function save(immediate){
+  if(immediate){ if(_saveTimer) clearTimeout(_saveTimer); persistNow(); return; }
+  if(_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(persistNow, 80);
+}
+window.addEventListener('pagehide', function(){ if(_saveTimer) persistNow(); });
+window.addEventListener('beforeunload', function(){ if(_saveTimer) persistNow(); });
 function loadRaw(){
   for(const key of [storeKey, storeKey+'_bak']){
     try{
