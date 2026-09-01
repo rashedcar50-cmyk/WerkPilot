@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.8</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.9</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2689,7 +2689,7 @@ function settings(){
   render();
   toast(t('synced'));
  };
- $('#reset').onclick=()=>{if(confirm(t('resetConfirm'))){db=clone(seed);save();toast(t('resetDone'));render()}};
+ $('#reset').onclick=()=>{askConfirm(t('resetConfirm'),'',()=>{db=clone(seed);save();toast(t('resetDone'));render()});};
 }
 
 function studio(){
@@ -2714,7 +2714,7 @@ function studio(){
     const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='baymeister-full.json'; a.click();
   };
-  $('#seedAgain').onclick=()=>{if(confirm(t('resetConfirm'))){db=clone(seed);save();render();}};
+  $('#seedAgain').onclick=()=>{askConfirm(t('resetConfirm'),'',()=>{db=clone(seed);save();render();});};
   $('#impRaw').onclick=()=>$('#jsonFile').click();
   $('#jsonFile').onchange=e=>{
     const f=e.target.files[0]; if(!f) return;
