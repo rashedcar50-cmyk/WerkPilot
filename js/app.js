@@ -2518,6 +2518,7 @@ function pickWhatsApp(sel){
 window.pickWhatsApp=pickWhatsApp;
 function applySharedFileTo(sel){
   const file=window._sharedWaFile; if(!file) return false;
+  try{ sel=sel||sessionStorage.getItem('waTarget')||'#doc'; }catch(e){ sel=sel||'#doc'; }
   const input=document.querySelector(sel||'#doc');
   if(!input) return false;
   const dt=new DataTransfer(); dt.items.add(file);

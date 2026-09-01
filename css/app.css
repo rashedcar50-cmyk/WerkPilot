@@ -220,3 +220,6 @@ input.latnum,.latnum{direction:ltr!important;unicode-bidi:isolate;font-variant-n
 .procam-review img{flex:1;object-fit:contain;width:100%;background:#000}
 
 input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)}
+
+.wa-wait{position:fixed;left:12px;right:12px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:140;background:#1C212B;color:#fff;border-radius:16px;padding:14px;box-shadow:0 12px 30px #0006}
+.wa-wait b{display:block;margin-bottom:4px;color:#E8A54B}
