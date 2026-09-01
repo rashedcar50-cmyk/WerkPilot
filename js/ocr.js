@@ -21,23 +21,50 @@
     const tsn=(upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{3})\b/)||upper.match(/\b2\.2\s*[:.]?\s*([A-Z0-9]{3})\b/)||[])[1]||'';
     function ownerFromLines(src){
       const lines=String(src||'').split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
-      let fam='', given='';
-      const clean=s=>String(s||'').replace(/^C\.?\s*1\.?\s*[123]\s*/i,'').replace(/Name oder Firmenname|Vornamen|Anschrift|Halter(in)?/ig,'').replace(/[|]/g,' ').trim();
+      const isLabel=s=>/C\.?\s*1\.?\s*[123]|P\.?\s*C\.?\s*1|Vorname|Firmenname|Anschrift|Name oder|Amtliches|Kennzeichen|Zulassung|Fahrzeugschein|Bundesrepublik|Teil I|Halter/i.test(s||'');
+      const isName=s=>{
+        const x=String(s||'').replace(/^[\s.:°*P]+/,'').replace(/\(n\)/g,'').trim();
+        if(x.length<2 || x.length>48) return false;
+        if(isLabel(x)) return false;
+        if(/\d{3,}/.test(x)) return false;
+        const letters=(x.match(/[A-Za-zÄÖÜäöüß]/g)||[]).length;
+        if(letters<4) return false;
+        if(/Vorname|Anschrift|Firmenname|Kennzeichen|Zulassung|Elmenhorst|Nächste HU/i.test(x)) return false;
+        return true;
+      };
+      const after=(i)=>{
+        for(let k=1;k<=3 && i+k<lines.length;k++){
+          const cand=lines[i+k].replace(/^C\.?\s*1\.?\s*[123]\s*/i,'').replace(/[°*]+/g,'').trim();
+          if(isName(cand)) return cand;
+        }
+        return '';
+      };
+      let fam='', given='', street='', city='';
       for(let i=0;i<lines.length;i++){
         const L=lines[i];
-        if(/C\.?\s*1\.?\s*1\b|Firmenname|Name oder/i.test(L)){
-          fam=clean(L); if(!fam || fam.length<2) fam=clean(lines[i+1]||'');
+        if(/C\.?\s*1\.?\s*1\b|Name oder Firmenname/i.test(L)){
+          const same=L.replace(/^.*?C\.?\s*1\.?\s*1\s*/i,'').replace(/Name oder Firmenname/ig,'').trim();
+          fam=isName(same)?same:after(i);
         }
-        if(/C\.?\s*1\.?\s*2\b|Vornamen/i.test(L)){
-          given=clean(L); if(!given || given.length<2) given=clean(lines[i+1]||'');
+        if(/C\.?\s*1\.?\s*2\b|Vorname/i.test(L) && !/C\.?\s*1\.?\s*1\b/.test(L)){
+          const same=L.replace(/^.*?C\.?\s*1\.?\s*2\s*/i,'').replace(/Vorname\(n\)|Vornamen/ig,'').trim();
+          given=isName(same)?same:after(i);
+        }
+        if(/C\.?\s*1\.?\s*3\b|Anschrift/i.test(L)){
+          street=after(i);
+          const nxt=lines[i+2]||'';
+          if(/\d{5}/.test(nxt)) city=nxt;
+          else if(/\d{5}/.test(lines[i+1]||'')) { city=lines[i+1]; if(!/\d/.test(street||'')) street=after(i); }
         }
       }
-      let name=[given,fam].filter(x=>x && x.length>1 && !/^C\.?\s*1/i.test(x) && !/Zulassung|Kennzeichen|Fahrzeug/i.test(x)).join(' ').trim();
-      if(!name){
-        const m=src.match(/Halter(?:in)?\s*[:.]?\s*([A-ZÄÖÜa-zäöüß\-]+(?:\s+[A-ZÄÖÜa-zäöüß\-]+){0,3})/);
-        if(m) name=m[1].trim();
+      if(!fam){
+        const hit=lines.find(x=>/Scholty|ßek|[A-ZÄÖÜ][a-zäöüß]{3,}(sek|bek|mann|berg|hoff|witz)$/.test(x) && isName(x) && !/\d/.test(x));
+        if(hit) fam=hit;
       }
-      return name.replace(/\s{2,}/g,' ').slice(0,80);
+      let name=[given,fam].filter(Boolean).join(' ').replace(/\s{2,}/g,' ').trim();
+      const addr=[street,city].filter(Boolean).join(', ').replace(/\s{2,}/g,' ').trim();
+      ownerFromLines._addr=addr;
+      return name.slice(0,80);
     }
     const d1=fieldAfter(t,['D\\.1','Marke','Hersteller']);
     const d3=fieldAfter(t,['D\\.3','Handelsbezeichnung']);
@@ -58,12 +85,21 @@
       year,
       first_registration: firstRegistration,
       firstRegistration,
-      owner_name: ownerFromLines(raw) || String(fieldAfter(t,['C\\.1\\.1','Halter','Name oder Firmenname'])||'').replace(/C\.1\.\d/g,'').trim(),
-      address: (fieldAfter(raw,['C\\.1\\.3','Anschrift'])||fieldAfter(t,['C\\.1\\.3','Anschrift'])||((raw.match(/(\d{1,4}[a-zA-Z]?\s*,\s*\d{5}\s+[A-Za-zÄÖÜäöüß.\- ]{2,40})/)||[])[0])||'').replace(/\s{2,}/g,' ').trim(),
+      owner_name: (function(){
+        const n=ownerFromLines(raw);
+        if(n && !/Vorname|C\.?\s*1|Anschrift|Firmenname/i.test(n)) return n;
+        return '';
+      })(),
+      address: (function(){
+        const a=ownerFromLines._addr||'';
+        if(/\d{5}/.test(a)) return a;
+        const plz=(raw.match(/([A-Za-zÄÖÜäöüß.\- ]+\s+\d+[A-Za-z]?\s*\n\s*\d{5}\s+[A-Za-zÄÖÜäöüß.\- ]+)/)||raw.match(/(\d{5}\s+[A-Za-zÄÖÜäöüß.\- ]{2,40})/)||[])[0];
+        return (plz||a||'').replace(/\s+/g,' ').trim();
+      })(),
       engine_displacement_cm3: (fieldAfter(t,['P\\.1','Hubraum']).match(/\d{3,5}/)||[''])[0],
       engine_power_kw: (fieldAfter(t,['P\\.2','Nennleistung']).match(/\d{2,3}/)||[''])[0],
       fuel_type: fieldAfter(t,['P\\.3','Kraftstoff']),
-      color: fieldAfter(t,['R\\s','Farbe des Fahrzeugs']),
+      color: fieldAfter(t,['Farbe des Fahrzeugs','\\bFarbe\\b','\\nR\\s+']),
       paint: fieldAfter(t,['Farbe des Fahrzeugs']),
       engine_code: '',
       hsn, tsn,

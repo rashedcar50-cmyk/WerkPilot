@@ -45,6 +45,15 @@ assert(/Tabah/i.test(full.owner_name||'') && /Rashid/i.test(full.owner_name||'')
 assert(/21493/.test(full.address||'') && /Schwarzenbek/i.test(full.address||''),'ocr full address');
 assert(full.engine_displacement_cm3==='1395','ocr hubraum');
 assert(full.engine_power_kw==='92','ocr kW');
+const messy='Amtliches Kennzeichen\nRZ FS1802\nC.1.1 Name oder Firmenname\nScholtyßek\nPC.1.2 Vorname(n) °Ca.\nDaniel Boris\nC.1.3 Anschrift\nAlbert-Schweitzer-Allee 4F\n21493 Schwarzenbek\nE VSSZZZ6JZCR007669\nD.1 SEAT\nD.3 IBIZA';
+const real=OCR.parse(messy);
+assert(/Daniel/i.test(real.owner_name||'') && /Scholty/i.test(real.owner_name||''),'ocr real holder not label');
+assert(!/Vorname/i.test(real.owner_name||''),'ocr rejects Vorname label');
+assert(/21493/.test(real.address||'') && /Albert/i.test(real.address||''),'ocr real address');
+assert(/RZ/.test(real.plate||real.license_plate||''),'ocr real plate');
+assert(real.vin==='VSSZZZ6JZCR007669','ocr real vin');
+assert(/SEAT/i.test(real.brand||real.make||''),'ocr real make');
+
 
 
 const merged=OCR.merge({vin:'WVWZZZ1JZXW000001',owner_name:''},{vin:'',owner_name:'Rashid Tabah',plate:'RZ-TB 76'});
