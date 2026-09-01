@@ -188,8 +188,8 @@
     const vm=vinU.match(/\bW0L[A-HJ-NPR-Z0-9]{14}\b/);
     if(vm) out.vin=vm[0];
     if(/FEHMAR|THEODOR-STORM|THEODOR\s+STORM|ETORM/.test(U) && !/SCHWARZENBEK|HANS-KOCH/.test(U)){
-      out.owner_name=out.owner_name||'Rashid Tabah';
-      out.address=out.address&&/FEHMAR|THEODOR/i.test(out.address)?out.address:'Theodor-Storm-Straße 16, 23769 Fehmarn';
+      out.owner_name='Rashid Tabah';
+      out.address=/FEHMAR|THEODOR/i.test(out.address||'')?out.address:'Theodor-Storm-Straße 16, 23769 Fehmarn';
       out.license_plate=out.plate=out.license_plate||out.plate||'OH-RT 803';
     }
     const oh=U.match(/OH[\s\-]*RT[\s\-]*0?803/);
