@@ -51,7 +51,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.12</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.13</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2550,7 +2550,7 @@ function integrations(){
 }
 function auditPage(){
  const rows=db.audit.filter(a=>!session.company||a.company===session.company.id||!a.company).slice(0,200);
- const act=s=>({login:'Login',logout:'Logout','invoice.create':'Rechnung','invoice.update':'Rechnung','invoice.storno':'Storno'}[s]||s);
+ const act=s=>({login:t('login'),logout:t('logout'),'invoice.create':t('invoices'),'invoice.update':t('editInvoice'),'invoice.storno':t('del')}[s]||s);
  $('#content').innerHTML=head(t('auditTitle'))+table([t('when'),t('userCol'),t('actionCol'),t('detailCol')],rows.map(a=>[fmtWhen(a.ts),esc(typeof dLabel==='function'?dLabel(a.user):a.user),esc(act(a.action)),esc(a.detail)]));
 }
 function newWorkshopModal(){
