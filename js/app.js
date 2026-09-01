@@ -51,7 +51,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.11</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.12</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2579,7 +2579,7 @@ function settings(){
  const w=workshop();
  const conf=(db.conflicts||[]).slice(0,8).map(c=>`${esc(c.ts)} · ${esc(c.key)} · ${esc(c.winner)}`).join('<br>')||'—';
  const arch=(db.archive||[]).slice(0,8).map(a=>`${esc(a.number||'')} · ${money(a.total)}`).join('<br>')||'—';
- $('#content').innerHTML=head(t('settings'))+`<div class="grid"><div class="card"><b>Beleg-Archiv</b><div class="muted">${arch}</div></div><div class="card"><b>Sync-Konflikte</b><div class="muted">${conf}</div></div></div><div class="card"><div class="form-grid">
+ $('#content').innerHTML=head(t('settings'))+`<div class="grid"><div class="card"><b>${t('archive')}</b><div class="muted">${arch}</div></div><div class="card"><b>${t('conflicts')}</b><div class="muted">${conf}</div></div></div><div class="card"><div class="form-grid">
  <div class="field span2"><div class="alert">${t('activeWs')}: <b>${esc(session.company.name)}</b> · ${esc(session.company.country)}. ${t('wsOnly')}</div></div>
  <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'de')}</select>
  <div class="hint">${t('langHint')}</div></div>
