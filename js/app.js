@@ -69,16 +69,29 @@ function login(){
  };
 }
 
+function closeMobileMenus(){
+  const side=$('#side'); if(side) side.classList.remove('open');
+  const slot=$('#toolsSlot'); if(slot) slot.classList.remove('open');
+}
 function bindShellEvents(){
- $$('[data-page]').forEach(b=>b.onclick=()=>goPage(b.dataset.page));
- if($('#backBtn')) $('#backBtn').onclick=goBack;
+ $$('[data-page]').forEach(b=>b.onclick=()=>{ closeMobileMenus(); goPage(b.dataset.page); });
+ if($('#backBtn')) $('#backBtn').onclick=()=>{ closeMobileMenus(); goBack(); };
  const lo=$('#logout');
  if(lo) lo.onclick=()=>{audit('logout');session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
- if($('#company')) $('#company').onchange=e=>{session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render(true))};
- if($('#addWorkshop')) $('#addWorkshop').onclick=newWorkshopModal;
- if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{db.settings.uiLang=e.target.value;save(true);applyUiLang();render(true);};
- if($('#menu')) $('#menu').onclick=()=>$('#side').classList.toggle('open');
- if($('#moreBtn')) $('#moreBtn').onclick=()=>$('#toolsSlot') && $('#toolsSlot').classList.toggle('open');
+ if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render(true))};
+ if($('#addWorkshop')) $('#addWorkshop').onclick=()=>{ closeMobileMenus(); newWorkshopModal(); };
+ if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{closeMobileMenus();db.settings.uiLang=e.target.value;save(true);applyUiLang();render(true);};
+ if($('#menu')) $('#menu').onclick=()=>{ const slot=$('#toolsSlot'); if(slot) slot.classList.remove('open'); $('#side').classList.toggle('open'); };
+ if($('#moreBtn')) $('#moreBtn').onclick=e=>{ e.stopPropagation(); const side=$('#side'); if(side) side.classList.remove('open'); $('#toolsSlot') && $('#toolsSlot').classList.toggle('open'); };
+ if(!window._menuHideBound){
+   window._menuHideBound=true;
+   document.addEventListener('click', function(ev){
+     const slot=$('#toolsSlot');
+     if(!slot || !slot.classList.contains('open')) return;
+     if(slot.contains(ev.target) || (ev.target.closest && ev.target.closest('#moreBtn'))) return;
+     slot.classList.remove('open');
+   });
+ }
  const qs=$('#qsearch');
  if(qs){
   qs.onkeydown=e=>{
@@ -110,7 +123,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.61</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.62</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -642,12 +655,14 @@ function modal(title,body,onSave,saveText){
 function closeModal(){$('#modalRoot').innerHTML=''}
 window.goPage=function(p){
   if(!p) return;
+  closeMobileMenus();
   session.hist=session.hist||[];
   if(session.page && session.page!==p) session.hist.push(session.page);
   if(session.hist.length>20) session.hist=session.hist.slice(-20);
   session.page=p; render();
 };
 window.goBack=function(){
+  closeMobileMenus();
   session.hist=session.hist||[];
   session.page=session.hist.pop()||'dashboard';
   render();
