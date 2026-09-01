@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.50</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.51</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -448,8 +448,9 @@ function plainTextDoc(type, id){
 
 function printDocMarkup(type, id){
   const html = buildDocHTML(type, id);
-  const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":(WP_RTL.includes(db.settings.uiLang||"ar")?"rtl":"ltr");
-  return `<!doctype html><html lang="${type==="invoices"?dl:(db.settings.uiLang||"ar")}" dir="${ddr}"><head><meta charset="utf-8"><title>TST</title>
+  const ui=db.settings.uiLang||'de';
+  const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":((window.WP_RTL||[]).includes(ui)?"rtl":"ltr");
+  return `<!doctype html><html lang="${type==="invoices"?dl:ui}" dir="${ddr}"><head><meta charset="utf-8"><title>TST</title>
     <style>
       @page{size:${(workshop().printPaper||db.settings.printPaper||'A4')} portrait;margin:${(workshop().printMargin||db.settings.printMargin||'8mm')}}
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -1613,6 +1614,15 @@ function ensureKd(cust){
 function deDate(d){
   try{ return new Date(d||Date.now()).toLocaleDateString('de-DE'); }catch(e){ return d||''; }
 }
+function payCode(v){
+  const s=String(v||'').toLowerCase();
+  const eq=k=>{ try{ return s===String(t(k)||'').toLowerCase(); }catch(e){ return false; } };
+  if(eq('payCash') || /cash|bar|نقد|kartein/.test(s)) return 'cash';
+  if(eq('payCard') || /card|karte|بطاقة|ec-?karte/.test(s)) return 'card';
+  if(eq('payBank') || /bank|überweis|uberweis|تحويل|iban/.test(s)) return 'bank';
+  return 'open';
+}
+window.payCode=payCode;
 function lineSum(ln){ return Number(ln.qty||1)*Number(ln.price||0); }
 function isLaborLine(ln){ if(ln.kind==='parts'||ln.kind==='قطعة'||ln.kind==='Ersatzteil') return false; if(ln.kind==='labor'||ln.kind==='اجر'||ln.kind==='أجور') return true; return /lohn|أجر|اجور|أجور|عمالة|arbeit|Arbeitswert|Leist/i.test(String(ln.name||ln.sku||ln.kind||'')); }
 function invoiceModel(x){
@@ -1880,7 +1890,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   modal(title, `<div class="hy-desk">
     <div class="hy-bar">
       <span>${new Date().toLocaleDateString('de-DE')}</span>
-      <select id="pay">${[[t('payOpen')], [t('payCash')],[t('payCard')],[t('payBank')]].map(([p])=>`<option ${((existing&&existing.payment)||'')===p?'selected':''}>${p}</option>`).join('')}</select>
+      <select id="pay">${[['open',t('payOpen')],['cash',t('payCash')],['card',t('payCard')],['bank',t('payBank')]].map(([v,p])=>`<option value="${v}" ${((existing&&existing.payment)|| (kind==='bar'?'cash':'open'))===v?'selected':''}>${p}</option>`).join('')}</select>
       <select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select>
       <select id="fcust"><option value="walkin" ${!customerId?'selected':''}>${t('walkIn')||t('cashSale')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select>
       <button type="button" class="btn ok small" id="scanInvCam" title="${t('openCam')}">📷 ${t('openCam')}</button>
@@ -1930,14 +1940,14 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     if(lines.some(l=>!(Number(l.qty)>0))) return toast(t('needQtyPrice'));
     let custId=$('#fcust')?.value||'';
     if(custId==='walkin') custId='';
-    const veh=vehicleOf($('#fv').value)||{};
+    const veh=vehicleOf($('#fv')&&$('#fv').value)||{};
     let parts=lines.filter(x=>!isLaborLine(x)).reduce((s,x)=>s+x.qty*x.price,0);
     let labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
     const discount=latNum($('#fd')?.value), tax=latNum($('#ft')?.value)||19;
     let net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
     parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
     const obj={id:existing?existing.id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custId||veh.customerId||'',parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
-      type:kind==='bar'?'Barverkauf':'Rechnung', payment:payCode($('#pay').value), paid:['cash','card'].includes(payCode($('#pay').value)),
+      type:kind==='bar'?'Barverkauf':'Rechnung', payment:payCode($('#pay')&&$('#pay').value), paid:['cash','card'].includes(payCode($('#pay')&&$('#pay').value)),
       number:existing?existing.number:nextInvoiceNumber(), lines, repairId:existing&&existing.repairId, auftrag:existing&&existing.auftrag, updatedAt:new Date().toISOString()};
     lines.forEach(rememberKatyArticle);
     if(existing){
@@ -3014,8 +3024,10 @@ function settings(){
  </div>`;
  if($('#lang')) $('#lang').onchange=()=>{db.settings.uiLang=$('#lang').value;save();applyUiLang();render();};
  $('#saveset').onclick=()=>{
+  try{
    db.settings.font=+$('#font').value||16;
    db.settings.uiLang=$('#lang').value;
+   if(typeof restoreOpenAI==='function') restoreOpenAI(db);
    patchWorkshop({
      hourlyRate:+$('#hrate').value||85,
      workshopPhone:$('#wphone').value,
@@ -3040,7 +3052,10 @@ function settings(){
      printColor:$('#pcolor')?$('#pcolor').value!=='0':true
    });
    const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} }
+   save(true);
+   if(typeof restoreOpenAI==='function') restoreOpenAI(db);
    applyUiLang();toast(t('saved'));render();
+  }catch(e){ console.error(e); toast((e&&e.message)||t('saveFail')||'Save failed'); }
  };
  if($('#addWsSet')) $('#addWsSet').onclick=newWorkshopModal;
  if($('#exportCo')) $('#exportCo').onclick=()=>{

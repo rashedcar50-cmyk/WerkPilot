@@ -155,6 +155,11 @@ function restoreOpenAI(store){
   }
   return k;
 }
+if(typeof window!=='undefined'){
+  window.readOpenAI=readOpenAI;
+  window.writeOpenAI=writeOpenAI;
+  window.restoreOpenAI=restoreOpenAI;
+}
 function persistJson(key, obj){
   localStorage.setItem(key, JSON.stringify(obj));
 }
