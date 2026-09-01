@@ -58,7 +58,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.23</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.24</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2494,9 +2494,26 @@ window.openProCamera=openProCamera;
 window.openCamera=function(target){ return openProCamera({target:typeof target==='string'?target:'#doc'}); };
 function pickWhatsApp(sel){
   window._camInput=sel||'#doc';
-  toast(t('waPickHint'));
-  const el=document.querySelector(sel||'#doc');
-  if(el) el.click();
+  try{ sessionStorage.setItem('waTarget', window._camInput); }catch(e){}
+  document.querySelectorAll('.wa-wait').forEach(n=>n.remove());
+  const bar=document.createElement('div');
+  bar.className='wa-wait';
+  bar.innerHTML=`<b>${t('fromWhatsApp')}</b><div>${t('waGoHint')}</div>
+    <div class="toolbar" style="margin-top:8px">
+      <button type="button" class="btn primary" id="waOpen">${t('openWhatsApp')}</button>
+      <button type="button" class="btn" id="waFile">${t('pickFile')}</button>
+      <button type="button" class="btn ghost" id="waX">✕</button>
+    </div>`;
+  document.body.appendChild(bar);
+  bar.querySelector('#waX').onclick=()=>bar.remove();
+  bar.querySelector('#waFile').onclick=()=>{
+    const el=document.querySelector(window._camInput||'#doc');
+    if(el) el.click();
+  };
+  bar.querySelector('#waOpen').onclick=()=>{
+    window.open('https://wa.me/','_blank','noopener');
+    toast(t('waGoHint'));
+  };
 }
 window.pickWhatsApp=pickWhatsApp;
 function applySharedFileTo(sel){
