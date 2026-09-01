@@ -2272,7 +2272,7 @@ async function scanPurchaseDocument(){
 
 async function openCameraForPurchase(onCapture){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    return toast('الكاميرا غير مدعومة في هذا المتصفح');
+    return toast(t('camUnsupported')||t('openCam'));
   }
 
   const box = document.createElement('div');
@@ -2280,13 +2280,13 @@ async function openCameraForPurchase(onCapture){
   box.innerHTML = `
     <div class="modal" style="max-width:700px">
       <div class="modal-head">
-        <b>📷 تصوير فاتورة الشراء</b>
+        <b>📷 ${t('scanPurchase')}</b>
         <button id="camClose" class="btn bad">✕</button>
       </div>
       <video id="cameraVideo" autoplay playsinline style="width:100%;border-radius:12px;background:#000;max-height:60vh"></video>
       <div style="margin-top:12px;text-align:center;display:flex;gap:8px;justify-content:center">
-        <button id="takePhoto" class="btn primary">📸 التقاط</button>
-        <button id="camClose2" class="btn ghost">إلغاء</button>
+        <button id="takePhoto" class="btn primary">📸 ${t('takePhoto')||t('openCam')}</button>
+        <button id="camClose2" class="btn ghost">${t('cancelBtn')}</button>
       </div>
     </div>
   `;
@@ -2314,16 +2314,16 @@ async function openCameraForPurchase(onCapture){
       canvas.height = video.videoHeight || 720;
       canvas.getContext('2d').drawImage(video, 0, 0);
       canvas.toBlob(blob=>{
-        if(!blob){ toast('فشل التقاط الصورة'); return; }
+        if(!blob){ toast(t('camDenied')); return; }
         const file = new File([blob], 'purchase-receipt.jpg', { type: 'image/jpeg' });
         close();
         if(typeof onCapture === 'function') onCapture(file);
-        else toast('تم التقاط الصورة');
+        else toast(t('shotOk'));
       }, 'image/jpeg', 0.85); // جودة 0.85 = أسرع وأصغر
     };
   } catch(e){
     box.remove();
-    toast('لم يتم السماح باستخدام الكاميرا');
+    toast(t('camDenied'));
     console.error(e);
   }
 }
@@ -2715,7 +2715,7 @@ function simpleModal(title,fields,onSave){
 login();
   async function openCamera(){
 if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-return toast('الكاميرا غير مدعومة في هذا المتصفح');
+return toast(t('camUnsupported')||t('openCam'));
 }
 
 const box=document.createElement('div');
@@ -2723,13 +2723,13 @@ box.className='modal-back';
 box.innerHTML=`
 <div class="modal" style="max-width:700px">
 <div class="modal-head">
-<b>📷 تصوير ورقة السيارة</b>
+<b>📷 ${t('scanScheinTitle')||t('scanSchein')}</b>
 <button id="camClose" class="btn bad">✕</button>
 </div>
 <video id="cameraVideo" autoplay playsinline
 style="width:100%;border-radius:12px;background:#000"></video>
 <div style="margin-top:12px;text-align:center">
-<button id="takePhoto" class="btn primary">📸 التقاط الصورة</button>
+<button id="takePhoto" class="btn primary">📸 ${t('takePhoto')||t('openCam')}</button>
 </div>
 </div>
 `;
@@ -2771,13 +2771,13 @@ input.files=dt.files;
 input.dispatchEvent(new Event('change',{bubbles:true}));
 
 close();
-toast('تم التقاط الصورة بنجاح');
+toast(t('shotOk'));
 },'image/jpeg',0.92);
 };
 
 }catch(e){
 box.remove();
-toast('لم يتم السماح باستخدام الكاميرا');
+toast(t('camDenied'));
 console.error(e);
 }
 }

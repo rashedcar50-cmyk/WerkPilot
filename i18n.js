@@ -436,9 +436,9 @@ window.WP_INV_DE = {
 })();
 (function(){
   const w={
-    en:{download:'Download',walkIn:'No customer / direct sale',stornoHint:'The invoice is cancelled (Storno), not deleted. The number stays archived.',pickFile:'Choose file',openCam:'Open camera'},
-    de:{download:'Herunterladen',walkIn:'Ohne Kunde / Barverkauf',stornoHint:'Die Rechnung wird storniert, nicht gelöscht. Die Nummer bleibt im Archiv.',pickFile:'Datei wählen',openCam:'Kamera öffnen'},
-    ar:{download:'تحميل',walkIn:'بدون عميل / بيع مباشر',stornoHint:'الفاتورة تتلغى (Storno) وما بتنحذف. الرقم بيضل بالأرشيف.',pickFile:'اختيار ملف',openCam:'فتح الكاميرا'},
+    en:{download:'Download',walkIn:'No customer / direct sale',stornoHint:'The invoice is cancelled (Storno), not deleted. The number stays archived.',pickFile:'Choose file',openCam:'Open camera',takePhoto:'Take photo',shotOk:'Photo captured',camDenied:'Camera permission denied',camUnsupported:'Camera not supported in this browser'},
+    de:{download:'Herunterladen',walkIn:'Ohne Kunde / Barverkauf',stornoHint:'Die Rechnung wird storniert, nicht gelöscht. Die Nummer bleibt im Archiv.',pickFile:'Datei wählen',openCam:'Kamera öffnen',takePhoto:'Foto aufnehmen',shotOk:'Foto aufgenommen',camDenied:'Kamerazugriff verweigert',camUnsupported:'Kamera in diesem Browser nicht verfügbar'},
+    ar:{download:'تحميل',walkIn:'بدون عميل / بيع مباشر',stornoHint:'الفاتورة تتلغى (Storno) وما بتنحذف. الرقم بيضل بالأرشيف.',pickFile:'اختيار ملف',openCam:'فتح الكاميرا',takePhoto:'التقاط الصورة',shotOk:'تم التقاط الصورة',camDenied:'لم يُسمح بالكاميرا',camUnsupported:'الكاميرا غير مدعومة في هذا المتصفح'},
     tr:{walkIn:'Müşterisiz / peşin satış'},
     sr:{walkIn:'Bez klijenta / gotovina'},
     ru:{walkIn:'Без клиента / наличные'},
