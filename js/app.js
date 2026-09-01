@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.2</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.3</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -95,7 +95,7 @@ function mountDevDock(){
   if(typeof isDev!=='function' || !isDev()) return;
   if($('#devFab')) return;
   const fab=document.createElement('button');
-  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok — طلب تعديل'; fab.textContent='G';
+  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok'; fab.textContent='G';
   document.body.appendChild(fab);
   fab.onclick=()=>toggleDevPanel();
 }
@@ -105,27 +105,27 @@ function toggleDevPanel(){
   const box=document.createElement('div');
   box.id='devPanel'; box.className='dev-panel';
   const reqs=db.settings.devRequests||[];
-  box.innerHTML=`<h3>Grok داخل الورشة</h3>
-    <p class="muted">هاللوحة إلك وحدك (owner). اكتب التعديل، بنحفظه هون. بعدين افتح محادثة Grok والصق الطلب حتى ينفّذ فوراً.</p>
-    <textarea id="devAsk" placeholder="مثال: أضف خانة رقم الهيكل على بطاقة الأمر"></textarea>
+  box.innerHTML=`<h3>${t('devTitle')}</h3>
+    <p class="muted">${t('devHint')}</p>
+    <textarea id="devAsk" placeholder="${t('devPh')}"></textarea>
     <div class="toolbar" style="margin-top:8px">
-      <button class="btn primary" id="devSave">حفظ الطلب</button>
-      <button class="btn" id="devCopy">نسخ الكل</button>
-      <button class="btn ghost" id="devClose">إغلاق</button>
+      <button class="btn primary" id="devSave">${t('saveReq')}</button>
+      <button class="btn" id="devCopy">${t('copyAll')}</button>
+      <button class="btn ghost" id="devClose">${t('closeBtn')}</button>
     </div>
-    <div class="dev-req">${reqs.length?reqs.slice().reverse().map(r=>`<div><b>${esc(r.ts)}</b><div>${esc(r.text)}</div></div>`).join(''):'<div class="muted">ما في طلبات بعد.</div>'}</div>`;
+    <div class="dev-req">${reqs.length?reqs.slice().reverse().map(r=>`<div><b>${esc(r.ts)}</b><div>${esc(r.text)}</div></div>`).join(''):'<div class="muted">'+t('noReqs')+'</div>'}</div>`;
   document.body.appendChild(box);
   $('#devClose').onclick=()=>box.remove();
   $('#devSave').onclick=()=>{
     const text=$('#devAsk').value.trim();
-    if(!text) return toast('اكتب الطلب أولاً');
+    if(!text) return toast(t('askWriteFirst'));
     db.settings.devRequests=db.settings.devRequests||[];
     db.settings.devRequests.push({ts:new Date().toLocaleString(),text});
-    save(); toast('تم حفظ الطلب'); box.remove(); toggleDevPanel();
+    save(); toast(t('reqSaved')); box.remove(); toggleDevPanel();
   };
   $('#devCopy').onclick=()=>{
     const text=(db.settings.devRequests||[]).map(r=>'- '+r.text).join('\n')||$('#devAsk').value;
-    navigator.clipboard.writeText(text).then(()=>toast('تم النسخ — الصقه في Grok')).catch(()=>toast(text));
+    navigator.clipboard.writeText(text).then(()=>toast(t('copiedGrok'))).catch(()=>toast(text));
   };
 }
 function page(){
@@ -392,8 +392,8 @@ async function exportInvoicePDF(iid){
   const inv=(db.invoices||[]).find(x=>x.id===iid);
   if(!inv) return toast(t('invMissing'));
   toast(t('pdfWait'));
-  try{ await WP.loadPdf(); }catch(e){ return toast('تعذر تحميل مكتبة PDF'); }
-  if(!window.html2canvas || !window.jspdf) return toast('مكتبة PDF غير محمّلة — حدّث الصفحة');
+  try{ await WP.loadPdf(); }catch(e){ return toast(t('pdfFailLib')); }
+  if(!window.html2canvas || !window.jspdf) return toast(t('pdfNotLoaded'));
   const page=printDocMarkup('invoices', iid);
   const host=document.createElement('div');
   host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1';
@@ -432,7 +432,7 @@ async function exportInvoicePDF(iid){
 window.exportInvoicePDF=exportInvoicePDF;
 
 function exportEmail(type, id){
-  const subject = encodeURIComponent('Werkivo - ' + (type || 'تقرير'));
+  const subject = encodeURIComponent('Werkivo - ' + (type || t('reportWord')));
   const body = encodeURIComponent(plainTextDoc(type, id).slice(0, 1800));
   window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }
@@ -501,7 +501,7 @@ function dashboard(){
  </div></div>`+(stale?`<div class="alert tap" onclick="goPage('settings')">${t('backupWarn')}</div>`:'');
  })()}
  <div class="card" style="margin-top:12px"><b>${t('todayCars')}</b>
- ${inside.length?inside.map(r=>`<div class="today-item tap" onclick="openRepair('${r.id}')"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(dLabel(r.description||''))} · ${esc(dLabel(r.tech||''))}</div></div><div><span class="status ${r.status==='انتظار قطع'?'warn':r.status==='قيد التنفيذ'?'info':'ok'}">${esc(stLabel(r.status))}</span>
+ ${inside.length?inside.map(r=>`<div class="today-item tap" onclick="openRepair('${r.id}')"><div>${esc(vehicleName(r.vehicleId))}<div class="muted">${esc(dLabel(r.description||''))} · ${esc(dLabel(r.tech||''))}</div></div><div><span class="status ${repairStatusClass(r.status)}">${esc(stLabel(r.status))}</span>
  <button class="btn small" onclick="event.stopPropagation();openRepair('${r.id}')">${t('openBtn')}</button></div></div>`).join(''):`<p class="muted">${t('noCarsInShop')}</p>`}
  </div>
  <div class="card" style="margin-top:12px"><b>${t('todayApptsTitle')}</b>
@@ -732,7 +732,7 @@ const ai = await response.json();
 
 if (!response.ok) {
 console.error(ai);
-throw new Error(ai.error || 'تعذرت قراءة ورقة السيارة');
+throw new Error(ai.error || t('ocrFailSchein'));
 }
 
 const parsed = {
@@ -892,14 +892,14 @@ async function readScheinAI(file){
     }
   }catch(e){ console.warn('tesseract', e); }
   const merged=mergeSchein(ai, local);
-  if(!merged.vin && !merged.license_plate) throw new Error('تعذرت قراءة ورقة السيارة');
+  if(!merged.vin && !merged.license_plate) throw new Error(t('ocrFailSchein'));
   return merged;
 }
 function findOrCreateFromSchein(ai){
   const plate = (ai.license_plate || ai.plate || '').trim();
   const vin = (ai.vin || '').trim().toUpperCase();
   let v = db.vehicles.find(x => (vin && (x.vin||'').toUpperCase()===vin) || (plate && x.plate===plate));
-  const ownerName = (ai.owner_name || ai.holder || ai.customer_name || '').trim() || (plate ? ('مالك '+plate) : 'زبون جديد');
+  const ownerName = (ai.owner_name || ai.holder || ai.customer_name || '').trim() || (plate ? (t('holderOf')+' '+plate) : t('newCustDefault'));
   const ownerPhone = (ai.phone || ai.owner_phone || '').trim();
   const ownerAddr = (ai.address || ai.owner_address || '').trim();
   let c = v ? db.customers.find(x=>x.id===v.customerId) : db.customers.find(x=>x.companyId===session.company.id && x.name===ownerName);
@@ -982,7 +982,7 @@ function scanScheinStartRepair(mode){
       const ai=window._scheinAI;
       const {c,v}=findOrCreateFromSchein(ai);
       v.km=km; upsertVehicleCloud(v); save();
-      const complaint=($('#scheinWork')&&$('#scheinWork').value||'').trim() || 'استلام من ورقة السيارة';
+      const complaint=($('#scheinWork')&&$('#scheinWork').value||'').trim() || t('scheinIntake');
       window._scheinReady=false; window._scheinAI=null;
       if(mode==='estimate'){
         closeModal();
@@ -998,11 +998,11 @@ function scanScheinStartRepair(mode){
         toast((v.plate||v.vin)+' / '+km+' km');
         return;
       }
-      const r={id:id('r'),companyId:session.company.id,vehicleId:v.id,complaint,description:complaint,jobs:[],parts:[],photos:[],tech:session.user.name||'',hours:1,status:'استلام',km:km,fuel:'نصف',date:todayISO()};
+      const r={id:id('r'),companyId:session.company.id,vehicleId:v.id,complaint,description:complaint,jobs:[],parts:[],photos:[],tech:session.user.name||'',hours:1,status:'intake',km:km,fuel:'half',date:todayISO()};
       db.repairs.push(r); upsertRepairCloud(r); save();
       audit('repair.from_schein', (v.plate||v.vin)+' '+km);
       closeModal(); session.repairId=r.id; session.page='repairs'; render();
-      toast('تم فتح الأمر — '+esc(v.plate||v.vin)+' / '+km+' km');
+      toast(t('jobOpened')+' — '+esc(v.plate||v.vin)+' / '+km+' km');
       return;
     }
     $('#ocrStatus').textContent=t('readingSchein');
@@ -1128,14 +1128,14 @@ function repairDesk(rid){
  if(kmBtn) kmBtn.onclick=()=>{
    r.km=$('#deskKm').value;
    if(v){ v.km=Number(r.km||0); upsertVehicleCloud(v); }
-   upsertRepairCloud(r); save(); toast('تم حفظ الكيلومتر'); render();
+   upsertRepairCloud(r); save(); toast(t('kmSaved')); render();
  };
  const add=$('#addStock');
  if(add) add.onclick=()=>{
    const item=db.inventory.find(x=>x.id===$('#stockPick').value);
-   if(!item) return toast('لا قطعة بالمخزون');
+   if(!item) return toast(t('noStockItem'));
    const qty=Number($('#stockQty').value||1);
-   if(Number(item.qty||0)<qty) return toast('الكمية غير كافية');
+   if(Number(item.qty||0)<qty) return toast(t('qtyLow'));
    r.parts=r.parts||[];
    r.parts.push({sku:item.sku,name:item.name,qty,price:Number(item.sell||item.buy||0),consumed:true});
    item.qty=Number(item.qty||0)-qty;
@@ -1148,7 +1148,7 @@ window.addRepairPhoto=async function(rid,kind,input){
   let url=await uploadWorkshopFile(file,'repairs');
   if(!url){ try{ url=await compressVehiclePhoto(file);}catch(e){ return toast(t('photoFail')); } }
   r.photos=r.photos||[]; r.photos.push({kind,url});
-  save(); upsertRepairCloud(r); render(); toast('تم حفظ الصورة');
+  save(); upsertRepairCloud(r); render(); toast(t('photoSaved')||t('shotOk'));
 };
 window.setRepairStatus=function(rid,st){
   const r=db.repairs.find(x=>x.id===rid); if(!r) return;
@@ -1164,10 +1164,10 @@ function repairModal(existing){
  <div class="field"><label>${t('tech')}</label><input id="rt" value="${esc(r.tech||'')}"></div>
  <div class="field"><label>${t('km')}</label><input id="rkm" class="latnum" inputmode="decimal" lang="de" value="${r.km||''}"></div>
  <div class="field"><label>${t('fuel')}</label><select id="rfuel">
-  <option value="فارغ" ${r.fuel==='فارغ'?'selected':''}>${t('fuelEmpty')}</option>
-  <option value="ربع" ${r.fuel==='ربع'?'selected':''}>${t('fuelQ')}</option>
-  <option value="نصف" ${!r.fuel||r.fuel==='نصف'?'selected':''}>${t('fuelH')}</option>
-  <option value="ممتلئ" ${r.fuel==='ممتلئ'?'selected':''}>${t('fuelF')}</option>
+  <option value="empty" ${r.fuel==='empty'||r.fuel==='فارغ'?'selected':''}>${t('fuelEmpty')}</option>
+  <option value="quarter" ${r.fuel==='quarter'||r.fuel==='ربع'?'selected':''}>${t('fuelQ')}</option>
+  <option value="half" ${!r.fuel||r.fuel==='half'||r.fuel==='نصف'?'selected':''}>${t('fuelH')}</option>
+  <option value="full" ${r.fuel==='full'||r.fuel==='ممتلئ'?'selected':''}>${t('fuelF')}</option>
  </select></div>
  <div class="field span2"><label>${t('complaint')}</label><textarea id="rc">${esc(r.complaint||'')}</textarea></div>
  <div class="field span2"><label>${t('work')}</label><textarea id="rd">${esc(r.description||'')}</textarea></div>
@@ -1207,7 +1207,7 @@ function repairModal(existing){
 }
 function repairEditModal(rid){
   const r=db.repairs.find(x=>x.id===rid);
-  if(!r) return toast('الأمر غير موجود');
+  if(!r) return toast(t('jobMissing'));
   repairModal(r);
 }
 window.openRepair=repairEditModal;
@@ -1216,7 +1216,7 @@ function appointments(){
   $('#content').innerHTML=head(t('appointmentsTitle'))+
   table([t('date'),t('time'),t('vehicle'),t('customer'),t('tech'),t('status'),t('action')],rows.map(a=>[
     esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(dLabel(a.tech||'-')),esc(stLabel(a.status||'')),
-    a.status==='تم التحويل'?'—':`<button class="btn small primary" onclick="appointmentToRepair('${a.id}')">${t('convertJob')}</button>`
+    (normStatus(a.status)==='converted')?'—':`<button class="btn small primary" onclick="appointmentToRepair('${a.id}')">${t('convertJob')}</button>`
   ]),'appointments')+
   `<div class="bottom-action"><button class="btn primary" id="add">${t('newApptBtn')}</button></div>`;
   $('#add').onclick=()=>{
@@ -1224,14 +1224,14 @@ function appointments(){
       <div class="field"><label>${t('vehicle')}</label><select id="av">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)}</option>`).join('')}</select></div>
       <div class="field"><label>${t('date')}</label><input id="ad" type="date" value="${todayISO()}"></div>
       <div class="field"><label>${t('time')}</label><input id="at" type="time" value="09:00"></div>
-      <div class="field"><label>${t('tech')}</label><input id="atech" value="${esc(dLabel('الميكانيكي'))}"></div>
+      <div class="field"><label>${t('tech')}</label><input id="atech" value="${esc(t('mechanic'))}"></div>
       <div class="field span2"><label>${t('note')}</label><input id="an"></div>
     </div>`,()=>{
       const vid=$('#av').value; const v=vehicleOf(vid);
       const clash=companyRows('appointments').some(x=>x.date===$('#ad').value && x.time===$('#at').value && x.tech===$('#atech').value);
       if(clash) return toast(t('clash'));
       db.appointments=db.appointments||[];
-      db.appointments.push({id:id('ap'),companyId:session.company.id,vehicleId:vid,customerId:v?.customerId||'',date:$('#ad').value,time:$('#at').value,tech:$('#atech').value,note:$('#an').value,status:'مؤكد'});
+      db.appointments.push({id:id('ap'),companyId:session.company.id,vehicleId:vid,customerId:v?.customerId||'',date:$('#ad').value,time:$('#at').value,tech:$('#atech').value,note:$('#an').value,status:'confirmed'});
       upsertAppointmentCloud(db.appointments[db.appointments.length-1]); save(); audit('appointment.create',$('#ad').value+' '+$('#at').value); closeModal(); render();
     });
   };
@@ -1239,12 +1239,12 @@ function appointments(){
 
 function appointmentToRepair(aid){
   const a=db.appointments.find(x=>x.id===aid);
-  if(!a) return toast('الموعد غير موجود');
-  if(a.status==='تم التحويل' && a.repairId){ session.repairId=a.repairId; session.page='repairs'; return render(); }
-  const r={id:id('r'),companyId:session.company.id,vehicleId:a.vehicleId,complaint:a.note||'موعد ورشة',description:a.note||'',jobs:[],parts:[],photos:[],tech:a.tech||'',hours:1,status:'استلام',km:'',fuel:'نصف',date:a.date||todayISO()};
+  if(!a) return toast(t('apptMissing'));
+  if(normStatus(a.status)==='converted' && a.repairId){ session.repairId=a.repairId; session.page='repairs'; return render(); }
+  const r={id:id('r'),companyId:session.company.id,vehicleId:a.vehicleId,complaint:a.note||t('shopAppt'),description:a.note||'',jobs:[],parts:[],photos:[],tech:a.tech||'',hours:1,status:'intake',km:'',fuel:'half',date:a.date||todayISO()};
   db.repairs.push(r); upsertRepairCloud(r);
-  a.status='تم التحويل'; a.repairId=r.id; upsertAppointmentCloud(a);
-  save(); audit('appointment.to_repair', a.date||''); session.repairId=r.id; session.page='repairs'; render(); toast('تم فتح أمر الإصلاح');
+  a.status='converted'; a.repairId=r.id; upsertAppointmentCloud(a);
+  save(); audit('appointment.to_repair', a.date||''); session.repairId=r.id; session.page='repairs'; render(); toast(t('jobOpened'));
 }
 window.appointmentToRepair=appointmentToRepair;
 function estimates(){
@@ -1732,7 +1732,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       upsertInvoiceCloud(obj); audit('invoice.update',obj.number);
     } else {
       db.invoices.push(obj); upsertInvoiceCloud(obj);
-      db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
+      db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'Sales',debit:0,credit:total,note:obj.number});
       audit('invoice.create',obj.number);
     }
     archiveBeleg(obj);
@@ -1796,7 +1796,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   if($('#katyPasteBtn')) $('#katyPasteBtn').onclick=()=>{
     const raw=$('#katyPaste').value||'';
     const rows=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-    if(!rows.length) return toast('الصق سطراً واحداً على الأقل');
+    if(!rows.length) return toast(t('needLine'));
     let n=0;
     rows.forEach(line=>{
       const parsed=parseInvoiceLine(line.replace(/\t/g,'|').replace(/\s{2,}/g,'|'));
@@ -1806,7 +1806,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       n++;
     });
     $('#katyPaste').value='';
-    toast('تمت إضافة '+n+' بند من الكتالوج');
+    toast(t('addedFrom')+' '+n);
   };
   if($('#katySku')) $('#katySku').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
 }
@@ -1870,7 +1870,7 @@ function financeModal(type, vehicleId='', customerId=''){
     obj.lines=[{name:'قطع',qty:1,price:parts},{name:'أجور',qty:1,price:labor}];
     db.invoices.push(obj);
     upsertInvoiceCloud(obj);
-    db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'مبيعات',debit:0,credit:total,note:obj.number});
+    db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'Sales',debit:0,credit:total,note:obj.number});
     audit('invoice.create',obj.number);
   }
   save();closeModal();render();
@@ -1988,7 +1988,7 @@ function purchaseManualModal(){
     audit('purchase.create', purchase.supplier);
     closeModal();
     render();
-    toast('تمت إضافة الشراء');
+    toast(t('purchaseAdded'));
   });
 }
 
@@ -2001,14 +2001,14 @@ function deletePurchaseDo(pid){
   deletePurchaseCloud(pid);
   audit('purchase.delete', pid);
   render();
-  toast('تم الحذف');
+  toast(t('deleted'));
 }
 
 async function viewReceipt(url){
-  if(!url) return toast('لا توجد فاتورة محفوظة');
+  if(!url) return toast(t('noReceipt'));
   // افتح الرابط مباشرة (صورة أو ملف من Supabase)
   const w = window.open(url, '_blank');
-  if(!w) toast('اسمح بالنوافذ المنبثقة لعرض الفاتورة');
+  if(!w) toast(t('preview'));
 }
 
 async function viewReceiptPDF(url){
@@ -2110,7 +2110,7 @@ async function scanPurchaseDocument(){
       let receiptUrl = pendingReceiptUrl;
       if(!receiptUrl && pendingFile){
         const sb = window.supabaseClient;
-        if(!sb) throw new Error('Supabase غير مهيأ');
+        if(!sb) throw new Error('Supabase');
         const fileName = `${Date.now()}-${(pendingFile.name||'receipt.jpg').replace(/[^a-zA-Z0-9._-]/g,'_')}`;
         const { error: uploadError } = await sb.storage
           .from('purchase-receipts')
@@ -2145,7 +2145,7 @@ async function scanPurchaseDocument(){
       toast(t('saved'));
     }catch(e){
       console.error(e);
-      $('#purchaseStatus').textContent = 'خطأ: ' + (e.message||'');
+      $('#purchaseStatus').textContent = t('errorGeneric')+': '+(e.message||'');
       toast(e.message || t('saveFailed'));
       $('#msave').disabled = false;
     }
@@ -2281,12 +2281,12 @@ async function scanPurchaseDocument(){
         const ms = Math.round(performance.now() - t0);
         const hasData = !!(ai.supplier_name || ai.supplier || ai.invoice_number || total);
         status.textContent = hasData
-          ? `✓ تمت القراءة خلال ${ms}ms — راجع البيانات ثم احفظ`
-          : `⚠ لم تُستخرج بيانات كافية (${ms}ms) — أكمل يدوياً ثم احفظ`;
+          ? ('✓ '+t('ocrHint')+' ('+ms+' ms)')
+          : ('⚠ '+t('ocrManual')+' ('+ms+' ms)');
 
       } catch(e){
         console.error(e);
-        status.textContent = 'خطأ في القراءة: ' + (e.message||'');
+        status.textContent = t('ocrFail')+' '+(e.message||'');
         // افتح النموذج يدوياً حتى لو فشل OCR
         formBox.classList.remove('hidden');
         if(saveBtn) saveBtn.disabled = false;
@@ -2379,7 +2379,7 @@ function expenses(){
  const rows=companyRows('expenses');
 $('#content').innerHTML=head(t('expensesTitle'),`<button class="btn primary" id="scanExpense">📷 ${t('scanBill')}</button> <button class="btn primary" id="add">${t('newExpense')}</button>`)+
  table([t('date'),t('statement'),t('amount'),t('category')],rows.map(x=>[esc(x.date),esc(x.note),money(x.amount),esc(x.category)]));
- $('#add').onclick=()=>simpleModal(t('newExpense'),[['date',t('date'),'date'],['note',t('statement')],['amount',t('amount'),'number'],['category',t('category')]],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);db.journal.push({id:id('j'),companyId:session.company.id,date:o.date||todayISO(),account:'مصروف',debit:Number(o.amount||0),credit:0,note:o.note});save();audit('expense.create',o.note);render()});
+ $('#add').onclick=()=>simpleModal(t('newExpense'),[['date',t('date'),'date'],['note',t('statement')],['amount',t('amount'),'number'],['category',t('category')]],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);db.journal.push({id:id('j'),companyId:session.company.id,date:o.date||todayISO(),account:'Expense',debit:Number(o.amount||0),credit:0,note:o.note});save();audit('expense.create',o.note);render()});
 $('#scanExpense').onclick=scanExpenseDocument;
 }
    async function scanExpenseDocument(){
@@ -2430,7 +2430,7 @@ const ai=await response.json();
 
 if(!response.ok){
 console.error(ai);
-throw new Error(ai.error||'تعذرت قراءة الفاتورة');
+throw new Error(ai.error||t('ocrFail'));
 }
 
 const amount=Number(
@@ -2443,9 +2443,9 @@ const expense={
 id:id('x'),
 companyId:session.company.id,
 date:ai.expense_date||new Date().toISOString().slice(0,10),
-note:ai.description||ai.supplier_name||'مصروف',
+note:ai.description||ai.supplier_name||t('expenseDefault'),
 amount:amount,
-category:ai.category||'مصروف',
+category:ai.category||t('expenseDefault'),
 supplier_name:ai.supplier_name||'',
 net_amount:ai.net_amount||'',
 tax_amount:ai.tax_amount||'',
@@ -2465,7 +2465,7 @@ toast(t('expAdded'));
 }catch(e){
 console.error(e);
 $('#expenseStatus').textContent=t('ocrFail');
-toast(e.message||'حدث خطأ');
+toast(e.message||t('errorGeneric'));
 $('#msave').disabled=false;
 }
 },t('readAdd2'));
@@ -2563,7 +2563,7 @@ function newWorkshopModal(){
     <div class="field span2"><label>${t('address')}</label><input id="nwAddr"></div>
   </div>`, ()=>{
     const brand=$('#nwBrand').value.trim(), name=$('#nwName').value.trim();
-    if(!brand && !name) return toast('أدخل اسم الورشة');
+    if(!brand && !name) return toast(t('enterWsName'));
     const co={id:id('ws'), name:brand||name, country:$('#nwCountry').value, currency:$('#nwCur').value.trim()||'EUR', docLang:$('#nwCountry').value==='DE'?'de':'de'};
     co.profile=defaultWorkshopProfile(co, db.settings);
     co.profile.workshopBrand=brand||name;
@@ -2572,7 +2572,7 @@ function newWorkshopModal(){
     co.profile.workshopAddress=$('#nwAddr').value.trim();
     co.profile.invoiceSeq=0; co.profile.auftragSeq=0;
     db.companies.push(co); save();
-    session.company=co; closeModal(); render(); toast('تمت إضافة الورشة — املأ البيانات القانونية من الإعدادات');
+    session.company=co; closeModal(); render(); toast(t('wsAdded'));
   });
 }
 window.newWorkshopModal=newWorkshopModal;
@@ -2672,7 +2672,7 @@ function settings(){
    const a=document.createElement('a');
    a.href=URL.createObjectURL(new Blob([JSON.stringify(pack,null,2)],{type:'application/json'}));
    a.download='tst-workshop-'+cid+'-'+new Date().toISOString().slice(0,10)+'.json';
-   a.click(); toast('تم تصدير ورشة '+cid);
+   a.click(); toast(t('exported')+' '+cid);
  };
  $('#exportData').onclick=()=>{
   const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
@@ -2681,45 +2681,45 @@ function settings(){
   db.settings.lastBackup=new Date().toISOString(); save();
   a.download='werkpilot-backup-'+new Date().toISOString().slice(0,10)+'.json';
   a.click();
-  toast('تم التصدير');
+  toast(t('exported'));
  };
  $('#syncCloud').onclick=async()=>{
-  toast('جاري المزامنة...');
+  toast(t('syncing'));
   await syncAllCloud();
   render();
-  toast('تمت المزامنة');
+  toast(t('synced'));
  };
- $('#reset').onclick=()=>{if(confirm('سيتم حذف كل البيانات المحلية. متابعة؟')){db=clone(seed);save();toast('تمت إعادة الضبط');render()}};
+ $('#reset').onclick=()=>{if(confirm(t('resetConfirm'))){db=clone(seed);save();toast(t('resetDone'));render()}};
 }
 
 function studio(){
-  if(!isDev()){ toast('هذه الصفحة لصاحب الورشة فقط'); session.page='dashboard'; return render(); }
+  if(!isDev()){ toast(t('ownerOnly')); session.page='dashboard'; return render(); }
   const reqs=db.settings.devRequests||[];
   $('#content').innerHTML=head(t('devStudio'))+`
-  <div class="alert">هذه الصفحة وزر G تظهر فقط لحساب owner. الموظفون ما بيشوفوهم.</div>
+  <div class="alert">${t('ownerOnly')}</div>
   <div class="card">
-    <p class="muted">Grok مو سيرفر جوّا الموقع، بس الطلبات محفوظة هون. الصقها بالمحادثة حتى التنفيذ يصير فوراً.</p>
-    <p>${reqs.length?reqs.slice().reverse().map(r=>`<div class="muted">${esc(r.ts)} — ${esc(r.text)}</div>`).join(''):'ما في طلبات بعد. استخدم الزر الذهبي G أسفل يمين الشاشة.'}</p>
+    <p class="muted">${t('devHint')}</p>
+    <p>${reqs.length?reqs.slice().reverse().map(r=>`<div class="muted">${esc(r.ts)} — ${esc(r.text)}</div>`).join(''):t('noReqs')}</p>
     <div class="toolbar">
-      <button class="btn" id="expRaw">تصدير JSON كامل</button>
-      <button class="btn" id="impRaw">استيراد JSON</button>
-      <button class="btn primary" id="seedAgain">إعادة بيانات التجربة</button>
+      <button class="btn" id="expRaw">${t('exportFull')}</button>
+      <button class="btn" id="impRaw">${t('importJson')}</button>
+      <button class="btn primary" id="seedAgain">${t('reseed')}</button>
     </div>
-    <div class="field" style="margin-top:12px"><label>ملاحظات تطوير</label><textarea id="devNotes">${esc(db.settings.devNotes||'')}</textarea></div>
-    <button class="btn primary" id="saveNotes">حفظ الملاحظات</button>
+    <div class="field" style="margin-top:12px"><label>${t('devNotesLbl')}</label><textarea id="devNotes">${esc(db.settings.devNotes||'')}</textarea></div>
+    <button class="btn primary" id="saveNotes">${t('save')}</button>
     <input id="jsonFile" type="file" accept="application/json" class="hidden">
   </div>`;
-  $('#saveNotes').onclick=()=>{db.settings.devNotes=$('#devNotes').value;save();toast('تم حفظ الملاحظات')};
+  $('#saveNotes').onclick=()=>{db.settings.devNotes=$('#devNotes').value;save();toast(t('notesSaved'))};
   $('#expRaw').onclick=()=>{
     const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='baymeister-full.json'; a.click();
   };
-  $('#seedAgain').onclick=()=>{if(confirm('إعادة الضبط؟')){db=clone(seed);save();render();}};
+  $('#seedAgain').onclick=()=>{if(confirm(t('resetConfirm'))){db=clone(seed);save();render();}};
   $('#impRaw').onclick=()=>$('#jsonFile').click();
   $('#jsonFile').onchange=e=>{
     const f=e.target.files[0]; if(!f) return;
     const r=new FileReader();
-    r.onload=()=>{try{db=JSON.parse(r.result);save();toast('تم الاستيراد');render()}catch{toast('ملف غير صالح')}};
+    r.onload=()=>{try{db=JSON.parse(r.result);save();toast(t('imported'));render()}catch{toast(t('invalidFile'))}};
     r.readAsText(f);
   };
 }

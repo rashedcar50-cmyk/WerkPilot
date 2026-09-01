@@ -110,7 +110,7 @@ async function lookupVinVincario(vin){
 }
 async function lookupVin(vin){
   vin=cleanVin(vin);
-  if(vin.length!==17) throw new Error('VIN لازم 17 خانة');
+  if(vin.length!==17) throw new Error(typeof t==='function'?t('vinNeed17'):'VIN 17');
   const [vinc,a,b]=await Promise.all([lookupVinVincario(vin), lookupVinNhtsa(vin), lookupVinEdge(vin)]);
   const merge=(k)=>pickVinVal(vinc[k])||pickVinVal(a[k])||pickVinVal(b[k])||'';
   let make=merge('make')||vinMakeFromWmi(vin);
@@ -128,7 +128,7 @@ async function lookupVin(vin){
     body: merge('body'),
     paint: merge('paint')
   };
-  if(!make && !model && !year) throw new Error('ما انلقطت بيانات لهالـ VIN');
+  if(!make && !model && !year) throw new Error(typeof t==='function'?t('vinFail'):'VIN');
   return info;
 }
 function fillVinFields(info, ids){
@@ -152,24 +152,24 @@ function openDistriAutoVin(vin){
 }
 function bindVinEnter(inputId, ids){
   const el=$(inputId); if(!el) return;
-  el.placeholder=el.placeholder||'17 خانة ثم Enter';
+  el.placeholder=el.placeholder||(typeof t==='function'?t('vinLbl'):'VIN');
   el.addEventListener('keydown', async ev=>{
     if(ev.key!=='Enter') return;
     ev.preventDefault();
     const vin=cleanVin(el.value);
     el.value=vin;
-    if(vin.length!==17) return toast('VIN لازم 17 خانة');
-    toast('جاري جلب بيانات السيارة...');
+    if(vin.length!==17) return toast(t('vinNeed17'));
+    toast(t('fetchingCar'));
     try{
       const info=await lookupVin(vin);
       fillVinFields(info, ids);
       const miss=[];
-      if(!info.model) miss.push('الموديل');
-      if(!info.engine) miss.push('كود المحرك');
-      if(!info.engine_displacement_cm3) miss.push('سعة المحرك');
-      toast(((info.make||'')+' '+(info.model||'')+' '+(info.year||'')+(info.engine_displacement_cm3?(' · '+info.engine_displacement_cm3+' cm³'):'')+(info.engine?(' · '+info.engine):'')).trim()+(miss.length?(' — ناقص: '+miss.join('، ')+' (اللون ما بينقرأ من VIN)'):' — اللون ما بينقرأ من VIN'));
+      if(!info.model) miss.push(t('missModel'));
+      if(!info.engine) miss.push(t('missEngine'));
+      if(!info.engine_displacement_cm3) miss.push(t('missCc'));
+      toast(((info.make||'')+' '+(info.model||'')+' '+(info.year||'')+(info.engine_displacement_cm3?(' · '+info.engine_displacement_cm3+' cm³'):'')+(info.engine?(' · '+info.engine):'')).trim()+(miss.length?(' — '+miss.join(', ')):'') );
       openDistriAutoVin(vin);
-    }catch(e){ toast(e.message||'تعذر قراءة VIN'); }
+     }catch(e){ toast(e.message||t('vinFail')); }
   });
 }
 const HSN_MAKE={
@@ -261,8 +261,8 @@ function bindKbaEnter(hsnId,tsnId,fillIds){
   const run=async()=>{
     const hsn=$(hsnId)?.value.trim();
     const tsn=$(tsnId)?.value.trim();
-    if(!hsn||hsn.length<4||!tsn) return toast('أدخل HSN (4) وTSN (3)');
-    toast('جاري جلب بيانات السيارة من المواقع المجانية...');
+    if(!hsn||hsn.length<4||!tsn) return toast(t('hsnNeed'));
+    toast(t('fetchingKba'));
     const info=await lookupKbaFree(hsn,tsn);
     const set=(id,val)=>{ const el=$(id); if(el && val) el.value=val; };
     set(fillIds.make, info.make);
@@ -275,7 +275,7 @@ function bindKbaEnter(hsnId,tsnId,fillIds){
     set(fillIds.weight, info.maxWeight);
     set(fillIds.klass, info.vehicleClass);
     if(info.model || info.engine_power_kw) toast((info.make||'')+' '+(info.model||'')+(info.engine_displacement_cm3?(' · '+info.engine_displacement_cm3+' cm³'):'')+(info.engine_power_kw?(' · '+info.engine_power_kw+' kW'):''));
-    else toast((info.make||'KBA')+' — الموديل مو موجود بهالمصدر المجاني، كمّل يدوياً');
+    else toast((info.make||'KBA')+' — '+t('kbaNoModel'));
   };
   const hEl=$(hsnId), tEl=$(tsnId);
   if(hEl){
@@ -317,10 +317,10 @@ function maintenanceDue(){
 }
 function todayISO(){return new Date().toISOString().slice(0,10)}
 function openRepairs(){
-  return companyRows('repairs').filter(r=>!['مكتمل','مسلَّم','مسلم'].includes(r.status));
+  return companyRows('repairs').filter(r=>typeof isOpenStatus==='function'?isOpenStatus(r.status):!['ready','delivered','done','closed'].includes(normStatus(r.status)));
 }
 function unpaidInvoices(){
-  return companyRows('invoices').filter(x=>x.paid===false || (!x.paid && x.payment==='غير محدد'));
+  return companyRows('invoices').filter(x=>x.paid===false || (!x.paid && (!x.payment || x.payment==='غير محدد' || x.payment==='offen' || x.payment===t('payOpen'))));
 }
 function repairPartsTotal(r){
   return (r.parts||[]).reduce((s,p)=>s+Number(p.qty||0)*Number(p.price||0),0);
@@ -417,7 +417,7 @@ function createInvoiceAuto(payload){
   try{ if(typeof archiveBeleg==='function') archiveBeleg(inv); }catch(e){}
   try{ if(typeof upsertInvoiceCloud==='function') upsertInvoiceCloud(inv); }catch(e){}
   db.journal=db.journal||[];
-  db.journal.push({id:typeof id==='function'?id('j'):('j'+Date.now()),companyId:session.company.id,date:(typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)),account:'مبيعات',debit:0,credit:total,note:inv.number});
+  db.journal.push({id:typeof id==='function'?id('j'):('j'+Date.now()),companyId:session.company.id,date:(typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)),account:'Sales',debit:0,credit:total,note:inv.number});
   if(typeof audit==='function') audit('invoice.auto', inv.number);
   save();
   return inv;
@@ -428,7 +428,7 @@ window.WP.Invoice={create:createInvoiceAuto};
 
 function convertRepairToInvoice(rid){
   const r=db.repairs.find(x=>x.id===rid);
-  if(!r) return toast('الأمر غير موجود');
+  if(!r) return toast(t('jobMissing'));
   const lines=[
     ...(r.parts||[]).map(p=>({name:p.name, sku:p.sku, qty:p.qty, price:p.price, kind:'parts'})),
     {name:'Arbeitswert', qty:Number(r.hours||1), price:Number(workshop().hourlyRate||db.settings.hourlyRate||100), kind:'labor'}
@@ -440,11 +440,11 @@ function convertRepairToInvoice(rid){
       lines, tax:19, auftrag:r.number||nextAuftragNumber(), km:r.km
     });
   }catch(e){ return toast(e.message||'invoice'); }
-  r.status='جاهز للتسليم';
+  r.status='ready';
   consumePartsFromRepair(r);
   if(typeof audit==='function') audit('invoice.from_repair', inv.number);
   save();
-  toast('تم إنشاء الفاتورة '+inv.number);
+  toast(t('invoiceCreated')+' '+inv.number);
   session.page='invoices';
   render();
   setTimeout(()=>{ try{ previewInvoice(inv.id); }catch(e){} }, 200);
@@ -455,14 +455,9 @@ function whatsappReady(rid){
   const v=vehicleOf(r.vehicleId);
   const c=customerOfVehicle(r.vehicleId);
   const phone=(c?.phone||'').replace(/[^\d+]/g,'');
-  const msg=encodeURIComponent(
-    'مرحباً '+(c?.name||'')+'،\n'+
-    'سيارتك '+(v?((v.make||'')+' '+(v.model||'')+' — '+(v.plate||'')):'')+'\n'+
-    'أصبحت جاهزة للتسليم في الورشة.\n'+
-    'العمل: '+(r.description||'')+'\n'+
-    'يمكنكم الحضور خلال ساعات العمل.\n'+
-    'WerkPilot / Auto Service'
-  );
+  const car=v?((v.make||'')+' '+(v.model||'')+' — '+(v.plate||'')):'';
+  const tpl=(typeof t==='function'&&t('waTpl'))||'Hello {name},\n{car}\n{work}';
+  const msg=encodeURIComponent(tpl.replace('{name}',c?.name||'').replace('{car}',car).replace('{work}',r.description||''));
   const num=phone.replace(/^\+/,'');
   window.open(num?('https://wa.me/'+num+'?text='+msg):('https://wa.me/?text='+msg),'_blank');
 }
@@ -470,7 +465,7 @@ function openPartsLink(vid){
   const v=vehicleOf(vid);
   const q=encodeURIComponent((v&& (v.vin||v.plate))||'');
   window.open('https://www.partslink24.com/','_blank');
-  toast(v?.vin ? ('VIN: '+v.vin+' — انسخه في PartsLink24') : 'افتح حساب PartsLink24');
+  toast(v?.vin ? ('VIN: '+v.vin+' '+t('copyVinPl24')) : t('openPl24'));
 }
 
 window.convertRepairToInvoice=convertRepairToInvoice;

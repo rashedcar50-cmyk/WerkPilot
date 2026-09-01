@@ -439,11 +439,11 @@ window.WP_INV_DE = {
     en:{download:'Download',walkIn:'No customer / direct sale',stornoHint:'The invoice is cancelled (Storno), not deleted. The number stays archived.',pickFile:'Choose file',openCam:'Open camera',takePhoto:'Take photo',shotOk:'Photo captured',camDenied:'Camera permission denied',camUnsupported:'Camera not supported in this browser'},
     de:{download:'Herunterladen',walkIn:'Ohne Kunde / Barverkauf',stornoHint:'Die Rechnung wird storniert, nicht gelöscht. Die Nummer bleibt im Archiv.',pickFile:'Datei wählen',openCam:'Kamera öffnen',takePhoto:'Foto aufnehmen',shotOk:'Foto aufgenommen',camDenied:'Kamerazugriff verweigert',camUnsupported:'Kamera in diesem Browser nicht verfügbar'},
     ar:{download:'تحميل',walkIn:'بدون عميل / بيع مباشر',stornoHint:'الفاتورة تتلغى (Storno) وما بتنحذف. الرقم بيضل بالأرشيف.',pickFile:'اختيار ملف',openCam:'فتح الكاميرا',takePhoto:'التقاط الصورة',shotOk:'تم التقاط الصورة',camDenied:'لم يُسمح بالكاميرا',camUnsupported:'الكاميرا غير مدعومة في هذا المتصفح'},
-    tr:{walkIn:'Müşterisiz / peşin satış'},
-    sr:{walkIn:'Bez klijenta / gotovina'},
-    ru:{walkIn:'Без клиента / наличные'},
-    pl:{walkIn:'Bez klienta / sprzedaż bezpośrednia'},
-    es:{walkIn:'Sin cliente / venta directa'}
+    tr:{walkIn:'Müşterisiz / peşin satış',pickFile:'Dosya seç',openCam:'Kamerayı aç',takePhoto:'Fotoğraf çek',shotOk:'Fotoğraf alındı',camDenied:'Kamera izni yok',camUnsupported:'Kamera yok'},
+    sr:{walkIn:'Bez klijenta / gotovina',pickFile:'Izaberi fajl',openCam:'Otvori kameru',takePhoto:'Slikaj',shotOk:'Slika snimljena',camDenied:'Nema dozvole za kameru',camUnsupported:'Kamera nije podržana'},
+    ru:{walkIn:'Без клиента / наличные',pickFile:'Выбрать файл',openCam:'Открыть камеру',takePhoto:'Сделать фото',shotOk:'Фото сохранено',camDenied:'Нет доступа к камере',camUnsupported:'Камера недоступна'},
+    pl:{walkIn:'Bez klienta / sprzedaż bezpośrednia',pickFile:'Wybierz plik',openCam:'Otwórz kamerę',takePhoto:'Zrób zdjęcie',shotOk:'Zdjęcie zapisane',camDenied:'Brak dostępu do kamery',camUnsupported:'Kamera niedostępna'},
+    es:{walkIn:'Sin cliente / venta directa',pickFile:'Elegir archivo',openCam:'Abrir cámara',takePhoto:'Tomar foto',shotOk:'Foto guardada',camDenied:'Cámara no permitida',camUnsupported:'Cámara no disponible'}
   };
   Object.keys(w).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], w[c]); });
 })();
@@ -455,6 +455,78 @@ window.WP_INV_DE = {
   };
   Object.keys(extra).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], extra[c]); });
   ['tr','sr','ru','pl','es'].forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], extra.en||{}); });
+})();
+(function(){
+  const z={
+    en:{
+      pdfFailLib:'Could not load PDF library',pdfNotLoaded:'PDF library missing — refresh the page',
+      ocrFailSchein:'Could not read the registration document',newCustDefault:'New customer',holderOf:'Keeper',
+      scheinIntake:'Check-in from registration',jobOpened:'Job opened',kmSaved:'Mileage saved',
+      noStockItem:'Part not in stock',qtyLow:'Not enough quantity',jobMissing:'Job not found',
+      apptMissing:'Appointment not found',shopAppt:'Workshop appointment',purchaseAdded:'Purchase saved',
+      deleted:'Deleted',noReceipt:'No receipt stored',expenseDefault:'Expense',errorGeneric:'Error',
+      enterWsName:'Enter workshop name',wsAdded:'Workshop added — fill legal data in Settings',
+      exported:'Exported',syncing:'Syncing…',synced:'Synced',resetConfirm:'Delete all local data?',
+      resetDone:'Reset done',ownerOnly:'Owner only',vinNeed17:'VIN must be 17 characters',
+      fetchingCar:'Looking up vehicle…',missModel:'model',missEngine:'engine code',missCc:'displacement',
+      vinFail:'VIN lookup failed',hsnNeed:'Enter HSN (4) and TSN (3)',fetchingKba:'Looking up KBA…',
+      kbaNoModel:'Model not in free source — complete manually',invoiceCreated:'Invoice created',
+      copyVinPl24:'— copy into PartsLink24',openPl24:'Open PartsLink24',
+      waTpl:'Hello {name},\nYour vehicle {car} is ready for pickup.\nWork: {work}\nPlease come during opening hours.\nTST Autoteile und Autoservice',
+      askWriteFirst:'Write a request first',reqSaved:'Request saved',copiedGrok:'Copied — paste in Grok',
+      devTitle:'Grok in the workshop',devHint:'Owner only. Save a change request, then paste it in Grok.',
+      devPh:'Example: add VIN field on the job card',saveReq:'Save request',copyAll:'Copy all',closeBtn:'Close',
+      noReqs:'No requests yet.',exportFull:'Export full JSON',importJson:'Import JSON',reseed:'Reload demo data',
+      devNotesLbl:'Dev notes',notesSaved:'Notes saved',invalidFile:'Invalid file',pdfSaved:'PDF saved',
+      reportWord:'Report',mechanic:'Technician'
+    },
+    de:{
+      pdfFailLib:'PDF-Bibliothek konnte nicht geladen werden',pdfNotLoaded:'PDF-Bibliothek fehlt — Seite aktualisieren',
+      ocrFailSchein:'Fahrzeugschein konnte nicht gelesen werden',newCustDefault:'Neukunde',holderOf:'Halter',
+      scheinIntake:'Annahme über Fahrzeugschein',jobOpened:'Auftrag geöffnet',kmSaved:'Kilometerstand gespeichert',
+      noStockItem:'Teil nicht im Lager',qtyLow:'Menge nicht ausreichend',jobMissing:'Auftrag nicht gefunden',
+      apptMissing:'Termin nicht gefunden',shopAppt:'Werkstatttermin',purchaseAdded:'Einkauf gespeichert',
+      deleted:'Gelöscht',noReceipt:'Kein Beleg gespeichert',expenseDefault:'Ausgabe',errorGeneric:'Fehler',
+      enterWsName:'Werkstattname eingeben',wsAdded:'Werkstatt angelegt — Rechtsdaten in den Einstellungen ergänzen',
+      exported:'Exportiert',syncing:'Synchronisiere…',synced:'Synchronisiert',resetConfirm:'Alle lokalen Daten löschen?',
+      resetDone:'Zurückgesetzt',ownerOnly:'Nur Inhaber',vinNeed17:'VIN muss 17 Zeichen haben',
+      fetchingCar:'Fahrzeugdaten werden geladen…',missModel:'Modell',missEngine:'Motorcode',missCc:'Hubraum',
+      vinFail:'VIN-Abfrage fehlgeschlagen',hsnNeed:'HSN (4) und TSN (3) eingeben',fetchingKba:'KBA-Daten werden geladen…',
+      kbaNoModel:'Modell in der freien Quelle nicht enthalten — manuell ergänzen',invoiceCreated:'Rechnung erstellt',
+      copyVinPl24:'— in PartsLink24 kopieren',openPl24:'PartsLink24 öffnen',
+      waTpl:'Guten Tag {name},\nIhr Fahrzeug {car} ist abholbereit.\nArbeit: {work}\nBitte kommen Sie in den Öffnungszeiten vorbei.\nTST Autoteile und Autoservice',
+      askWriteFirst:'Zuerst die Anfrage schreiben',reqSaved:'Anfrage gespeichert',copiedGrok:'Kopiert — in Grok einfügen',
+      devTitle:'Grok in der Werkstatt',devHint:'Nur Inhaber. Anfrage speichern, dann in Grok einfügen.',
+      devPh:'Beispiel: VIN-Feld auf der Auftragskarte',saveReq:'Anfrage speichern',copyAll:'Alles kopieren',closeBtn:'Schließen',
+      noReqs:'Noch keine Anfragen.',exportFull:'Komplettes JSON exportieren',importJson:'JSON importieren',reseed:'Demodaten laden',
+      devNotesLbl:'Entwickler-Notizen',notesSaved:'Notizen gespeichert',invalidFile:'Ungültige Datei',pdfSaved:'PDF gespeichert',
+      reportWord:'Bericht',mechanic:'Techniker'
+    },
+    ar:{
+      pdfFailLib:'تعذر تحميل مكتبة PDF',pdfNotLoaded:'مكتبة PDF غير محمّلة — حدّث الصفحة',
+      ocrFailSchein:'تعذرت قراءة ورقة السيارة',newCustDefault:'زبون جديد',holderOf:'مالك',
+      scheinIntake:'استلام من ورقة السيارة',jobOpened:'تم فتح الأمر',kmSaved:'تم حفظ الكيلومتر',
+      noStockItem:'لا قطعة بالمخزون',qtyLow:'الكمية غير كافية',jobMissing:'الأمر غير موجود',
+      apptMissing:'الموعد غير موجود',shopAppt:'موعد ورشة',purchaseAdded:'تمت إضافة الشراء',
+      deleted:'تم الحذف',noReceipt:'لا توجد فاتورة محفوظة',expenseDefault:'مصروف',errorGeneric:'حدث خطأ',
+      enterWsName:'أدخل اسم الورشة',wsAdded:'تمت إضافة الورشة — املأ البيانات القانونية من الإعدادات',
+      exported:'تم التصدير',syncing:'جاري المزامنة...',synced:'تمت المزامنة',resetConfirm:'سيتم حذف كل البيانات المحلية. متابعة؟',
+      resetDone:'تمت إعادة الضبط',ownerOnly:'هذه الصفحة لصاحب الورشة فقط',vinNeed17:'VIN لازم 17 خانة',
+      fetchingCar:'جاري جلب بيانات السيارة...',missModel:'الموديل',missEngine:'كود المحرك',missCc:'سعة المحرك',
+      vinFail:'تعذر قراءة VIN',hsnNeed:'أدخل HSN (4) وTSN (3)',fetchingKba:'جاري جلب بيانات السيارة من المواقع المجانية...',
+      kbaNoModel:'الموديل مو موجود بهالمصدر المجاني، كمّل يدوياً',invoiceCreated:'تم إنشاء الفاتورة',
+      copyVinPl24:'— انسخه في PartsLink24',openPl24:'افتح حساب PartsLink24',
+      waTpl:'مرحباً {name}،\nسيارتك {car}\nأصبحت جاهزة للتسليم في الورشة.\nالعمل: {work}\nيمكنكم الحضور خلال ساعات العمل.\nTST Autoteile und Autoservice',
+      askWriteFirst:'اكتب الطلب أولاً',reqSaved:'تم حفظ الطلب',copiedGrok:'تم النسخ — الصقه في Grok',
+      devTitle:'Grok داخل الورشة',devHint:'هاللوحة إلك وحدك (owner). اكتب التعديل ثم الصقه في Grok.',
+      devPh:'مثال: أضف خانة رقم الهيكل على بطاقة الأمر',saveReq:'حفظ الطلب',copyAll:'نسخ الكل',closeBtn:'إغلاق',
+      noReqs:'ما في طلبات بعد.',exportFull:'تصدير JSON كامل',importJson:'استيراد JSON',reseed:'إعادة بيانات التجربة',
+      devNotesLbl:'ملاحظات تطوير',notesSaved:'تم حفظ الملاحظات',invalidFile:'ملف غير صالح',pdfSaved:'تم حفظ PDF',
+      reportWord:'تقرير',mechanic:'الميكانيكي'
+    }
+  };
+  Object.keys(z).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], z[c]); });
+  ['tr','sr','ru','pl','es'].forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], z.en); });
 })();
 window.t = function(key){
   const store = (typeof db!=='undefined' && db) || window.db || (window.WP && WP.db);
@@ -586,7 +658,7 @@ window.scrubUiLang = function(root){
   });
 };
 window.fuelLabel = function(s){
-  const map={'فارغ':'fuelEmpty','ربع':'fuelQ','نصف':'fuelH','ممتلئ':'fuelF'};
+  const map={'فارغ':'fuelEmpty','ربع':'fuelQ','نصف':'fuelH','ممتلئ':'fuelF',empty:'fuelEmpty',quarter:'fuelQ',half:'fuelH',full:'fuelF'};
   return map[s]?t(map[s]):(s||'');
 };
 window.docLang = function(){
