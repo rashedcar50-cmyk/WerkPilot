@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.3</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.4</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -1867,7 +1867,7 @@ function financeModal(type, vehicleId='', customerId=''){
     obj.payment=payCode($('#pay').value);
     obj.paid=['cash','card'].includes(obj.payment);
     obj.number=nextInvoiceNumber();
-    obj.lines=[{name:'قطع',qty:1,price:parts},{name:'أجور',qty:1,price:labor}];
+    obj.lines=[{name:'Teile',qty:1,price:parts,kind:'parts'},{name:'Arbeitswert',qty:1,price:labor,kind:'labor'}];
     db.invoices.push(obj);
     upsertInvoiceCloud(obj);
     db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:'Sales',debit:0,credit:total,note:obj.number});
