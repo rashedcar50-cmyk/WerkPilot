@@ -58,7 +58,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.25</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.26</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -784,59 +784,12 @@ function scanVehicleDocument(){
   $('#msave').disabled=true;
   try{
    const url=URL.createObjectURL(f);$('#ocrImg').src=url;$('#ocrImg').classList.remove('hidden');
-   const imageData = await new Promise((resolve, reject) => {
-const reader = new FileReader();
-reader.onload = () => resolve(reader.result);
-reader.onerror = reject;
-reader.readAsDataURL(f);
-});
-
-$('#ocrStatus').textContent = t('readingAI');
-
-const response = await fetch(
-`${window.SUPABASE_URL}/functions/v1/vehicle-ocr`,
-{
-method: 'POST',
-headers: {
-'Content-Type': 'application/json',
-'apikey': window.SUPABASE_KEY,
-'Authorization': `Bearer ${window.SUPABASE_KEY}`
-},
-body: JSON.stringify({
-image: imageData
-})
-}
-   
-);
-
-const ai = await response.json();
-
-if (!response.ok) {
-console.error(ai);
-throw new Error(ai.error || t('ocrFailSchein'));
-}
-
-const parsed = {
-plate: ai.license_plate || '',
-vin: ai.vin || '',
-make: ai.brand || '',
-model: ai.model || '',
-year: ai.year || '',
-engine_displacement_cm3: ai.engine_displacement_cm3 || '',
-fuel_type: ai.fuel_type || '',
-engine_power_kw: ai.engine_power_kw || '',
-engine: ai.engine_code || '',
-paint: ai.color || '',
-firstRegistration: ai.first_registration || ''
-};
-
-closeModal();
-
-vehicleModal({
-...parsed,
-ocrSource: f.name
-});
-   toast(t('ocrHint'));
+   $('#ocrStatus').textContent = t('readingAI');
+   const ai = await (WP.OCR && WP.OCR.read ? WP.OCR.read(f) : readScheinAI(f));
+   const {c,v}=findOrCreateFromSchein(ai);
+   closeModal();
+   vehicleModal(v);
+   toast((c&&c.name?c.name+' · ':'')+(v.plate||v.vin||''));
   }catch(e){console.error(e);$('#ocrStatus').textContent=t('ocrManual');$('#msave').disabled=false}
  },t('readData'));
  $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden'); if($('#docName')) $('#docName').textContent=f.name;}};

@@ -189,40 +189,74 @@
       return (boxes||[]).map(b=>b.rawValue||b.cornerPoints&&'').filter(Boolean).join('\n');
     }catch(e){ return ''; }
   }
+  function blobFromDataUrl(dataUrl){
+    const m=String(dataUrl).split(',');
+    const b=atob(m[1]||'');
+    const u=new Uint8Array(b.length);
+    for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i);
+    return new Blob([u],{type:'image/jpeg'});
+  }
+  async function cropTop(file){
+    return new Promise((resolve,reject)=>{
+      const img=new Image();
+      const url=URL.createObjectURL(file);
+      img.onload=()=>{
+        const c=document.createElement('canvas');
+        const w=img.width, h=Math.max(40,Math.round(img.height*0.48));
+        c.width=w; c.height=h;
+        const ctx=c.getContext('2d');
+        ctx.drawImage(img,0,0,w,h,0,0,w,h);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg',0.92));
+      };
+      img.onerror=reject; img.src=url;
+    });
+  }
+  function fromAnyText(obj){
+    const txt=[obj&&obj.raw_text,obj&&obj.text,obj&&obj.full_text,obj&&obj.ocr_text].filter(Boolean).join('\n');
+    return txt?parse(txt):{};
+  }
+  async function cloudRead(img){
+    if(!window.SUPABASE_URL || !window.SUPABASE_KEY) return {};
+    const controller=new AbortController();
+    const to=setTimeout(()=>controller.abort(), 12000);
+    try{
+      const response=await fetch(`${window.SUPABASE_URL}/functions/v1/vehicle-ocr`,{
+        method:'POST', signal:controller.signal,
+        headers:{'Content-Type':'application/json','apikey':window.SUPABASE_KEY,'Authorization':'Bearer '+window.SUPABASE_KEY},
+        body:JSON.stringify({
+          image:img, country:'DE',
+          document:'Zulassungsbescheinigung Teil I',
+          fields:['C.1.1','C.1.2','C.1.3','A','B','D.1','D.3','E','2.1','2.2','P.1','P.2']
+        })
+      });
+      clearTimeout(to);
+      if(!response.ok) return {};
+      const js=await response.json();
+      return merge(js, fromAnyText(js));
+    }catch(e){ clearTimeout(to); return {}; }
+  }
   async function read(file){
     const q=await quality(file);
     if(!q.ok) console.warn('ocr-quality', q.issues);
     const imgA=await preprocess(file,'contrast');
-    let cloud={};
-    try{
-      if(window.SUPABASE_URL && window.SUPABASE_KEY){
-        const controller=new AbortController();
-        const to=setTimeout(()=>controller.abort(), 8000);
-        const response=await fetch(`${window.SUPABASE_URL}/functions/v1/vehicle-ocr`,{
-          method:'POST', signal:controller.signal,
-          headers:{'Content-Type':'application/json','apikey':window.SUPABASE_KEY,'Authorization':'Bearer '+window.SUPABASE_KEY},
-          body:JSON.stringify({image:imgA,country:'DE',document:'Zulassungsbescheinigung Teil I'})
-        });
-        clearTimeout(to);
-        if(response.ok) cloud=await response.json();
-      }
-    }catch(e){ console.warn('ocr-cloud',e); }
-    const device=await deviceText(file);
+    const [cloud, device] = await Promise.all([cloudRead(imgA), deviceText(file)]);
     let local=parse(device);
-    const needLocal=!(cloud.owner_name||local.owner_name) || !(cloud.vin||local.vin||cloud.license_plate||local.license_plate);
-    if(needLocal){
+    let out=merge(cloud, local);
+    if(!out.owner_name || !(out.vin||out.license_plate)){
       try{
         await (W.loadOcr? W.loadOcr(): Promise.resolve());
-        const text1=await Promise.race([
-          tess(imgA,6),
-          new Promise((_,rej)=>setTimeout(()=>rej(new Error('tess-timeout')), 12000))
+        const top=await cropTop(file);
+        const text=await Promise.race([
+          tess(out.owner_name?imgA:top, 4),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error('tess-timeout')), 10000))
         ]).catch(()=>'');
-        local=merge(local, parse(text1));
+        local=merge(local, parse(text));
+        out=merge(out, local);
       }catch(e){}
     }
-    const out=merge(cloud, local);
     out.ocrScore=score(out);
-    out.ocrSource=device && local.owner_name ? 'device+cloud' : 'werkivo-ocr';
+    out.ocrSource='max';
     out.ocrQuality=q;
     if(!out.vin && !out.license_plate) throw new Error(q.ok?'ocr-empty':'ocr-photo-quality');
     return out;
