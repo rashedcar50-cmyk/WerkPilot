@@ -1,6 +1,6 @@
 /* BayMeister screens */
-function vehicleOf(vid){ return (window.vehicleOf && window.vehicleOf!==vehicleOf)? window.vehicleOf(vid) : ((db.vehicles||[]).find(x=>x.id===vid)); }
-function customerOf(cid){ return (db.customers||[]).find(c=>c.id===cid); }
+function vehicleOf(vid){ return (typeof rowById==='function' && rowById('vehicles',vid)) || (db.vehicles||[]).find(x=>x.id===vid); }
+function customerOf(cid){ return (typeof rowById==='function' && rowById('customers',cid)) || (db.customers||[]).find(c=>c.id===cid); }
 function waBtn(sel, cls){
   const lab=(typeof t==='function' && t('fromWhatsApp') && t('fromWhatsApp')!=='fromWhatsApp') ? t('fromWhatsApp') : 'WhatsApp';
   return `<button type="button" class="btn btn-wa ${cls||''}" onclick="pickWhatsApp('${sel}')"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.89 14.09c-.25.7-1.45 1.29-2.02 1.37-.52.07-1.17.1-1.89-.12-.43-.13-.99-.32-1.7-.63-3-1.3-4.96-4.33-5.11-4.53-.15-.2-1.25-1.66-1.25-3.17 0-1.5.79-2.24 1.07-2.54.28-.3.61-.37.81-.37h.58c.19 0 .44-.07.69.53.25.61.85 2.08.93 2.23.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.38-.45.51-.15.15-.3.31-.13.6.17.3.76 1.25 1.63 2.03 1.12 1 2.07 1.31 2.36 1.46.3.15.47.12.64-.07.17-.2.74-.86.94-1.16.2-.3.4-.25.67-.15.28.1 1.75.83 2.05.98.3.15.5.22.57.34.07.12.07.7-.18 1.4z"/></svg> ${lab}</button>`;
@@ -39,13 +39,18 @@ function login(){
  window._loginFails = window._loginFails || 0;
  const lg=$('#loginLang');
  if(lg){ lg.onchange=()=>{db.settings.uiLang=lg.value;save();login();}; }
- $('#loginBtn').onclick=()=>{
+ $('#loginBtn').onclick=async ()=>{
   if(lg) {db.settings.uiLang=lg.value;save();}
   if(window._loginFails>=5) return $('#loginErr').textContent=t('loginBlocked');
-  const u=db.users.find(x=>x.u===$('#lu').value.trim()&&x.p===$('#lp').value);
-  if(!u){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
+  const name=$('#lu').value.trim(), pass=$('#lp').value;
+  const cand=(db.users||[]).find(x=>x.u===name);
+  const ok=cand && WP.Engine && await WP.Engine.passOk(cand.p, pass);
+  if(!ok){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
+  if(cand.p===pass && WP.Engine.hashPassAsync){
+    try{ cand.p=await WP.Engine.hashPassAsync(pass); save(true); }catch(e){}
+  }
   window._loginFails=0;
-  session={user:u,company:db.companies[0],page:'dashboard'};
+  session={user:WP.Engine.publicUser(cand),company:db.companies[0],page:'dashboard'};
   audit('login');
   syncAllCloud().finally(async ()=>{
     WP.run("afterLogin", session);
@@ -105,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.38</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.39</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -699,13 +704,13 @@ function compressVehiclePhoto(file){
     const img=new Image();
     const url=URL.createObjectURL(file);
     img.onload=()=>{
-      const max=720;
+      const max=640;
       let w=img.width,h=img.height;
       if(w>max||h>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s)}
       const c=document.createElement('canvas'); c.width=w;c.height=h;
       c.getContext('2d').drawImage(img,0,0,w,h);
       URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg',0.55));
+      resolve(c.toDataURL('image/jpeg',0.45));
     };
     img.onerror=reject;
     img.src=url;
@@ -2508,7 +2513,9 @@ async function ingestScheinFile(file){
       const {c,v}=findOrCreateFromSchein(ai);
       vehicleModal(Object.assign({},v,{customerId:c&&c.id}));
     }
-    toast(t('scheinFilled')||t('saved'));
+    const src=ai.ocrSource==='openai'?'OpenAI GPT-4o-mini':(ai.ocrSource||'OCR');
+    toast((t('scheinFilled')||t('saved'))+' · '+src);
+    if($('#ocrStatus')) $('#ocrStatus').textContent=(t('scheinFilled')||'')+' · '+src;
   }catch(e){ console.warn(e); toast(t('readFailClear')||t('ocrFailSchein')); }
 }
 window.ingestScheinFile=ingestScheinFile;

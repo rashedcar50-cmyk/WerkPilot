@@ -84,15 +84,16 @@ function load(){
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
   if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'});
   merged.users.forEach(u=>{
-    if(u.role==='developer' && (u.u==='owner' || u.u==='Rashid' || u.p==='bm-dev-2026')){
-      u.u='Rashid'; u.p='1976R'; u.name=u.name&&u.name!=='صاحب الورشة / تطوير'?u.name:'Rashid Tabah';
+    if(u.role==='developer' && (u.u==='owner' || u.u==='Rashid')){
+      u.u='Rashid';
+      if(!u.p || u.p==='bm-dev-2026') u.p='1976R';
+      if(!u.name || u.name==='صاحب الورشة / تطوير') u.name='Rashid Tabah';
     }
     if(u.role==='mechanic' && (u.u==='mechanic' || u.u==='ismail')){
-      u.u='ismail'; u.p='1977A'; u.name='Ismail';
+      u.u='ismail';
+      if(!u.p) u.p='1977A';
+      if(!u.name) u.name='Ismail';
     }
-    if(u.role==='accountant'){ u.p='1978B'; }
-    if(u.role==='warehouse'){ u.p='1979C'; }
-    if(u.role==='manager' && (u.u==='admin' || u.p==='1234')){ u.p='1980D'; }
   });
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
   ensureCompanyProfiles(merged);
@@ -130,11 +131,13 @@ function persistJson(key, obj){
 }
 function slimForStorage(src){
   const slim=clone(src);
-  slim.audit=(slim.audit||[]).slice(0,80);
-  (slim.vehicles||[]).forEach(v=>{ if((v.photo||'').length>40000) v.photo=''; });
+  slim.audit=(slim.audit||[]).slice(0,60);
+  slim.journal=(slim.journal||[]).slice(0,200);
+  if((slim.archive||[]).length>80) slim.archive=slim.archive.slice(0,80);
+  (slim.vehicles||[]).forEach(v=>{ if((v.photo||'').length>24000) v.photo=''; });
   (slim.repairs||[]).forEach(r=>{
-    if((r.photos||[]).length>4) r.photos=r.photos.slice(0,4);
-    (r.photos||[]).forEach(p=>{ if(p && p.url && String(p.url).length>40000) p.url=''; });
+    if((r.photos||[]).length>3) r.photos=r.photos.slice(0,3);
+    (r.photos||[]).forEach(p=>{ if(p && p.url && String(p.url).length>24000) p.url=''; });
   });
   return slim;
 }
@@ -148,8 +151,8 @@ function flushRows(){ _rowsMemo=null; _rowsCid=null; }
 function persistNow(){
   try{
     flushRows();
-    persistJson(storeKey, db);
-    try{ persistJson(storeKey+'_bak', db); }catch(e){}
+    persistJson(storeKey, slimForStorage(db));
+    try{ persistJson(storeKey+'_bak', slimForStorage(db)); }catch(e){}
     window.db=db;
     if(window.WP){ WP.db=db; WP.session=session; WP.run('afterSave', db); }
   }catch(err){

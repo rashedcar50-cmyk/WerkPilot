@@ -34,6 +34,9 @@ const ix=E.index({
 assert(!!ix.customers.c1 && !ix.customers.c2,'index filters company');
 assert(ix.vehiclesByCustomer.c1.length===2,'index vehicles by customer');
 assert(!!ix.invoices.i1,'index invoice');
+assert(typeof E.hashPass==='function','hashPass exists');
+assert(E.hashPass('1976R')!=='1976R','hash hides password');
+assert(typeof E.publicUser==='function' && !E.publicUser({u:'Rashid',p:'1976R',role:'developer'}).p,'session user has no password');
 
 vm.runInContext(fs.readFileSync(path.join(root,'js/ocr.js'),'utf8'), sandbox);
 const OCR=sandbox.window.WP.OCR;
