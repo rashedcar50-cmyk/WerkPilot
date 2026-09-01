@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.6</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.7</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -1223,7 +1223,7 @@ function appointments(){
     modal(t('newAppt'),`<div class="form-grid">
       <div class="field"><label>${t('vehicle')}</label><select id="av">${companyRows('vehicles').map(v=>`<option value="${v.id}">${esc(v.plate||v.vin)}</option>`).join('')}</select></div>
       <div class="field"><label>${t('date')}</label><input id="ad" class="latnum" lang="de" value="${todayISO()}" placeholder="2026-09-01"></div>
-      <div class="field"><label>${t('time')}</label><input id="at" type="time" value="09:00"></div>
+      <div class="field"><label>${t('time')}</label><input id="at" class="latnum" lang="de" value="09:00" placeholder="09:00"></div>
       <div class="field"><label>${t('tech')}</label><input id="atech" value="${esc(t('mechanic'))}"></div>
       <div class="field span2"><label>${t('note')}</label><input id="an"></div>
     </div>`,()=>{
