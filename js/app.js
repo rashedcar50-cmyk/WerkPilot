@@ -2524,7 +2524,8 @@ function integrations(){
 }
 function auditPage(){
  const rows=db.audit.filter(a=>!session.company||a.company===session.company.id||!a.company).slice(0,200);
- $('#content').innerHTML=head(t('auditTitle'))+table([t('when'),t('userCol'),t('actionCol'),t('detailCol')],rows.map(a=>[new Date(a.ts).toLocaleString(),esc(a.user),esc(a.action),esc(a.detail)]));
+ const act=s=>({login:'Login',logout:'Logout','invoice.create':'Rechnung','invoice.update':'Rechnung','invoice.storno':'Storno'}[s]||s);
+ $('#content').innerHTML=head(t('auditTitle'))+table([t('when'),t('userCol'),t('actionCol'),t('detailCol')],rows.map(a=>[fmtWhen(a.ts),esc(typeof dLabel==='function'?dLabel(a.user):a.user),esc(act(a.action)),esc(a.detail)]));
 }
 function newWorkshopModal(){
   modal(t('newWorkshop'), `<div class="form-grid">

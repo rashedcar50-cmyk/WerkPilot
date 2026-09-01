@@ -167,6 +167,15 @@ function loadRaw(){
 
 
 function id(p='x'){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function uiLocale(){
+  const lang=(typeof db!=='undefined' && db.settings && db.settings.uiLang) || 'de';
+  return lang==='de'?'de-DE':lang==='en'?'en-GB':lang==='ar'?'ar-SY':'de-DE';
+}
+function fmtWhen(ts){
+  try{ return new Date(ts).toLocaleString(uiLocale(),{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return String(ts||''); }
+}
+window.uiLocale=uiLocale; window.fmtWhen=fmtWhen;
 function money(v){return Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'})}
 function toast(msg){
   const x=document.createElement('div');
