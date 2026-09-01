@@ -61,7 +61,7 @@ function render(){
  <main class="main">
   <div class="topbar">
    <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
-   <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="ورشة جديدة">＋</button>`:''}
+   <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="${t('newWorkshop')}">＋</button>`:''}
    <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
    <div class="top-actions lang-row"><button class="btn ghost small" id="backBtn">${t('prev')}</button><select id="uiLangTop" title="لغة البرنامج">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span></div>
   </div>
@@ -2451,7 +2451,7 @@ function journal(){
  const rows=companyRows('journal');
  $('#content').innerHTML=head(t('journalTitle'),`<button class="btn primary" id="add">${t('newEntry')}</button>`)+
  table([t('date'),t('account'),t('debit'),t('credit'),t('statement')],rows.map(x=>[esc(x.date),esc(x.account),money(x.debit),money(x.credit),esc(x.note)]));
- $('#add').onclick=()=>simpleModal('قيد جديد',[['date','التاريخ','date'],['account','الحساب'],['debit','مدين','number'],['credit','دائن','number'],['note','البيان']],o=>{o.companyId=session.company.id;o.id=id('j');db.journal.push(o);save();audit('journal.create',o.account);render()});
+ $('#add').onclick=()=>simpleModal(t('newEntry'),[['date',t('date'),'date'],['account',t('account')],['debit',t('debit'),'number'],['credit',t('credit'),'number'],['note',t('statement')]],o=>{o.companyId=session.company.id;o.id=id('j');db.journal.push(o);save();audit('journal.create',o.account);render()});
 }
 function reports(){
  const inv=companyRows('invoices'),exp=companyRows('expenses'),pur=companyRows('purchases');
@@ -2598,9 +2598,9 @@ function settings(){
  <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
   <button class="btn primary" id="saveset">${t('save')}</button>
-  <button class="btn" id="addWsSet">＋ ورشة جديدة</button>
+  <button class="btn" id="addWsSet">＋ ${t('newWorkshop')}</button>
   <button class="btn" id="exportData">${t('backup')}</button>
-  <button class="btn" id="exportCo">نسخة هذه الورشة</button>
+  <button class="btn" id="exportCo">${t('exportWs')||t('backup')}</button>
   <button class="btn" id="syncCloud">${t('sync')}</button>
   <button class="btn bad" id="reset">${t('reset')}</button>
  </div>
