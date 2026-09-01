@@ -115,15 +115,33 @@ assert(!!ver,'index has version');
 assert(idx.includes('js/app.js?v='+ver),'index cache-busts app.js');
 assert(idx.includes('js/quality.js?v='+ver),'index loads quality.js');
 assert(idx.includes('js/scan.js?v='+ver),'index loads scan.js');
+assert(idx.includes('js/print.js?v='+ver),'index loads print.js');
+assert(idx.includes('js/camera.js?v='+ver),'index loads camera.js');
+assert(idx.includes('js/invoice-print.js?v='+ver),'index loads invoice-print.js');
+assert(idx.includes('js/customers.js?v='+ver),'index loads customers.js');
+assert(idx.includes('js/repairs.js?v='+ver),'index loads repairs.js');
+assert(idx.includes('js/invoice-edit.js?v='+ver),'index loads invoice-edit.js');
 assert(OCR.dropUngrounded({owner_name:'Daniel Test',brand:'SEAT'},'').owner_name==='Daniel Test','empty raw keeps owner');
 assert(/legalGaps/.test(i18n),'i18n has legalGaps');
 assert(sw.includes(ver),'sw cache version matches index');
 
 const app=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+const cam=fs.readFileSync(path.join(root,'js/camera.js'),'utf8');
+const prn=fs.readFileSync(path.join(root,'js/print.js'),'utf8');
+const invp=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
 assert(app.includes('window.supabase &&'),'supabase init is guarded');
-assert(app.includes('function openProCamera'),'pro camera exists');
-assert(app.includes('function pickWhatsApp'),'whatsapp picker exists');
+assert(cam.includes('function openProCamera'),'pro camera exists');
+assert(cam.includes('function pickWhatsApp'),'whatsapp picker exists');
 assert(app.includes('function waBtn'),'whatsapp icon helper exists');
+assert(prn.includes('function shareBar'),'print module has shareBar');
+assert(invp.includes('function workshopInfo'),'invoice-print has workshopInfo');
+assert(fs.readFileSync(path.join(root,'js/customers.js'),'utf8').includes('function customers()'),'customers module');
+assert(fs.readFileSync(path.join(root,'js/repairs.js'),'utf8').includes('function repairs()'),'repairs module');
+assert(fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8').includes('function invoiceDesigner'),'invoice-edit module');
+assert(!/function customers\(/.test(app),'app.js no longer owns customers page');
+assert(!/function invoiceDesigner\(/.test(app),'app.js no longer owns invoice designer');
+assert(!/function openProCamera/.test(app),'camera not forked in app.js');
+assert(!/function workshopInfo/.test(app),'invoice print not forked in app.js');
 assert(!/confirm\(t\('resetConfirm'\)\)/.test(app),'no native confirm left');
 
 if(failed){ console.error(failed+' failed'); process.exit(1); }

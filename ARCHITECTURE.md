@@ -13,9 +13,21 @@ does not require editing a 3000-line HTML file.
 | `css/app.css` | Theme and layout |
 | `js/config.js` | Version, feature flags, `WP.registerPage` / `WP.hook` |
 | `i18n.js` | UI language packs |
-| `js/main.js` | Domain logic (customers, vehicles, invoices, OCR) |
+| `js/engine.js` | Status, validate, migrate |
+| `js/core.js` | Storage, session, OpenAI vault |
+| `js/ocr.js` | Fahrzeugschein parse + read |
+| `js/scan.js` | Fill customer form from OCR |
+| `js/lookup.js` | HSN/TSN / VIN lookup |
+| `js/invoice-print.js` | German invoice HTML |
+| `js/print.js` | Print / PDF / e-mail / WhatsApp |
+| `js/camera.js` | Camera + WhatsApp ingest |
+| `js/customers.js` | Customers, vehicles, Schein bind |
+| `js/repairs.js` | Jobs and Schein-to-repair |
+| `js/invoice-edit.js` | Invoice designer |
+| `js/quality.js` | Legal field checklist |
+| `js/app.js` | Shell, dashboard, remaining screens |
 | `supabase-config.js` | Cloud project keys |
-| `js/plugins/` | Optional add-ons loaded after main |
+| `js/plugins/` | Optional add-ons |
 
 ## Extension points
 
