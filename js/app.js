@@ -51,7 +51,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.17</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.18</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -59,10 +59,11 @@ function render(){
  </div></aside>
  <main class="main">
   <div class="topbar">
-   <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
+   <button class="btn ghost mobile-menu" id="menu" type="button">☰</button>
+   <div class="top-actions desk-tools">
    <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="${t('newWorkshop')}">＋</button>`:''}
    <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
-   <div class="top-actions lang-row"><button class="btn ghost small" id="backBtn">${t('prev')}</button><select id="uiLangTop" title="${t('language')}">${langOptions(db.settings.uiLang||'de')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span></div>
+   <div class="top-actions lang-row"><button class="btn ghost small" id="backBtn" type="button">${t('prev')}</button><select id="uiLangTop" title="${t('language')}">${langOptions(db.settings.uiLang||'de')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span></div>
   </div>
   <div class="content" id="content"></div>
  </main>
