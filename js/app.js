@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.48</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.49</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -170,8 +170,8 @@ function placeGrokFab(fab, x, y){
 function mountDevDock(){
   if(typeof isDev!=='function' || !isDev()) return;
   if($('#devFab')) return;
-  const fab=document.createElement('button');
-  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok — lange drücken zum Verschieben'; fab.type='button'; fab.textContent='G';
+  const fab=document.createElement('div');
+  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok — lange drücken zum Verschieben'; fab.setAttribute('role','button'); fab.textContent='G';
   document.body.appendChild(fab);
   const saved=grokPosLoad();
   requestAnimationFrame(()=>{
@@ -183,6 +183,7 @@ function mountDevDock(){
     return {x:t.clientX, y:t.clientY};
   };
   const start=e=>{
+    if(e.cancelable) try{ e.preventDefault(); }catch(err){}
     const p=point(e);
     sx=p.x; sy=p.y; moved=false; dragging=false;
     const r=fab.getBoundingClientRect(); ox=r.left; oy=r.top;
@@ -214,10 +215,9 @@ function mountDevDock(){
     dragging=false;
     if(!moved) toggleDevPanel();
   };
-  fab.addEventListener('pointerdown', start);
-  window.addEventListener('pointermove', move, {passive:false});
-  window.addEventListener('pointerup', end);
-  window.addEventListener('pointercancel', end);
+  ['pointerdown','touchstart'].forEach(ev=>fab.addEventListener(ev, start, {passive:false}));
+  ['pointermove','touchmove'].forEach(ev=>window.addEventListener(ev, move, {passive:false}));
+  ['pointerup','pointercancel','touchend','touchcancel'].forEach(ev=>window.addEventListener(ev, end));
 }
 function grokOut(msg){
   const el=$('#devOut'); if(el) el.textContent=String(msg||'');
@@ -2887,8 +2887,9 @@ function integrations(){
    try{
      db.settings=db.settings||{};
      if($('#oaKey')){
-       db.settings.openaiKey=$('#oaKey').value.trim();
-       try{ localStorage.setItem('werkivo_openai', db.settings.openaiKey); }catch(e){}
+       const typed=$('#oaKey').value.trim();
+       if(typed) writeOpenAI(typed);
+       else restoreOpenAI(db);
      }
      if($('#vinKey')) db.settings.vincarioKey=$('#vinKey').value.trim();
      if($('#vinSec')) db.settings.vincarioSecret=$('#vinSec').value.trim();

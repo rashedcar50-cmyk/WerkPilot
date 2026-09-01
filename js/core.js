@@ -73,12 +73,7 @@ function load(){
   if(!merged.settings) merged.settings=clone(seed.settings);
   merged.settings={...clone(seed.settings),...merged.settings};
   if(!['ar','de','en','es','tr','sr','ru','pl'].includes(merged.settings.uiLang)) merged.settings.uiLang='de';
-  if(!merged.settings.openaiKey){
-    try{
-      const stored=(typeof localStorage!=='undefined' && localStorage.getItem('werkivo_openai'))||'';
-      if(stored) merged.settings.openaiKey=stored;
-    }catch(e){}
-  }
+  restoreOpenAI(merged);
   if(window.WP && WP.Engine) WP.Engine.migrate(merged);
 
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
@@ -126,6 +121,39 @@ function ensureCompanyProfiles(store){
     WORKSHOP_KEYS.forEach(k=>{ if(co.profile[k]===undefined) co.profile[k]=defaultWorkshopProfile(co, st.settings)[k]; });
   });
 }
+const OA_VAULT='werkivo_openai_v1';
+function readOpenAI(){
+  try{
+    const a=localStorage.getItem(OA_VAULT)||'';
+    const b=localStorage.getItem('werkivo_openai')||'';
+    const c=(typeof db!=='undefined' && db && db.settings && db.settings.openaiKey)||'';
+    return a||b||c||'';
+  }catch(e){ return ''; }
+}
+function writeOpenAI(key){
+  const k=String(key||'').trim();
+  if(!k) return readOpenAI();
+  try{
+    localStorage.setItem(OA_VAULT, k);
+    localStorage.setItem('werkivo_openai', k);
+  }catch(e){}
+  if(typeof db!=='undefined' && db && db.settings) db.settings.openaiKey=k;
+  return k;
+}
+function restoreOpenAI(store){
+  const target=store|| (typeof db!=='undefined'?db:null);
+  if(!target) return '';
+  target.settings=target.settings||{};
+  const k=readOpenAI() || target.settings.openaiKey || '';
+  if(k){
+    target.settings.openaiKey=k;
+    try{
+      localStorage.setItem(OA_VAULT, k);
+      localStorage.setItem('werkivo_openai', k);
+    }catch(e){}
+  }
+  return k;
+}
 function persistJson(key, obj){
   localStorage.setItem(key, JSON.stringify(obj));
 }
@@ -153,6 +181,7 @@ function persistNow(){
     flushRows();
     persistJson(storeKey, slimForStorage(db));
     try{ persistJson(storeKey+'_bak', slimForStorage(db)); }catch(e){}
+    restoreOpenAI(db);
     window.db=db;
     if(window.WP){ WP.db=db; WP.session=session; WP.run('afterSave', db); }
   }catch(err){

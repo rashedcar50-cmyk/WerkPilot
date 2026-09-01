@@ -408,8 +408,9 @@
   }
   function openaiKey(){
     try{
+      if(typeof readOpenAI==='function'){ const v=readOpenAI(); if(v) return v; }
       return (window.db && db.settings && db.settings.openaiKey)
-        || (typeof localStorage!=='undefined' && localStorage.getItem('werkivo_openai'))
+        || (typeof localStorage!=='undefined' && (localStorage.getItem('werkivo_openai_v1')||localStorage.getItem('werkivo_openai')))
         || window.OPENAI_KEY
         || '';
     }catch(e){ return ''; }
