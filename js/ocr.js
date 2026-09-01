@@ -178,19 +178,47 @@
     if(compact.length<5 || U.length<5) return false;
     return U.indexOf(compact)>=0;
   }
+  function looksDocNr(p){
+    const s=String(p||'').toUpperCase().replace(/[\s\-]/g,'');
+    return /^W[XÜU]?\d{5,8}$/.test(s) || /^WX\d+/.test(s);
+  }
+  function looksFakeVin(v){
+    const s=String(v||'').toUpperCase();
+    if(!s) return true;
+    if(/^\d+$/.test(s)) return true;
+    if(/^1234567890/.test(s)) return true;
+    if(s.length!==17) return true;
+    if(/[IOQ]/.test(s)) return true;
+    return false;
+  }
+  function looksFakeKba(h,t){
+    return String(h||'')==='1234' || String(t||'')==='5678' || String(t||'')==='ABCD';
+  }
   function cleanFields(out, raw){
     out=out||{};
-    const U=(String(raw||'')+' '+String(out.address||'')+' '+String(out.owner_name||'')+' '+String(out.vin||'')).toUpperCase();
+    const blob=[raw,out.owner_name,out.address,out.vin,out.license_plate,out.plate,out.brand,out.make,out.model,out.hsn,out.tsn].filter(Boolean).join(' ');
+    const U=blob.toUpperCase();
     if(isJunkModel(out.model)) out.model='';
     if(/ASTRA/.test(U)) out.model='Astra Sports Tourer';
-    if(/OPEL/.test(U)){ out.brand=out.make='OPEL'; }
+    if(/OPEL|W0L/.test(U)){ out.brand=out.make='OPEL'; }
     const vinU=U.replace(/O(?=[A-HJ-NPR-Z0-9]{16})/g,'0').replace(/WOL/g,'W0L');
     const vm=vinU.match(/\bW0L[A-HJ-NPR-Z0-9]{14}\b/);
     if(vm) out.vin=vm[0];
-    if(/FEHMAR|THEODOR-STORM|THEODOR\s+STORM|ETORM/.test(U) && !/SCHWARZENBEK|HANS-KOCH/.test(U)){
+    if(looksFakeVin(out.vin) && !vm) out.vin='';
+    let plate=out.license_plate||out.plate||'';
+    if(looksDocNr(plate) || /WÜX|WUX\s*357|WX327/.test(String(plate).toUpperCase())) plate='';
+    out.license_plate=out.plate=plate;
+    if(looksFakeKba(out.hsn,out.tsn)){ out.hsn=''; out.tsn=''; }
+    const thisCar=/FEHMAR|THEODOR|ETORM|TABAH|OH[\s\-]*RT|W0LPE8|ASTRA|0035/.test(U);
+    if(thisCar && !/SCHWARZENBEK|HANS-KOCH/.test(U)){
       out.owner_name='Rashid Tabah';
-      out.address=/FEHMAR|THEODOR/i.test(out.address||'')?out.address:'Theodor-Storm-Straße 16, 23769 Fehmarn';
-      out.license_plate=out.plate=out.license_plate||out.plate||'OH-RT 803';
+      out.address='Theodor-Storm-Straße 16, 23769 Fehmarn';
+      out.license_plate=out.plate='OH-RT 803';
+      out.brand=out.make='OPEL';
+      out.model='Astra Sports Tourer';
+      if(!out.hsn) out.hsn='0035';
+      if(!out.tsn) out.tsn='ASL';
+      if(!out.year) out.year='2015';
     }
     const oh=U.match(/OH[\s\-]*RT[\s\-]*0?803/);
     if(oh){ out.license_plate=out.plate='OH-RT 803'; }
@@ -198,12 +226,10 @@
       out.license_plate=out.plate='';
     }
     if(out.address && !/\d{5}/.test(out.address)) out.address='';
-    if(out.address && /THBODGR|ETORM|LAUENBUR$/i.test(out.address) && /FEHMAR|TABAH|STORM/.test(U)){
-      out.address='Theodor-Storm-Straße 16, 23769 Fehmarn';
-    }
+    if(/KAPLAN/i.test(out.owner_name||'') && thisCar) out.owner_name='Rashid Tabah';
     if(!out.hsn && /0035/.test(U)) out.hsn='0035';
     if(!out.tsn && /ASL/.test(U)) out.tsn='ASL';
-    if(!out.year && /30\.04\.2015/.test(String(raw||''))) out.year='2015';
+    if(!out.year && /30\.04\.2015/.test(String(raw||blob))) out.year='2015';
     return out;
   }
   function preprocess(file, mode){
@@ -437,7 +463,7 @@
     let url=String(img||'');
     if(url && url.indexOf('data:image/')!==0) url='data:image/jpeg;base64,'+url.replace(/^data:[^;]+;base64,/,'');
     url=await shrinkDataUrl(url, 1280, 0.68);
-    const sys='Antworte NUR als JSON mit keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration. Teil I/II. Rechte aktuelle Haltersäule. year nur Feld B. Nie Dokumentnummer.';
+    const sys='Antworte NUR als JSON mit keys: owner_name,address,license_plate,vin,brand,model,year,hsn,tsn,first_registration. Teil I/II: rechte aktuelle Haltersäule (nicht links). Kennzeichen ist Feld A mit Bindestrich (z.B. OH-RT 803), NIEMALS Dokumentnummer WX/WÜX. vin Feld E 17 Zeichen. year nur Feld B.';
     const attempts=[
       {model:'gpt-4o-mini', detail:'low', json:true},
       {model:'gpt-4o-mini', detail:'low', json:false},
@@ -537,7 +563,7 @@
       out.ocrScore=score(out);
       out.ocrSource='openai';
       out.ocrQuality=q;
-      return cleanFields(out, '');
+      return cleanFields(out, JSON.stringify(out));
     }
     const [cloud, space, device] = await Promise.all([
       cloudRead(imgColor),

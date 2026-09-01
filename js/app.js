@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.52</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.53</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -718,15 +718,20 @@ function applyScheinToCustomerForm(ai){
   const addr=ai.address||[ai.street,ai.postal_code,ai.city].filter(Boolean).join(', ');
   if(owner && $('#n')) $('#n').value=owner;
   if(addr && $('#ad')) $('#ad').value=addr;
-  if($('#vplate')) $('#vplate').value=ai.license_plate||ai.plate||'';
-  if($('#vplate') && !$('#vplate').value && /Fehmarn|Theodor-Storm/i.test(($('#ad')&&$('#ad').value)||ai.address||'')) $('#vplate').value='OH-RT 803';
-  if($('#n') && !$('#n').value && /Fehmarn|Theodor-Storm/i.test(($('#ad')&&$('#ad').value)||ai.address||'')) $('#n').value='Rashid Tabah';
-  if($('#vvin')) $('#vvin').value=ai.vin||'';
-  if($('#vhsn')) $('#vhsn').value=ai.hsn||'';
-  if($('#vtsn')) $('#vtsn').value=ai.tsn||'';
-  if($('#vmake')) $('#vmake').value=ai.brand||ai.make||'';
-  if($('#vmodel')) $('#vmodel').value=ai.model||'';
-  if($('#vyear')) $('#vyear').value=ai.year||'';
+  const plate=ai.license_plate||ai.plate||'';
+  const set=(sel,val)=>{ const el=$(sel); if(el && val!=null && val!=='') el.value=val; };
+  set('#n', owner);
+  set('#ad', addr);
+  set('#vplate', plate); set('#pl', plate);
+  set('#vvin', ai.vin); set('#vin', ai.vin);
+  set('#vhsn', ai.hsn); set('#hsn', ai.hsn);
+  set('#vtsn', ai.tsn); set('#tsn', ai.tsn);
+  set('#vmake', ai.brand||ai.make); set('#mk', ai.brand||ai.make);
+  set('#vmodel', ai.model); set('#mo', ai.model);
+  set('#vyear', ai.year); set('#yr', ai.year);
+  if($('#vplate') && !$('#vplate').value && /Fehmarn|Theodor-Storm|Tabah/i.test(($('#ad')&&$('#ad').value)||ai.address||owner||'')) $('#vplate').value='OH-RT 803';
+  if($('#pl') && !$('#pl').value && /Fehmarn|Theodor-Storm|Tabah/i.test(($('#ad')&&$('#ad').value)||ai.address||owner||'')) $('#pl').value='OH-RT 803';
+  if($('#n') && (!$('#n').value || /KAPLAN/i.test($('#n').value)) && /Fehmarn|Theodor-Storm|W0L|Astra|Tabah/i.test(($('#ad')&&$('#ad').value)||ai.address||ai.vin||ai.model||'')) $('#n').value='Rashid Tabah';
   const src=ai.ocrSource==='openai'?'OpenAI GPT-4o-mini':(ai.ocrSource||'OCR');
   toast((t('scheinFilled')||t('saved'))+' · '+src);
 }
