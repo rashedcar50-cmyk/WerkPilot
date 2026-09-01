@@ -52,7 +52,7 @@ th{background:#efebe3;position:sticky;top:0}
 .modal .toolbar{position:sticky;bottom:0;background:var(--panel);padding:10px 0 18px;z-index:3}
 .modal.wide{width:min(980px,100%)}
 .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.span2{grid-column:1/-1}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-bottom:88px}.span2{grid-column:1/-1}
 .kba-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .kba-row input{text-transform:uppercase;letter-spacing:.06em;font-weight:700}
 .filebox{border:1px dashed #c4b8a8;border-radius:12px;padding:12px;background:#faf8f4}
