@@ -51,7 +51,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.19</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.20</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -526,7 +526,7 @@ function showSearchResults(q){
 
 function customers(){
  const rows=companyRows('customers');
- $('#content').innerHTML=head(t('customers'),canEdit()?`<button class="btn primary" id="add">${t('newCustomer')}</button>`:'')+
+ $('#content').innerHTML=head(t('customers'),canEdit()?`<button class="btn ok" id="scanCust">📷 ${t('scanSchein')}</button><button class="btn primary" id="add">${t('newCustomer')}</button>`:'')+
  listShareBar('customers')+
  table([t('name'),t('phone'),t('taxId'),t('address'),t('cars'),t('action')],rows.map(c=>[
   esc(c.companyName? (c.companyName+' · '+(c.contact||c.name||'')) : (c.name||'-')),
@@ -536,11 +536,52 @@ function customers(){
   <button class="btn small primary" onclick="invoiceForCustomer('${c.id}')">${t('newInvoice')}</button>
   <button class="btn small" onclick="invoicesForCustomer('${c.id}')">${t('invoicesOf')}</button>`:'—'
  ]), 'customers');
- if(canEdit() && $('#add')) $('#add').onclick=customerModal;
+ if(canEdit() && $('#add')) $('#add').onclick=()=>customerModal();
+ if(canEdit() && $('#scanCust')) $('#scanCust').onclick=()=>customerModal();
+}
+function applyScheinToCustomerForm(ai){
+  if(!ai) return;
+  const owner=ai.owner_name||ai.holder||ai.customer_name||'';
+  const addr=[ai.street,ai.postal_code,ai.city].filter(Boolean).join(', ');
+  if(owner && $('#n')) $('#n').value=owner;
+  if(addr && $('#ad')) $('#ad').value=addr;
+  if($('#vplate')) $('#vplate').value=ai.license_plate||ai.plate||'';
+  if($('#vvin')) $('#vvin').value=ai.vin||'';
+  if($('#vhsn')) $('#vhsn').value=ai.hsn||'';
+  if($('#vtsn')) $('#vtsn').value=ai.tsn||'';
+  if($('#vmake')) $('#vmake').value=ai.brand||ai.make||'';
+  if($('#vmodel')) $('#vmodel').value=ai.model||'';
+  if($('#vyear')) $('#vyear').value=ai.year||'';
+  toast(t('scheinFilled')||t('saved'));
+}
+function afterCustomerVehicle(c,v){
+  if(!v){ render(); return; }
+  modal(t('nextForCar'),`<div class="okbox">${esc(c.name||c.companyName||'')} · ${esc(v.plate||v.vin||'')}</div>
+    <div class="toolbar" style="flex-direction:column;margin-top:12px">
+      <button type="button" class="btn primary full" id="goAppt">${t('newAppt')}</button>
+      <button type="button" class="btn primary full" id="goInv">${t('newInvoice')}</button>
+      <button type="button" class="btn full" id="goEst">${t('createQuote')}</button>
+    </div>`,()=>render(), t('closeBtn'));
+  if($('#goAppt')) $('#goAppt').onclick=()=>{ closeModal(); session.page='appointments'; render(); setTimeout(()=>{
+    const add=$('#add'); if(add) add.click();
+    setTimeout(()=>{ const sel=$('#av'); if(sel && v.id) sel.value=v.id; }, 80);
+  }, 40); };
+  if($('#goInv')) $('#goInv').onclick=()=>{ closeModal(); session.page='invoices'; invoiceDesigner('invoice', c.id, null, v.id); };
+  if($('#goEst')) $('#goEst').onclick=()=>{ closeModal(); session.page='estimates'; financeModal('estimate', v.id, c.id); };
 }
 function customerModal(existing){
  const c0=existing||{};
  modal(existing?t('editCustomer'):t('newCustomer'),`<div class="form-grid">
+ ${existing?'':`<div class="field span2"><label>${t('scanSchein')}</label>
+  <input id="doc" type="file" accept="image/*" class="hidden">
+  <div class="toolbar">
+    <button type="button" class="btn primary" id="custCam">📷 ${t('openCam')}</button>
+    <button type="button" class="btn" id="custPick">${t('pickFile')}</button>
+  </div>
+  <div class="hint">${t('ocrHint')}</div>
+  <img id="ocrImg" class="ocr-preview hidden">
+  <div id="ocrStatus" class="hint"></div>
+ </div>`}
  <div class="field"><label>${t('customerType')}</label><select id="ctype"><option value="person" ${c0.type!=='company'?'selected':''}>${t('person')}</option><option value="company" ${c0.type==='company'?'selected':''}>${t('company')}</option></select></div>
  <div class="field"><label>${t('contact')}</label><input id="n" value="${esc(c0.name||c0.contact||'')}"></div>
  <div class="field"><label>${t('companyName')}</label><input id="cfirma" value="${esc(c0.companyName||'')}"></div>
@@ -573,14 +614,36 @@ function customerModal(existing){
   if(existing){ const i=db.customers.findIndex(x=>x.id===c0.id); if(i>=0) db.customers[i]={...db.customers[i],...c}; audit('customer.update',c.name); }
   else { db.customers.push(c); audit('customer.create',c.name); }
   const plate=$('#vplate').value.trim(), vin=$('#vvin').value.trim();
+  let veh=null;
   if(plate||vin){
-    const v={id:id('v'),companyId:session.company.id,customerId:c.id,plate,vin,hsn:$('#vhsn').value.trim(),tsn:$('#vtsn').value.trim().toUpperCase(),kba:($('#vhsn').value.trim()+' '+$('#vtsn').value.trim().toUpperCase()).trim(),make:$('#vmake').value.trim(),model:$('#vmodel').value.trim(),year:$('#vyear').value.trim(),km:$('#vkm').value};
-    db.vehicles.push(v); if(typeof upsertVehicleCloud==='function') upsertVehicleCloud(v);
+    veh={id:id('v'),companyId:session.company.id,customerId:c.id,plate,vin,hsn:$('#vhsn').value.trim(),tsn:$('#vtsn').value.trim().toUpperCase(),kba:($('#vhsn').value.trim()+' '+$('#vtsn').value.trim().toUpperCase()).trim(),make:$('#vmake').value.trim(),model:$('#vmodel').value.trim(),year:$('#vyear').value.trim(),km:$('#vkm').value};
+    db.vehicles.push(veh); if(typeof upsertVehicleCloud==='function') upsertVehicleCloud(veh);
   }
-  save();upsertCustomerCloud(c);closeModal();render();
+  save();upsertCustomerCloud(c);closeModal();
+  if(veh && !existing) afterCustomerVehicle(c,veh);
+  else render();
  });
  bindVinEnter('#vvin',{vin:'#vvin',make:'#vmake',model:'#vmodel',year:'#vyear'});
  bindKbaEnter('#vhsn','#vtsn',{make:'#vmake',model:'#vmodel',year:'#vyear'});
+ if($('#custPick')) $('#custPick').onclick=()=>$('#doc') && $('#doc').click();
+ if($('#custCam')) $('#custCam').onclick=()=>openCamera('#doc');
+ if($('#doc')) $('#doc').onchange=async e=>{
+   const f=e.target.files && e.target.files[0]; if(!f) return;
+   if($('#ocrImg')){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); }
+   if($('#ocrStatus')) $('#ocrStatus').textContent=t('readingSchein');
+   try{
+     let ai=null;
+     try{ ai=await readScheinAI(f); }catch(err){
+       try{ await WP.loadOcr(); }catch(x){}
+       let text='';
+       if(window.Tesseract){ const res=await Tesseract.recognize(f,'deu+eng'); text=res?.data?.text||''; }
+       const parsed=typeof parseVehicleOCR==='function'?parseVehicleOCR(text):{};
+       ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:parsed.owner||''};
+     }
+     applyScheinToCustomerForm(ai);
+     if($('#ocrStatus')) $('#ocrStatus').textContent=t('scheinFilled');
+   }catch(err){ if($('#ocrStatus')) $('#ocrStatus').textContent=t('readFailClear'); }
+ };
 }
 function editCustomer(cid){ const c=db.customers.find(x=>x.id===cid); if(c) customerModal(c); }
 window.editCustomer=editCustomer;
