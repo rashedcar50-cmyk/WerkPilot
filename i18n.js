@@ -454,6 +454,7 @@ window.WP_INV_DE = {
     ar:{plHint:'افتح الموقع مع VIN السيارة المحددة.',plOpen:'فتح PartsLink24',waTitle:'واتساب الورشة',waHint:'إرسال جاهزية السيارة من أوامر الإصلاح.',tseHint:'نقطة تكامل جاهزة. الربط الحقيقي يحتاج مزوداً معتمداً.',katyHintInt:'سجّل دخولك مرة. رقم القطعة بالفاتورة يعبّي الاسم والسعر.',katyUser:'مستخدم Katy',katyPass:'كلمة سر Katy',saveLogin:'حفظ الدخول',openKaty:'فتح Katy',openHenry:'فتح Henry',henryImportHint:'استورد قائمة Henry (CSV).',katySaved:'تم حفظ الدخول على هذا الجهاز',imported:'تم الاستيراد',exportWs:'نسخة هذه الورشة',newWorkshop:'ورشة جديدة'}
   };
   Object.keys(extra).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], extra[c]); });
+  ['tr','sr','ru','pl','es'].forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], extra.en||{}); });
 })();
 window.t = function(key){
   const store = (typeof db!=='undefined' && db) || window.db || (window.WP && WP.db);

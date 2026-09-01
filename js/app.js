@@ -52,7 +52,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.11.8</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.11.9</span> Sie sind angemeldet als: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -63,7 +63,7 @@ function render(){
    <div class="top-actions"><button class="btn ghost mobile-menu" id="menu">☰</button>
    <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>${canEdit()?`<button class="btn ghost small" id="addWorkshop" title="${t('newWorkshop')}">＋</button>`:''}
    <input class="searchbox" id="qsearch" placeholder="${t('search')}"></div>
-   <div class="top-actions lang-row"><button class="btn ghost small" id="backBtn">${t('prev')}</button><select id="uiLangTop" title="لغة البرنامج">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span></div>
+   <div class="top-actions lang-row"><button class="btn ghost small" id="backBtn">${t('prev')}</button><select id="uiLangTop" title="${t('language')}">${langOptions(db.settings.uiLang||'ar')}</select><span class="badge hide-mobile"><span class="dot"></span>${esc(dLabel(session.user.name))}</span></div>
   </div>
   <div class="content" id="content"></div>
  </main>
@@ -422,7 +422,7 @@ async function exportInvoicePDF(iid){
     const name=(inv.number||'Rechnung').replace(/[^\w.-]+/g,'_')+'.pdf';
     archiveBeleg(inv);
     pdf.save(name);
-    toast('تم حفظ PDF');
+    toast(t('saved'));
   }catch(e){
     console.error(e);
     toast(t('pdfFail'));
@@ -755,7 +755,7 @@ vehicleModal({
 ...parsed,
 ocrSource: f.name
 });
-   toast('تمت القراءة. راجع الحقول قبل الحفظ.');
+   toast(t('ocrHint'));
   }catch(e){console.error(e);$('#ocrStatus').textContent=t('ocrManual');$('#msave').disabled=false}
  },t('readData'));
  $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden'); if($('#docName')) $('#docName').textContent=f.name;}};
@@ -1028,13 +1028,13 @@ function scanScheinStartRepair(mode){
       const owner=ai.owner_name||ai.holder||ai.customer_name||'-';
       $('#scheinPreview').classList.remove('hidden');
       $('#scheinPreview').innerHTML=`<div class="okbox">
-        <b>تمّت القراءة. راجع ثم أدخل الكم:</b><br>
-        الزبون: ${esc(owner)}<br>
-        اللوحة: ${esc(plate)}<br>
+        <b>${t('ocrHint')}</b><br>
+        ${t('customer')}: ${esc(dePrintName(owner))}<br>
+        ${t('plate')}: ${esc(plate)}<br>
         VIN: ${esc(vin)}<br>
         ${esc(ai.brand||ai.make||'')} ${esc(ai.model||'')} ${esc(ai.year||'')}
-        <div class="field" style="margin-top:10px"><label>${t('kmNowEx')}</label><input id="scheinKm" class="latnum" inputmode="decimal" lang="de" inputmode="numeric" placeholder="86500"></div>
-        <div class="field"><label>${t('repairNeeded')}</label><textarea id="scheinWork" placeholder="مثلاً: صوت من المحرك / تغيير زيت / فرامل"></textarea></div>
+        <div class="field" style="margin-top:10px"><label>${t('kmNowEx')}</label><input id="scheinKm" class="latnum" inputmode="decimal" lang="de" placeholder="86500"></div>
+        <div class="field"><label>${t('repairNeeded')}</label><textarea id="scheinWork" placeholder="${t('repairNeeded')}"></textarea></div>
       </div>`;
       $('#ocrStatus').textContent=t('enterKmSave');
       $('#msave').disabled=false;
@@ -1078,7 +1078,7 @@ function repairDesk(rid){
  const r=db.repairs.find(x=>x.id===rid);
  if(!r){ session.repairId=null; return repairs(); }
  const v=vehicleOf(r.vehicleId); const c=customerOfVehicle(r.vehicleId);
- const sts=['استلام','تشخيص','انتظار قطع','قيد التنفيذ','جاهز للتسليم','مسلَّم'];
+ const sts=['intake','diag','wait_parts','working','ready','delivered'];
  const stock=companyRows('inventory');
  const photos=r.photos||[];
  const before=photos.filter(x=>x.kind==='before');
@@ -1173,7 +1173,7 @@ function repairModal(existing){
  <div class="field span2"><label>${t('partsLineFmt')}</label><textarea id="rparts">${esc(parts)}</textarea></div>
  <div class="field"><label>${t('hours')}</label><input id="rh" class="latnum" inputmode="decimal" lang="de" step=".25" value="${r.hours||1}"></div>
  <div class="field"><label>${t('status')}</label><select id="rs">
-  ${['استلام','تشخيص','انتظار قطع','قيد التنفيذ','جاهز للتسليم','مسلَّم'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${stLabel(s)}</option>`).join('')}
+  ${['intake','diag','wait_parts','working','ready','delivered'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${stLabel(s)}</option>`).join('')}
  </select></div>
  </div>`,()=>{
   const parsedParts=$('#rparts').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
@@ -2520,7 +2520,8 @@ function integrations(){
   <button class="btn" id="katyGo">${t('openKaty')}</button>
   <button class="btn" id="henryGo">${t('openHenry')}</button></div>
   <p class="hint">${t('henryImportHint')}</p>
-  <input id="henryFile" type="file" accept=".csv,.txt,.tsv">
+  <input id="henryFile" type="file" accept=".csv,.txt,.tsv" class="hidden">
+  <button type="button" class="btn" id="henryPick">${t('pickFile')}</button>
  </div>
  </div>`;
  const btn=$('#plOpen');
@@ -2538,6 +2539,7 @@ function integrations(){
    openKatySearch('');
  };
  if($('#henryGo')) $('#henryGo').onclick=()=>window.open(db.settings.henryUrl||'https://www.matthies.de/software/henry-jr.print.html','_blank');
+ if($('#henryPick')) $('#henryPick').onclick=()=>$('#henryFile').click();
  if($('#henryFile')) $('#henryFile').onchange=e=>{
    const f=e.target.files[0]; if(!f) return;
    const r=new FileReader();
