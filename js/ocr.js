@@ -59,7 +59,7 @@
       first_registration: firstRegistration,
       firstRegistration,
       owner_name: ownerFromLines(raw) || String(fieldAfter(t,['C\\.1\\.1','Halter','Name oder Firmenname'])||'').replace(/C\.1\.\d/g,'').trim(),
-      address: fieldAfter(t,['C\\.1\\.3','Anschrift']),
+      address: (fieldAfter(raw,['C\\.1\\.3','Anschrift'])||fieldAfter(t,['C\\.1\\.3','Anschrift'])||((raw.match(/(\d{1,4}[a-zA-Z]?\s*,\s*\d{5}\s+[A-Za-zÄÖÜäöüß.\- ]{2,40})/)||[])[0])||'').replace(/\s{2,}/g,' ').trim(),
       engine_displacement_cm3: (fieldAfter(t,['P\\.1','Hubraum']).match(/\d{3,5}/)||[''])[0],
       engine_power_kw: (fieldAfter(t,['P\\.2','Nennleistung']).match(/\d{2,3}/)||[''])[0],
       fuel_type: fieldAfter(t,['P\\.3','Kraftstoff']),
@@ -265,6 +265,29 @@
     else if(given && !mapped.owner_name) mapped.owner_name=given;
     return merge(mapped, fromAnyText(js));
   }
+  async function spaceRead(img){
+    try{
+      const key=(window.db && db.settings && db.settings.ocrSpaceKey) || 'K81772188988957';
+      const body=new URLSearchParams();
+      body.set('base64Image', img.indexOf('data:')===0?img:('data:image/jpeg;base64,'+img));
+      body.set('language','ger');
+      body.set('isOverlayRequired','false');
+      body.set('OCREngine','2');
+      body.set('scale','true');
+      body.set('detectOrientation','true');
+      const controller=new AbortController();
+      const to=setTimeout(()=>controller.abort(), 12000);
+      const res=await fetch('https://api.ocr.space/parse/image',{
+        method:'POST', signal:controller.signal,
+        headers:{apikey:key,'Content-Type':'application/x-www-form-urlencoded'},
+        body:body.toString()
+      });
+      clearTimeout(to);
+      const js=await res.json().catch(()=>({}));
+      const text=((js.ParsedResults||[]).map(r=>r.ParsedText||'').join('\n')) || '';
+      return text?parse(text):{};
+    }catch(e){ console.warn('ocr-space', e); return {}; }
+  }
   async function cloudRead(img){
     if(!window.SUPABASE_URL || !window.SUPABASE_KEY) return {};
     const controller=new AbortController();
@@ -290,9 +313,13 @@
     if(!q.ok) console.warn('ocr-quality', q.issues);
     const imgColor=await colorJpeg(file);
     const imgA=await preprocess(file,'contrast');
-    const [cloud, device] = await Promise.all([cloudRead(imgColor), deviceText(file)]);
-    let local=parse(device);
-    let out=merge(cloud, local);
+    const [cloud, space, device] = await Promise.all([
+      cloudRead(imgColor),
+      spaceRead(imgColor),
+      deviceText(file)
+    ]);
+    let local=merge(space, parse(device));
+    let out=merge(local, cloud);
     if(!out.owner_name || !(out.vin||out.license_plate)){
       try{
         await (W.loadOcr? W.loadOcr(): Promise.resolve());
@@ -305,6 +332,7 @@
         out=merge(out, local);
       }catch(e){}
     }
+    if(!out.year && out.first_registration) out.year=String(out.first_registration).slice(-4);
     out.ocrScore=score(out);
     out.ocrSource='max';
     out.ocrQuality=q;

@@ -40,6 +40,12 @@ assert(p.tsn==='AAX','ocr tsn');
 const named=OCR.parse('C.1.1 Tabah\nC.1.2 Rashid\nC.1.3 Hans-Koch-Ring 12\nE WVWZZZ1JZXW000001\nA RZ-TB 76');
 assert(/Tabah/i.test(named.owner_name||''),'ocr owner family C.1.1');
 assert(/Rashid/i.test(named.owner_name||''),'ocr owner given C.1.2');
+const full=OCR.parse('BUNDESREPUBLIK DEUTSCHLAND\nZulassungsbescheinigung Teil I\nA RZ-TB 1976\nB 12.03.2018\nC.1.1 Tabah\nC.1.2 Rashid\nC.1.3 Hans-Koch-Ring 12, 21493 Schwarzenbek\nD.1 VOLKSWAGEN\nD.3 Golf\nE WVWZZZ1JZXW000001\nP.1 1395\nP.2 92\n2.1 0603 2.2 AAX');
+assert(/Tabah/i.test(full.owner_name||'') && /Rashid/i.test(full.owner_name||''),'ocr full owner');
+assert(/21493/.test(full.address||'') && /Schwarzenbek/i.test(full.address||''),'ocr full address');
+assert(full.engine_displacement_cm3==='1395','ocr hubraum');
+assert(full.engine_power_kw==='92','ocr kW');
+
 
 const merged=OCR.merge({vin:'WVWZZZ1JZXW000001',owner_name:''},{vin:'',owner_name:'Rashid Tabah',plate:'RZ-TB 76'});
 assert(merged.vin==='WVWZZZ1JZXW000001','merge keeps valid vin');
