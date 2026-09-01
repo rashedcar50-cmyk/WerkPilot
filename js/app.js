@@ -52,7 +52,13 @@ function login(){
     if(/share=1/.test(location.search) || await consumeSharedWhatsApp()){
       session.page='customers';
       render();
-      setTimeout(()=>customerModal(), 200);
+      setTimeout(()=>{
+        customerModal();
+        setTimeout(()=>{
+          applySharedFileTo('#doc');
+          if(window._sharedWaFile) ingestScheinFile(window._sharedWaFile);
+        }, 250);
+      }, 200);
     } else render();
   });
  };
@@ -63,7 +69,7 @@ function render(){
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.35</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.36</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -2456,28 +2462,61 @@ async function openProCamera(opts){
 }
 window.openProCamera=openProCamera;
 window.openCamera=function(target){ return openProCamera({target:typeof target==='string'?target:'#doc'}); };
+async function ingestScheinFile(file){
+  if(!file) return;
+  toast(t('readingSchein')||t('readingAI'));
+  try{
+    const ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(file): readScheinAI(file));
+    if($('#n')||$('#vplate')) applyScheinToCustomerForm(ai);
+    if($('#pl')&&$('#vin')){
+      if(ai.license_plate||ai.plate) $('#pl').value=ai.license_plate||ai.plate;
+      if(ai.vin) $('#vin').value=ai.vin;
+      if($('#hsn')&&ai.hsn) $('#hsn').value=ai.hsn;
+      if($('#tsn')&&ai.tsn) $('#tsn').value=ai.tsn;
+      if($('#mk')&&(ai.brand||ai.make)) $('#mk').value=ai.brand||ai.make;
+      if($('#mo')&&ai.model) $('#mo').value=ai.model;
+      if($('#yr')&&ai.year) $('#yr').value=ai.year;
+      if($('#cc')&&ai.engine_displacement_cm3) $('#cc').value=ai.engine_displacement_cm3;
+      if($('#kw')&&ai.engine_power_kw) $('#kw').value=ai.engine_power_kw;
+      if($('#fuel')&&ai.fuel_type) $('#fuel').value=ai.fuel_type;
+      if($('#pa')&&(ai.color||ai.paint)) $('#pa').value=ai.color||ai.paint;
+      if($('#en')&&(ai.engine||ai.engine_code)) $('#en').value=ai.engine||ai.engine_code;
+      if($('#vmaxw')&&ai.maxWeight) $('#vmaxw').value=ai.maxWeight;
+      if($('#vseats')&&ai.seats) $('#vseats').value=ai.seats;
+      if($('#vklass')&&ai.vehicleClass) $('#vklass').value=ai.vehicleClass;
+    }
+    if(!$('#n') && !($('#pl')&&$('#vin'))){
+      const {c,v}=findOrCreateFromSchein(ai);
+      vehicleModal(Object.assign({},v,{customerId:c&&c.id}));
+    }
+    toast(t('scheinFilled')||t('saved'));
+  }catch(e){ console.warn(e); toast(t('readFailClear')||t('ocrFailSchein')); }
+}
+window.ingestScheinFile=ingestScheinFile;
 function pickWhatsApp(sel){
   window._camInput=sel||'#doc';
   try{ sessionStorage.setItem('waTarget', window._camInput); }catch(e){}
-  document.querySelectorAll('.wa-wait').forEach(n=>n.remove());
-  const bar=document.createElement('div');
-  bar.className='wa-wait';
-  bar.innerHTML=`<b>${t('fromWhatsApp')}</b><div>${t('waGoHint')}</div>
-    <div class="toolbar" style="margin-top:8px">
-      <button type="button" class="btn primary" id="waOpen">${t('openWhatsApp')}</button>
-      <button type="button" class="btn" id="waFile">${t('pickFile')}</button>
-      <button type="button" class="btn ghost" id="waX">✕</button>
-    </div>`;
-  document.body.appendChild(bar);
-  bar.querySelector('#waX').onclick=()=>bar.remove();
-  bar.querySelector('#waFile').onclick=()=>{
-    const el=document.querySelector(window._camInput||'#doc');
-    if(el) el.click();
-  };
-  bar.querySelector('#waOpen').onclick=()=>{
-    window.open('https://wa.me/','_blank','noopener');
-    toast(t('waGoHint'));
-  };
+  let inp=document.getElementById('waPickInput');
+  if(!inp){
+    inp=document.createElement('input');
+    inp.id='waPickInput';
+    inp.type='file';
+    inp.accept='image/*';
+    inp.className='hidden';
+    document.body.appendChild(inp);
+    inp.addEventListener('change', async function(){
+      const f=this.files&&this.files[0];
+      if(!f) return;
+      const target=document.querySelector(window._camInput||'#doc');
+      if(target){
+        try{ const dt=new DataTransfer(); dt.items.add(f); target.files=dt.files; target.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){}
+      }
+      await ingestScheinFile(f);
+      this.value='';
+    });
+  }
+  toast(t('waPickHint')||t('fromWhatsApp'));
+  inp.click();
 }
 window.pickWhatsApp=pickWhatsApp;
 function applySharedFileTo(sel){
