@@ -143,13 +143,16 @@ th{background:#efebe3;position:sticky;top:0}
 
 
 
-/* developer dock — owner only */
-.dev-fab{position:fixed;left:16px;right:auto;bottom:22px;z-index:40;width:52px;height:52px;border-radius:16px;border:0;background:linear-gradient(180deg,#E8A54B,#c4842e);color:#111;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer}
-.dev-panel{position:fixed;left:16px;right:auto;bottom:84px;z-index:80;width:min(380px,calc(100vw - 24px));max-height:70vh;overflow:auto;background:#fff;border:1px solid #E4DED4;border-radius:16px;padding:14px;box-shadow:0 16px 40px rgba(28,33,43,.15)}
+/* developer dock — owner only, top-right so it never covers Speichern */
+.dev-fab{position:fixed;top:78px;right:14px;left:auto;bottom:auto;z-index:45;width:48px;height:48px;border-radius:14px;border:0;background:linear-gradient(180deg,#E8A54B,#c4842e);color:#111;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.28);cursor:pointer}
+.dev-panel{position:fixed;top:134px;right:14px;left:auto;bottom:auto;z-index:90;width:min(400px,calc(100vw - 24px));max-height:calc(100vh - 150px);overflow:auto;background:#fff;border:1px solid #E4DED4;border-radius:16px;padding:14px;box-shadow:0 16px 40px rgba(28,33,43,.18)}
 .dev-panel h3{margin:0 0 8px;font-size:1rem}
-.dev-panel textarea{width:100%;min-height:110px;background:#F4F1EA;color:#1C212B;border:1px solid #E4DED4;border-radius:10px;padding:8px}
+.dev-panel textarea{width:100%;min-height:72px;background:#F4F1EA;color:#1C212B;border:1px solid #E4DED4;border-radius:10px;padding:8px}
 .dev-req{border-top:1px solid #E4DED4;margin-top:10px;padding-top:8px;font-size:.85rem}
-@media (max-width:860px){.dev-fab{bottom:72px}.dev-panel{bottom:132px}}
+.dev-quick{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.dev-quick button{font-size:.78rem}
+.dev-out{font-size:.8rem;background:#F4F1EA;border-radius:8px;padding:8px;margin-top:8px;white-space:pre-wrap;max-height:120px;overflow:auto}
+@media (max-width:860px){.dev-fab{top:70px;right:10px}.dev-panel{top:124px;right:8px;left:8px;width:auto}}
 
 .henry-ui{background:#d9e2ef;border:1px solid #8aa0bd;border-radius:8px;padding:8px}
 .henry-cap{background:#E8A54B;color:#1a2330;font-weight:800;font-size:.82rem;padding:4px 8px;margin:0 0 6px}

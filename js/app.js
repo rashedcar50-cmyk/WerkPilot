@@ -110,7 +110,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.46</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.47</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
@@ -143,9 +143,56 @@ function mountDevDock(){
   if(typeof isDev!=='function' || !isDev()) return;
   if($('#devFab')) return;
   const fab=document.createElement('button');
-  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok'; fab.textContent='G';
+  fab.id='devFab'; fab.className='dev-fab'; fab.title='Grok — volle Steuerung'; fab.type='button'; fab.textContent='G';
   document.body.appendChild(fab);
   fab.onclick=()=>toggleDevPanel();
+}
+function grokOut(msg){
+  const el=$('#devOut'); if(el) el.textContent=String(msg||'');
+  toast(String(msg||'').slice(0,80));
+}
+function runGrokCommand(raw){
+  if(typeof isDev!=='function' || !isDev()) return grokOut('Nur Entwickler');
+  const text=String(raw||'').trim();
+  if(!text) return grokOut('Befehl leer');
+  db.settings.devRequests=db.settings.devRequests||[];
+  db.settings.devRequests.push({ts:fmtWhen(new Date()),text});
+  save(true);
+  const low=text.toLowerCase();
+  const go=p=>{ closeModal&&closeModal(); session.page=p; render(); grokOut('→ '+p); };
+  if(/^(js:|>)/i.test(text)){
+    try{
+      const code=text.replace(/^(js:|>)\s*/i,'');
+      const res=Function('db','session','WP','goPage','save','render','toast', '"use strict"; return (async()=>('+code+'))()')(db,session,window.WP,window.goPage,save,render,toast);
+      Promise.resolve(res).then(v=>grokOut(v===undefined?'OK':JSON.stringify(v))).catch(e=>grokOut(e.message));
+    }catch(e){ grokOut(e.message); }
+    return;
+  }
+  if(/kunde|customer|عميل/.test(low) && /neu|new|جديد/.test(low)){ go('customers'); setTimeout(()=>{ if(typeof customerModal==='function') customerModal(); }, 60); return; }
+  if(/fahrzeug|auto|سيارة|vehicle/.test(low) && /neu|new|جديد/.test(low)){ go('vehicles'); setTimeout(()=>{ const add=$('#add'); if(add) add.click(); }, 60); return; }
+  if(/rechnung|invoice|فاتورة/.test(low) && /neu|new|جديد|erstell/.test(low)){ go('invoices'); setTimeout(()=>{ if(typeof invoiceDesigner==='function') invoiceDesigner('invoice'); }, 80); return; }
+  if(/termin|موعد|appointment/.test(low) && /neu|new|جديد/.test(low)){ go('appointments'); setTimeout(()=>{ const add=$('#add'); if(add) add.click(); }, 60); return; }
+  if(/auftrag|repair|إصلاح/.test(low)) return go('repairs');
+  if(/lager|inventory|مخزون/.test(low)) return go('inventory');
+  if(/integration|openai|katy/.test(low)) return go('integrations');
+  if(/einstell|settings|إعداد/.test(low)) return go('settings');
+  if(/bericht|report|تقرير/.test(low)) return go('reports');
+  if(/heute|dashboard|اليوم/.test(low)) return go('dashboard');
+  if(/deutsch|german|\bde\b/.test(low) && /sprache|language|لغة/.test(low)){ db.settings.uiLang='de'; save(true); render(true); return grokOut('Sprache: de'); }
+  if(/arab|\bar\b|عربي/.test(low) && /sprache|language|لغة/.test(low)){ db.settings.uiLang='ar'; save(true); render(true); return grokOut('Sprache: ar'); }
+  if(/english|\ben\b|إنكل/.test(low) && /sprache|language|لغة/.test(low)){ db.settings.uiLang='en'; save(true); render(true); return grokOut('Sprache: en'); }
+  if(/backup|export|نسخ/.test(low)){
+    try{
+      const blob=new Blob([JSON.stringify(db)],{type:'application/json'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='werkivo-backup.json'; a.click();
+      return grokOut('Backup gestartet');
+    }catch(e){ return grokOut(e.message); }
+  }
+  if(/speichern|save|حفظ/.test(low)){ save(true); return grokOut('Gespeichert'); }
+  const pages='dashboard customers vehicles repairs appointments estimates invoices purchases inventory employees expenses journal reports integrations audit help settings studio'.split(' ');
+  const hit=pages.find(p=>low===p || low.indexOf(p)>=0);
+  if(hit) return go(hit);
+  grokOut('Ausgeführt als Notiz. Beispiele: neue Rechnung · neuer Kunde · js: db.customers.length');
 }
 function toggleDevPanel(){
   const old=$('#devPanel');
@@ -153,27 +200,37 @@ function toggleDevPanel(){
   const box=document.createElement('div');
   box.id='devPanel'; box.className='dev-panel';
   const reqs=db.settings.devRequests||[];
-  box.innerHTML=`<h3>${t('devTitle')}</h3>
-    <p class="muted">${t('devHint')}</p>
-    <textarea id="devAsk" placeholder="${t('devPh')}"></textarea>
-    <div class="toolbar" style="margin-top:8px">
-      <button class="btn primary" id="devSave">${t('saveReq')}</button>
-      <button class="btn" id="devCopy">${t('copyAll')}</button>
-      <button class="btn ghost" id="devClose">${t('closeBtn')}</button>
+  box.innerHTML=`<h3>Grok Steuerung</h3>
+    <p class="muted">Volle Rechte — Seite öffnen, Beleg anlegen, oder js: Befehl.</p>
+    <div class="dev-quick">
+      <button type="button" class="btn small" data-g="neue Rechnung">Rechnung</button>
+      <button type="button" class="btn small" data-g="neuer Kunde">Kunde</button>
+      <button type="button" class="btn small" data-g="neuer Termin">Termin</button>
+      <button type="button" class="btn small" data-g="repairs">Auftrag</button>
+      <button type="button" class="btn small" data-g="integrations">OpenAI</button>
+      <button type="button" class="btn small" data-g="settings">Settings</button>
+      <button type="button" class="btn small" data-g="backup">Backup</button>
     </div>
-    <div class="dev-req">${reqs.length?reqs.slice().reverse().map(r=>`<div><b>${esc(r.ts)}</b><div>${esc(r.text)}</div></div>`).join(''):'<div class="muted">'+t('noReqs')+'</div>'}</div>`;
+    <textarea id="devAsk" placeholder="neue Rechnung · js: db.vehicles.length"></textarea>
+    <div class="toolbar" style="margin-top:8px">
+      <button type="button" class="btn primary" id="devRun">Ausführen</button>
+      <button type="button" class="btn" id="devSave">${t('saveReq')||'Notiz'}</button>
+      <button type="button" class="btn ghost" id="devClose">${t('closeBtn')}</button>
+    </div>
+    <div class="dev-out" id="devOut"></div>
+    <div class="dev-req">${reqs.length?reqs.slice(-8).reverse().map(r=>`<div><b>${esc(r.ts)}</b><div>${esc(r.text)}</div></div>`).join(''):'<div class="muted">'+t('noReqs')+'</div>'}</div>`;
   document.body.appendChild(box);
   $('#devClose').onclick=()=>box.remove();
+  const run=()=>{ const v=$('#devAsk').value.trim(); if(!v) return grokOut('Befehl leer'); runGrokCommand(v); };
+  $('#devRun').onclick=run;
+  $('#devAsk').addEventListener('keydown',e=>{ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); run(); }});
+  box.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>runGrokCommand(b.getAttribute('data-g')));
   $('#devSave').onclick=()=>{
     const text=$('#devAsk').value.trim();
     if(!text) return toast(t('askWriteFirst'));
     db.settings.devRequests=db.settings.devRequests||[];
     db.settings.devRequests.push({ts:fmtWhen(new Date()),text});
-    save(); toast(t('reqSaved')); box.remove(); toggleDevPanel();
-  };
-  $('#devCopy').onclick=()=>{
-    const text=(db.settings.devRequests||[]).map(r=>'- '+r.text).join('\n')||$('#devAsk').value;
-    navigator.clipboard.writeText(text).then(()=>toast(t('copiedGrok'))).catch(()=>toast(text));
+    save(true); toast(t('reqSaved'));
   };
 }
 function page(){
