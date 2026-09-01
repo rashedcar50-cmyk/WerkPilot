@@ -478,7 +478,7 @@ window.WP_INV_DE = {
       devPh:'Example: add VIN field on the job card',saveReq:'Save request',copyAll:'Copy all',closeBtn:'Close',
       noReqs:'No requests yet.',exportFull:'Export full JSON',importJson:'Import JSON',reseed:'Reload demo data',
       devNotesLbl:'Dev notes',notesSaved:'Notes saved',invalidFile:'Invalid file',pdfSaved:'PDF saved',
-      reportWord:'Report',mechanic:'Technician',saveSlim:'Saved after reducing photos',saveFail:'Local save failed — export a backup now'
+      reportWord:'Report',mechanic:'Technician',saveSlim:'Saved after reducing photos',saveFail:'Local save failed — export a backup now',loggedInAs:'Signed in as'
     },
     de:{
       pdfFailLib:'PDF-Bibliothek konnte nicht geladen werden',pdfNotLoaded:'PDF-Bibliothek fehlt — Seite aktualisieren',
@@ -500,7 +500,7 @@ window.WP_INV_DE = {
       devPh:'Beispiel: VIN-Feld auf der Auftragskarte',saveReq:'Anfrage speichern',copyAll:'Alles kopieren',closeBtn:'Schließen',
       noReqs:'Noch keine Anfragen.',exportFull:'Komplettes JSON exportieren',importJson:'JSON importieren',reseed:'Demodaten laden',
       devNotesLbl:'Entwickler-Notizen',notesSaved:'Notizen gespeichert',invalidFile:'Ungültige Datei',pdfSaved:'PDF gespeichert',
-      reportWord:'Bericht',mechanic:'Techniker',saveSlim:'Gespeichert nach Verkleinern der Fotos',saveFail:'Lokales Speichern fehlgeschlagen — jetzt Backup exportieren'
+      reportWord:'Bericht',mechanic:'Techniker',saveSlim:'Gespeichert nach Verkleinern der Fotos',saveFail:'Lokales Speichern fehlgeschlagen — jetzt Backup exportieren',loggedInAs:'Sie sind angemeldet als'
     },
     ar:{
       pdfFailLib:'تعذر تحميل مكتبة PDF',pdfNotLoaded:'مكتبة PDF غير محمّلة — حدّث الصفحة',
@@ -522,7 +522,7 @@ window.WP_INV_DE = {
       devPh:'مثال: أضف خانة رقم الهيكل على بطاقة الأمر',saveReq:'حفظ الطلب',copyAll:'نسخ الكل',closeBtn:'إغلاق',
       noReqs:'ما في طلبات بعد.',exportFull:'تصدير JSON كامل',importJson:'استيراد JSON',reseed:'إعادة بيانات التجربة',
       devNotesLbl:'ملاحظات تطوير',notesSaved:'تم حفظ الملاحظات',invalidFile:'ملف غير صالح',pdfSaved:'تم حفظ PDF',
-      reportWord:'تقرير',mechanic:'الميكانيكي',saveSlim:'الحفظ تم بعد تخفيف الصور',saveFail:'تعذر الحفظ المحلي — صدّر نسخة احتياطية'
+      reportWord:'تقرير',mechanic:'الميكانيكي',saveSlim:'الحفظ تم بعد تخفيف الصور',saveFail:'تعذر الحفظ المحلي — صدّر نسخة احتياطية',loggedInAs:'مسجّل الدخول باسم'
     }
   };
   Object.keys(z).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], z[c]); });
