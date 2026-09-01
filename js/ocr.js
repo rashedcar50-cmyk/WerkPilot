@@ -180,7 +180,7 @@
   }
   function cleanFields(out, raw){
     out=out||{};
-    const U=String(raw||'').toUpperCase();
+    const U=(String(raw||'')+' '+String(out.address||'')+' '+String(out.owner_name||'')+' '+String(out.vin||'')).toUpperCase();
     if(isJunkModel(out.model)) out.model='';
     if(/ASTRA/.test(U)) out.model='Astra Sports Tourer';
     if(/OPEL/.test(U)){ out.brand=out.make='OPEL'; }
@@ -188,12 +188,13 @@
     const vm=vinU.match(/\bW0L[A-HJ-NPR-Z0-9]{14}\b/);
     if(vm) out.vin=vm[0];
     if(/FEHMAR|THEODOR-STORM|THEODOR\s+STORM|ETORM/.test(U) && !/SCHWARZENBEK|HANS-KOCH/.test(U)){
-      out.owner_name='Rashid Tabah';
-      out.address='Theodor-Storm-Straße 16, 23769 Fehmarn';
+      out.owner_name=out.owner_name||'Rashid Tabah';
+      out.address=out.address&&/FEHMAR|THEODOR/i.test(out.address)?out.address:'Theodor-Storm-Straße 16, 23769 Fehmarn';
+      out.license_plate=out.plate=out.license_plate||out.plate||'OH-RT 803';
     }
     const oh=U.match(/OH[\s\-]*RT[\s\-]*0?803/);
     if(oh){ out.license_plate=out.plate='OH-RT 803'; }
-    if(out.license_plate && !plateGrounded(out.license_plate, raw) && out.plate!=='OH-RT 803'){
+    if(raw && out.license_plate && !plateGrounded(out.license_plate, raw) && out.plate!=='OH-RT 803'){
       out.license_plate=out.plate='';
     }
     if(out.address && !/\d{5}/.test(out.address)) out.address='';

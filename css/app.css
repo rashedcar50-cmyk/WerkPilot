@@ -47,9 +47,9 @@ table{width:100%;border-collapse:collapse;min-width:720px;background:var(--panel
 th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:start;vertical-align:top}
 th{background:#efebe3;position:sticky;top:0}
 .status{padding:4px 8px;border-radius:999px;background:#efebe3;color:#1c212b}.status.ok{background:#d7efe0}.status.warn{background:#f3e2c4}
-.modal-back{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:18px;z-index:50}
+.modal-back{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:18px;z-index:120}
 .modal{width:min(760px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
-.modal .toolbar{position:sticky;bottom:0;background:var(--panel);padding-top:8px;z-index:2}
+.modal .toolbar{position:sticky;bottom:0;background:var(--panel);padding:10px 0 18px;z-index:3}
 .modal.wide{width:min(980px,100%)}
 .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.span2{grid-column:1/-1}
@@ -144,7 +144,7 @@ th{background:#efebe3;position:sticky;top:0}
 
 
 /* developer dock — owner only */
-.dev-fab{position:fixed;left:16px;right:auto;bottom:22px;z-index:80;width:52px;height:52px;border-radius:16px;border:0;background:linear-gradient(180deg,#E8A54B,#c4842e);color:#111;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer}
+.dev-fab{position:fixed;left:16px;right:auto;bottom:22px;z-index:40;width:52px;height:52px;border-radius:16px;border:0;background:linear-gradient(180deg,#E8A54B,#c4842e);color:#111;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer}
 .dev-panel{position:fixed;left:16px;right:auto;bottom:84px;z-index:80;width:min(380px,calc(100vw - 24px));max-height:70vh;overflow:auto;background:#fff;border:1px solid #E4DED4;border-radius:16px;padding:14px;box-shadow:0 16px 40px rgba(28,33,43,.15)}
 .dev-panel h3{margin:0 0 8px;font-size:1rem}
 .dev-panel textarea{width:100%;min-height:110px;background:#F4F1EA;color:#1C212B;border:1px solid #E4DED4;border-radius:10px;padding:8px}
