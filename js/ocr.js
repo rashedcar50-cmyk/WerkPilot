@@ -46,8 +46,8 @@
       return all[0]?all[0].p:'';
     }
     const plate=parsePlate(raw);
-    const hsn=(upper.match(/\bHSN\s*[:.]?\s*(\d{4})\b/)||upper.match(/\b2\.1\s*[:.]?\s*(\d{4})\b/)||[])[1]||'';
-    const tsn=(upper.match(/\b2\.2\s*[:.]?\s*([A-Z]{1,3})(?![A-Z0-9])/)||upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{2,3})\b/)||[])[1]||'';
+    const hsn=(upper.match(/\bHSN\s*[:.]?\s*(\d{4})\b/)||upper.match(/2[\s.,]*1\s*[:.]?\s*(\d{4})\b/)||upper.match(/\b(\d{4})\s+2[\s.,]*2\b/)||[])[1]||'';
+    const tsn=(upper.match(/2[\s.,]*2\s*[:.]?\s*([A-Z]{1,3})(?![A-Z0-9])/)||upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{2,3})\b/)||[])[1]||'';
     function ownerFromLines(src){
       const lines=String(src||'').split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
       const isLabel=s=>/C\.?\s*1\.?\s*[123]|P\.?\s*C\.?\s*1|Vorname|Firmenname|Anschrift|Name oder|Amtliches|Kennzeichen|Zulassung|Fahrzeugschein|Bundesrepublik|Teil I|Halter/i.test(s||'');
@@ -95,12 +95,29 @@
       ownerFromLines._addr=addr;
       return name.slice(0,80);
     }
-    const d1=fieldAfter(t,['D\\.1','Marke','Hersteller']);
-    const d3=fieldAfter(t,['D\\.3','Handelsbezeichnung']);
+    function lineAfter(code){
+      const lines=t.split(/\n/).map(s=>s.trim()).filter(Boolean);
+      const re=new RegExp('(?:^|\\b)'+code+'\\b','i');
+      for(let i=0;i<lines.length;i++){
+        if(!re.test(lines[i])) continue;
+        const rest=lines[i].replace(re,'').replace(/^[\s.:-]+/,'').trim();
+        if(rest && rest.length>=2 && rest.length<=28 && !/Handelsbezeichnung|Marke|Hersteller/i.test(rest)) return rest;
+        const nxt=(lines[i+1]||'').trim();
+        if(nxt && nxt.length>=2 && nxt.length<=28 && !/^\d[\d.\s]*$/.test(nxt)) return nxt;
+      }
+      return '';
+    }
+    const d1=fieldAfter(t,['D\\.1','Marke','Hersteller'])||lineAfter('D\\.1');
+    const d3=fieldAfter(t,['D\\.3','Handelsbezeichnung'])||lineAfter('D\\.3')||lineAfter('D\\.2');
     const makeFromList=MAKES.find(x=>upper.includes(x))||'';
     let make='';
     try{ make=(d1.match(new RegExp(MAKES.join('|'),'i'))||[makeFromList])[0] || d1.split(/[/,]/)[0].trim(); }catch(e){ make=makeFromList; }
-    const model=(d3||'').replace(new RegExp('^'+String(make||'')+'\\s*','i'),'').trim();
+    let model=(d3||'').replace(new RegExp('^'+String(make||'')+'\\s*','i'),'').trim();
+    if(!model || /Handelsbezeichnung|D\.\d/i.test(model)){
+      const known={FIAT:['TIPO','PANDA','500X','500','DUCATO','DOBLO','PUNTO','BRAVO'],SEAT:['IBIZA','LEON','ARONA','ATECA','ALHAMBRA'],VW:['GOLF','POLO','PASSAT','TIGUAN','CADDY','TOURAN'],VOLKSWAGEN:['GOLF','POLO','PASSAT','TIGUAN'],BMW:['1ER','3ER','5ER','X1','X3','X5'],AUDI:['A3','A4','A6','Q3','Q5'],MERCEDES:['A-KLASSE','C-KLASSE','E-KLASSE','SPRINTER','VITO']};
+      const list=known[(make||'').toUpperCase()]||[];
+      model=list.find(x=>upper.includes(x))||'';
+    }
     const yearMatch=t.match(/B\s*[:.]?\s*(\d{2}\.\d{2}\.(19|20)\d{2})/i) || t.match(/\b(\d{2}\.\d{2}\.(19|20)\d{2})\b/);
     const firstRegistration=yearMatch ? (yearMatch[1]||yearMatch[0]) : '';
     const year=firstRegistration.slice(-4);

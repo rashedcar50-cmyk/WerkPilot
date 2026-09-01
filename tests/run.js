@@ -21,6 +21,7 @@ assert(E.validateVehicle({vin:'123'}).length>0,'vin bad');
 assert(E.validateVehicle({vin:'WVWZZZ1JIOW123456'}).length>0,'vin I/O invalid');
 assert(E.validateInvoice({total:0,lines:[]}).length>0,'empty invoice');
 assert(E.validateInvoice({total:10,lines:[{}]}).length===0,'invoice with total ok');
+
 const migrated=E.migrate({settings:{uiLang:'xx'},repairs:[{status:'استلام'}],appointments:[{status:'مؤكد'}]});
 assert(migrated.settings.uiLang==='de','migrate unknown lang → de');
 assert(migrated.repairs[0].status==='intake','migrate repair status');
@@ -57,6 +58,10 @@ assert(/FS 1802|FS1802/.test((docn.plate||docn.license_plate||'').replace('-',''
 
 assert(real.vin==='VSSZZZ6JZCR007669','ocr real vin');
 assert(/SEAT/i.test(real.brand||real.make||''),'ocr real make');
+const kba=OCR.parse('2.1 7593 2.2 AF\nD.1 SEAT\nD.3\nIBIZA');
+assert(kba.hsn==='7593','ocr messy kba hsn');
+assert(kba.tsn==='AF','ocr messy kba tsn');
+assert(/IBIZA/i.test(kba.model||''),'ocr model next line');
 
 
 
