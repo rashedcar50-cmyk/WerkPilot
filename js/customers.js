@@ -80,6 +80,14 @@ function customerModal(existing){
   const plate=$('#vplate').value.trim(), vin=$('#vvin').value.trim();
   let veh=null;
   if(plate||vin){
+    const already=findExistingVehicle({license_plate:plate,vin});
+    if(already){
+      toast(t('vehicleExists'));
+      save();upsertCustomerCloud(c);closeModal();
+      session.page='vehicles'; render();
+      setTimeout(()=>vehicleModal(already), 80);
+      return;
+    }
     veh={id:id('v'),companyId:session.company.id,customerId:c.id,plate,vin,hsn:$('#vhsn').value.trim(),tsn:$('#vtsn').value.trim().toUpperCase(),kba:($('#vhsn').value.trim()+' '+$('#vtsn').value.trim().toUpperCase()).trim(),make:$('#vmake').value.trim(),model:$('#vmodel').value.trim(),year:$('#vyear').value.trim(),km:$('#vkm').value};
     db.vehicles.push(veh); if(typeof upsertVehicleCloud==='function') upsertVehicleCloud(veh);
   }
@@ -248,32 +256,43 @@ async function readScheinAI(file){
   if(window.WP && WP.OCR && WP.OCR.read) return WP.OCR.read(file);
   throw new Error('ocr-module-missing');
 }
+function normPlate(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g,''); }
+function findExistingVehicle(ai){
+  const plate=normPlate(ai && (ai.license_plate||ai.plate));
+  const vin=String((ai&&ai.vin)||'').trim().toUpperCase();
+  const rows=(typeof companyRows==='function'?companyRows('vehicles'):(db.vehicles||[]));
+  return rows.find(x=>{
+    if(vin && String(x.vin||'').toUpperCase()===vin) return true;
+    if(plate && normPlate(x.plate)===plate) return true;
+    return false;
+  })||null;
+}
 function findOrCreateFromSchein(ai){
   const plate = (ai.license_plate || ai.plate || '').trim();
   const vin = (ai.vin || '').trim().toUpperCase();
-  let v = db.vehicles.find(x => (vin && (x.vin||'').toUpperCase()===vin) || (plate && x.plate===plate));
+  let v = findExistingVehicle(ai);
+  if(v){
+    const c = db.customers.find(x=>x.id===v.customerId) || db.customers.find(x=>x.companyId===session.company.id && x.id===v.customerId);
+    return {c,v,existing:true};
+  }
   const ownerName = (ai.owner_name || ai.holder || ai.customer_name || '').trim() || (plate ? (t('holderOf')+' '+plate) : t('newCustDefault'));
   const ownerPhone = (ai.phone || ai.owner_phone || '').trim();
   const ownerAddr = (ai.address || ai.owner_address || '').trim();
-  let c = v ? db.customers.find(x=>x.id===v.customerId) : db.customers.find(x=>x.companyId===session.company.id && x.name===ownerName);
+  let c = db.customers.find(x=>x.companyId===session.company.id && x.name===ownerName);
   if(!c){
     c={id:id('c'),companyId:session.company.id,name:ownerName,phone:ownerPhone,email:'',address:ownerAddr};
     db.customers.push(c); upsertCustomerCloud(c);
   }
-  if(!v){
-    v={id:id('v'),companyId:session.company.id,customerId:c.id,cloudId:undefined,
-      plate, vin, make:ai.brand||ai.make||'', model:ai.model||'', year:ai.year||'',
-      engine:ai.engine_code||ai.engine||'', paint:ai.color||ai.paint||'',
-      engine_displacement_cm3:ai.engine_displacement_cm3||'', fuel_type:ai.fuel_type||'',
-      engine_power_kw:ai.engine_power_kw||'', hsn:ai.hsn||'', tsn:ai.tsn||'', kba:ai.kba||((ai.hsn||'')+' '+(ai.tsn||'')).trim(),
-      maxWeight:ai.maxWeight||'', seats:ai.seats||'', vehicleClass:ai.vehicleClass||'',
-      km:0, nextServiceKm:0, photo:'',
-      ocrSource:'fahrzeugschein'};
-    db.vehicles.push(v); upsertVehicleCloud(v);
-  } else if(c && v.customerId!==c.id && !v.customerId){
-    v.customerId=c.id;
-  }
-  return {c,v};
+  v={id:id('v'),companyId:session.company.id,customerId:c.id,cloudId:undefined,
+    plate, vin, make:ai.brand||ai.make||'', model:ai.model||'', year:ai.year||'',
+    engine:ai.engine_code||ai.engine||'', paint:ai.color||ai.paint||'',
+    engine_displacement_cm3:ai.engine_displacement_cm3||'', fuel_type:ai.fuel_type||'',
+    engine_power_kw:ai.engine_power_kw||'', hsn:ai.hsn||'', tsn:ai.tsn||'', kba:ai.kba||((ai.hsn||'')+' '+(ai.tsn||'')).trim(),
+    maxWeight:ai.maxWeight||'', seats:ai.seats||'', vehicleClass:ai.vehicleClass||'',
+    km:0, nextServiceKm:0, photo:'',
+    ocrSource:'fahrzeugschein'};
+  db.vehicles.push(v); upsertVehicleCloud(v);
+  return {c,v,existing:false};
 }
 async function scheinFileToCustomerVehicle(file){
   let ai;

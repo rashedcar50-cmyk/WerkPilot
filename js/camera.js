@@ -138,13 +138,24 @@ async function ingestScheinFile(file){
       if($('#vseats')&&ai.seats) $('#vseats').value=ai.seats;
       if($('#vklass')&&ai.vehicleClass) $('#vklass').value=ai.vehicleClass;
     }
-    if(!$('#n') && !($('#pl')&&$('#vin'))){
-      const {c,v}=findOrCreateFromSchein(ai);
-      vehicleModal(Object.assign({},v,{customerId:c&&c.id}));
-    }
     const src=ai.ocrSource==='server'?'Server':(ai.ocrSource==='openai'?'OpenAI GPT-4o-mini':(ai.ocrSource||'OCR'));
-    toast((t('scheinFilled')||t('saved'))+' · '+src);
-    if($('#ocrStatus')) $('#ocrStatus').textContent=(t('scheinFilled')||'')+' · '+src;
+    const dup=typeof findExistingVehicle==='function'?findExistingVehicle(ai):null;
+    if(dup){
+      toast(t('vehicleExists'));
+      if($('#ocrStatus')) $('#ocrStatus').textContent=t('vehicleExists');
+      if(!$('#n') && !($('#pl')&&$('#vin'))){
+        session.page='vehicles'; render();
+        setTimeout(()=>vehicleModal(dup), 80);
+      }
+    } else if(!$('#n') && !($('#pl')&&$('#vin'))){
+      const found=findOrCreateFromSchein(ai);
+      save();
+      vehicleModal(Object.assign({},found.v,{customerId:found.c&&found.c.id}));
+      toast((t('scheinFilled')||t('saved'))+' · '+src);
+    } else {
+      toast((t('scheinFilled')||t('saved'))+' · '+src);
+      if($('#ocrStatus')) $('#ocrStatus').textContent=(t('scheinFilled')||'')+' · '+src;
+    }
   }catch(e){ console.warn(e); toast(t('readFailClear')||t('ocrFailSchein')); }
   finally{ window._scheinBusy=false; }
 }
