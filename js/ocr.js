@@ -678,16 +678,18 @@
     const q=await quality(file);
     if(!q.ok) console.warn('ocr-quality', q.issues);
     const imgColor=await colorJpeg(file);
-    const imgA=await preprocess(file,'contrast');
     let out=await openaiRead(imgColor);
     out=stripDemo(out);
-    if(score(out)>=72 && out.owner_name && (out.vin||out.license_plate) && (out.hsn||out.model||out.brand) && !isDemoValue(out.owner_name+out.address+out.vin+out.license_plate)){
+    const enough=(out.vin||out.license_plate) && (out.hsn||out.model||out.brand||out.make);
+    if((score(out)>=55 && enough && !isDemoValue((out.owner_name||'')+(out.address||'')+(out.vin||'')+(out.license_plate||''))) ||
+       (score(out)>=72 && out.owner_name && enough && !isDemoValue(out.owner_name+out.address+out.vin+out.license_plate))){
       if(!out.year && out.first_registration) out.year=String(out.first_registration).slice(-4);
       out.ocrScore=score(out);
       out.ocrSource=W._ocrLast==='server'?'server':(W._ocrLast==='openai'?'openai':(W._ocrLast||'ocr'));
       out.ocrQuality=q;
       return cleanFields(out, (W._ocrRaw||'')+' '+JSON.stringify(out));
     }
+    const imgA=await preprocess(file,'contrast');
     const [cloud, space, device] = await Promise.all([
       cloudRead(imgColor),
       spaceRead(imgColor),
