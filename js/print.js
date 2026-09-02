@@ -92,7 +92,7 @@ function printDocMarkup(type, id){
       .rechnung{width:100%;max-width:190mm;margin:0 auto}
       .rh-main{display:block}
       .ta-head{text-align:left;margin:0 0 6px}
-      .ta-logo{max-width:88mm;height:auto;display:block}
+      .ta-logo{max-width:120mm;width:72%;height:auto;display:block}
       .ta-rule{height:0;border-top:2px solid #0B2A4A;border-bottom:2px solid #E85D04;margin:6px 0 12px}
       .rh-title{text-align:left;font-size:18px;font-weight:700;margin:0;color:#0B2A4A}
       .rh-legal{text-align:center;font-size:10px;margin:2px 0}

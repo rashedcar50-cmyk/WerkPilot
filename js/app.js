@@ -142,7 +142,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.86</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
+ <div class="henry-top"><span class="ver">v1.12.87</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><img class="app-logo" src="logo-app.jpg" alt="TABAH AUTO"></div></div><div class="nav">
@@ -153,7 +153,7 @@ function render(force){
   <div class="topbar">
    <button class="ico-btn mobile-menu" id="menu" type="button" aria-label="Menu">☰</button>
    <button class="ico-btn" id="backBtn" type="button" aria-label="${t('prev')}">←</button>
-   <div class="mob-title">TABAH AUTO</div>
+   <div class="mob-title"><img class="app-logo" src="logo-app.jpg" alt="TABAH AUTO"></div>
    <div class="tools-slot" id="toolsSlot">
     <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>
     <input class="searchbox" id="qsearch" placeholder="${t('search')}">
