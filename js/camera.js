@@ -149,31 +149,60 @@ async function ingestScheinFile(file){
   finally{ window._scheinBusy=false; }
 }
 window.ingestScheinFile=ingestScheinFile;
+function waFileInput(){
+  let inp=document.getElementById('waPickInput');
+  if(inp) return inp;
+  inp=document.createElement('input');
+  inp.id='waPickInput';
+  inp.type='file';
+  inp.accept='image/*,application/pdf';
+  inp.className='hidden';
+  document.body.appendChild(inp);
+  inp.addEventListener('change', async function(){
+    const f=this.files&&this.files[0];
+    if(!f) return;
+    const target=document.querySelector(window._camInput||'#doc');
+    let forwarded=false;
+    if(target){
+      try{ const dt=new DataTransfer(); dt.items.add(f); target.files=dt.files; target.dispatchEvent(new Event('change',{bubbles:true})); forwarded=true; }catch(e){}
+    }
+    if(!forwarded && typeof ingestScheinFile==='function' && !window._scheinBusy) await ingestScheinFile(f);
+    this.value='';
+  });
+  return inp;
+}
+function openWhatsAppApp(){
+  const deep='whatsapp://';
+  const web='https://wa.me/';
+  const a=document.createElement('a');
+  a.href=deep;
+  a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ try{ a.remove(); }catch(e){} window.open(web,'_blank','noopener'); }, 700);
+}
 function pickWhatsApp(sel){
   window._camInput=sel||'#doc';
   try{ sessionStorage.setItem('waTarget', window._camInput); }catch(e){}
-  let inp=document.getElementById('waPickInput');
-  if(!inp){
-    inp=document.createElement('input');
-    inp.id='waPickInput';
-    inp.type='file';
-    inp.accept='image/*';
-    inp.className='hidden';
-    document.body.appendChild(inp);
-    inp.addEventListener('change', async function(){
-      const f=this.files&&this.files[0];
-      if(!f) return;
-      const target=document.querySelector(window._camInput||'#doc');
-      let forwarded=false;
-      if(target){
-        try{ const dt=new DataTransfer(); dt.items.add(f); target.files=dt.files; target.dispatchEvent(new Event('change',{bubbles:true})); forwarded=true; }catch(e){}
-      }
-      if(!forwarded && !window._scheinBusy) await ingestScheinFile(f);
-      this.value='';
-    });
+  const hint=t('waGoHint')||t('waPickHint')||'';
+  if(typeof modal==='function'){
+    modal(t('fromWhatsApp')||'WhatsApp',
+      `<p class="hint">${hint}</p>
+       <ol class="hint" style="padding-inline-start:18px;line-height:1.5">
+         <li>${t('openWhatsApp')}</li>
+         <li>${t('waPickHint')}</li>
+       </ol>
+       <div class="toolbar" style="flex-direction:column;margin-top:12px">
+         <button type="button" class="btn btn-wa full" id="waOpen">${t('openWhatsApp')}</button>
+         <button type="button" class="btn primary full" id="waFile">${t('pickFile')}</button>
+       </div>`, null, t('closeBtn')||t('cancel'));
+    if($('#waOpen')) $('#waOpen').onclick=()=>{ openWhatsAppApp(); };
+    if($('#waFile')) $('#waFile').onclick=()=>{ waFileInput().click(); };
+    return;
   }
-  toast(t('waPickHint')||t('fromWhatsApp'));
-  inp.click();
+  toast(hint);
+  openWhatsAppApp();
+  setTimeout(()=>waFileInput().click(), 400);
 }
 window.pickWhatsApp=pickWhatsApp;
 function applySharedFileTo(sel){
