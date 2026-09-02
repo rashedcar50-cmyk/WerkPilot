@@ -90,6 +90,13 @@ assert(real.vin==='VSSZZZ6JZCR007669','ocr real vin');
 assert(/SEAT/i.test(real.brand||real.make||''),'ocr real make');
 const kba=OCR.parse('2.1 7593 2.2 AF\nD.1 SEAT\nD.3\nIBIZA');
 assert(kba.hsn==='7593','ocr messy kba hsn');
+const spr=OCR.parse('Zulassungsbescheinigung Teil I\nA PM MZ70\nB 07.04.09\nC.1.1 Landkreis Potsdam-Mittelmark\nC.1.3 Niemoellerstrasse 1\n14806 Bad Belzig\nD.1 MERCEDES-BENZ\nD.3 Sprinter\nE WDB9061531N406888\n2.1 1313 2.2 SC');
+assert(/PM/.test(spr.plate||spr.license_plate||'') && /70/.test(spr.plate||spr.license_plate||''),'sprinter plate PM-MZ 70');
+assert((spr.vin||'').indexOf('WDB906')>=0,'sprinter vin');
+assert(/Mercedes/i.test(spr.brand||spr.make||''),'sprinter make from WDB');
+assert(/Sprinter/i.test(spr.model||''),'sprinter model');
+assert(spr.hsn==='1313','sprinter hsn 1313');
+assert(spr.year==='2009','sprinter year 07.04.09');
 assert(kba.tsn==='AF','ocr messy kba tsn');
 assert(/IBIZA/i.test(kba.model||''),'ocr model next line');
 

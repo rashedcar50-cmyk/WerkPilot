@@ -185,6 +185,7 @@ function lookupKbaLocal(hsn,tsn){
   const t3=tsn.slice(0,3);
   let model='';
   if(hsn==='0035' && t3==='ASL') model='Astra Sports Tourer';
+  else if(hsn==='1313' && t3==='SC') model='Sprinter';
   else if(TSN_MODEL[t3] && HSN_MAKE[hsn]) model=TSN_MODEL[t3];
   return {hsn,tsn,kba:(hsn+' '+tsn).trim(),make:HSN_MAKE[hsn]||'',model};
 }

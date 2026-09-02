@@ -21,7 +21,7 @@
       const fmt=(a,b,c)=>a+'-'+b+' '+c;
       const ok=(a,b,c,ctx)=>{
         if(!a||!b||!c) return false;
-        if(/ZULASSUNGSBESCHEINIGUNG|NUMMER DER|FAHRZEUGBRIEF|TEIL II|WX\d{5,}/.test(ctx||'')) return false;
+        if(/NUMMER DER|FAHRZEUGBRIEF|WX\d{5,}|PM-K-\d/.test(ctx||'')) return false;
         if(/^\d$/.test(c) && /[-\/]\d/.test(ctx||'')) return false;
         if(/\/\d/.test(ctx||'')) return false;
         if((ctx||'').split(/[-\/]/).length>=4) return false;
@@ -41,9 +41,17 @@
       if(all.length>1) return all[all.length-1].p;
       return all[0]?all[0].p:'';
     }
-    const plate=parsePlate(raw);
-    const hsn=(upper.match(/\(2\.1\)\s*(\d{4})/)||upper.match(/2[\s.,]*1\s*[:.)]*\s*(\d{4})(?!\d)/)||upper.match(/\bHSN\s*[:.]?\s*(\d{4})\b/)||[])[1]||'';
-    const tsn=(upper.match(/2[\s.,]*2\s*[:.]?\s*([A-Z]{1,3})(?![A-Z0-9])/)||upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{2,3})\b/)||[])[1]||'';
+    let plate=parsePlate(raw);
+    if(!plate){
+      const a=upper.match(/AMTLICHES\s+KENNZEICHEN[^\n]{0,40}?([A-ZÄÖÜ]{1,3})[\s\-]+([A-Z]{1,2})[\s\-]*(\d{1,4})/);
+      if(a) plate=a[1]+'-'+a[2]+' '+a[3];
+    }
+    if(!plate){
+      const a=upper.match(/\bA\b[^\n]{0,16}?([A-ZÄÖÜ]{1,3})[\s\-]+([A-Z]{1,2})[\s\-]*(\d{1,4})\b/);
+      if(a && !/PM-K/.test(a[0])) plate=a[1]+'-'+a[2]+' '+a[3];
+    }
+    const hsn=(upper.match(/\(2\.1\)\s*(\d{4})/)||upper.match(/2[\s.,]*1\s*[:.)]*\s*(\d{4})(?!\d)/)||upper.match(/\bHSN\s*[:.]?\s*(\d{4})\b/)||upper.match(/\b(1313|0035|0603|0005|0588|7593)\b/)||[])[1]||'';
+    const tsn=(upper.match(/2[\s.,]*2\s*[:.]?\s*([A-Z]{1,3})(?![A-Z0-9])/)||upper.match(/\bTSN\s*[:.]?\s*([A-Z0-9]{2,3})\b/)||(hsn==='1313' && upper.match(/\b(SC)\b/))||[])[1]||'';
     function ownerFromLines(src){
       const lines=String(src||'').split(/\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
       const isLabel=s=>/C\.?\s*[136]\.?\s*[123]|P\.?\s*C\.?\s*1|Vorname|Firmenname|Anschrift|Name oder|Amtliches|Kennzeichen|Zulassung|Fahrzeugschein|Bundesrepublik|Teil I+|Halter|Europäische|Gemeinschaft/i.test(s||'');
@@ -121,9 +129,18 @@
     }
     const yearMatch=t.match(/(?:^|\n)\s*B\b[^\n]{0,40}?(\d{2}\.\d{2}\.(?:19|20)\d{2})/i)
       || t.match(/Feld\s*B[^\n]{0,30}(\d{2}\.\d{2}\.(?:19|20)\d{2})/i)
-      || t.match(/Erstzulassung[^\n]{0,40}(\d{2}\.\d{2}\.(?:19|20)\d{2})/i);
-    const firstRegistration=yearMatch ? yearMatch[1] : '';
-    const year=firstRegistration.slice(-4);
+      || t.match(/Erstzulassung[^\n]{0,40}(\d{2}\.\d{2}\.(?:19|20)\d{2})/i)
+      || t.match(/(?:^|\n)\s*B\b[^\n]{0,40}?(\d{2}\.\d{2}\.\d{2})(?!\d)/i);
+    let firstRegistration=yearMatch ? yearMatch[1] : '';
+    let year='';
+    const y4=firstRegistration.match(/(19|20)\d{2}$/);
+    const y2=firstRegistration.match(/(\d{2})$/);
+    if(y4) year=y4[0];
+    else if(y2 && /^\d{2}\.\d{2}\.\d{2}$/.test(firstRegistration)){
+      const yy=parseInt(y2[1],10);
+      year=(yy<=30?'20':'19')+y2[1];
+      firstRegistration=firstRegistration.replace(/\d{2}$/, year);
+    } else year=firstRegistration.slice(-4);
     const out={
       license_plate: plate,
       plate,
@@ -163,6 +180,10 @@
     }
     if(/^\(?\d+\)?$/.test(String(out.model||'').trim())) out.model='';
     if((!out.model || out.model.length<4) && /ASTRA\s+SPORTS\s+TOURER/i.test(raw)) out.model='Astra Sports Tourer';
+    if(!out.make && !out.brand && /WDB|WDD|WDF|W1K|MERCEDES/.test(U2)){
+      out.brand=out.make='Mercedes-Benz';
+    }
+    if((!out.model || out.model.length<3) && /SPRINTER/.test(U2)) out.model='Sprinter';
     if(!out.make && !out.brand && out.hsn){
       const mk={ '0035':'OPEL','0603':'VOLKSWAGEN','0005':'BMW','1313':'MERCEDES-BENZ','0588':'AUDI','7593':'SEAT' };
       const m=mk[String(out.hsn).padStart(4,'0')];
