@@ -198,14 +198,15 @@ function pickWhatsApp(sel){
   const hint=t('waGoHint')||t('waPickHint')||'';
   if(typeof modal==='function'){
     modal(t('fromWhatsApp')||'WhatsApp',
-      `<p class="hint">${hint}</p>
-       <ol class="hint" style="padding-inline-start:18px;line-height:1.5">
+      `<p class="hint">${t('waNoShareIcon')||hint}</p>
+       <ol class="hint" style="padding-inline-start:18px;line-height:1.55">
          <li>${t('openWhatsApp')}</li>
-         <li>${t('waPickHint')}</li>
+         <li>${t('waSaveInChat')}</li>
+         <li>${t('waThenPick')}</li>
        </ol>
        <div class="toolbar" style="flex-direction:column;margin-top:12px">
          <button type="button" class="btn btn-wa full" id="waOpen">${t('openWhatsApp')}</button>
-         <button type="button" class="btn primary full" id="waFile">${t('pickFile')}</button>
+         <button type="button" class="btn primary full" id="waFile">${t('waThenPick')}</button>
        </div>`, null, t('closeBtn')||t('cancel'));
     if($('#waOpen')) $('#waOpen').onclick=()=>{ openWhatsAppApp(); };
     if($('#waFile')) $('#waFile').onclick=()=>{ waFileInput().click(); };
