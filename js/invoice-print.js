@@ -200,21 +200,13 @@ function buildWorkshopRechnung(x){
   const m=invoiceModel(x);
   const tpl=workshop().invoiceTpl||db.settings.invoiceTpl||'modern';
   const {w,cust}=m;
-  const coTitle=(w.name && !/^TST$/i.test(String(w.name).trim())) ? w.name : 'Autoservice und Autoteile Tabah UG';
-  const henryHead=`<div class="rh-band"><div class="rh-title">${esc(coTitle)}</div></div>
-      <div class="rh-legal">(haftungsbeschränkt)</div>
-      <div class="rh-sender">${esc(w.name)}, ${esc(w.address)}</div>`;
-  if(tpl==='modern'){
-    return `<div class="rechnung tpl-modern" dir="ltr" lang="de"><div class="rh-main">
-      ${henryHead}
+  const logo=window.WP_INVOICE_LOGO||'logo-invoice.jpg';
+  const head=`<div class="ta-head"><img class="ta-logo" src="${logo}" alt="TABAH AUTO"></div>
+      <div class="ta-rule"></div>`;
+  const thanks=`<p class="rh-thanks">Vielen Dank für Ihr Vertrauen. Wir sind gerne für Sie da.<br><em>Mit freundlichen Grüßen<br>Ihr Tabah Auto Service Team</em></p>`;
+  return `<div class="rechnung tpl-tabah" dir="ltr" lang="de"><div class="rh-main">
+      ${head}
       <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
-      <div class="rh-docname">Rechnung</div>
-      ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
-  }
-  return `<div class="rechnung tpl-classic" dir="ltr" lang="de"><div class="rh-main">
-      ${henryHead}
-      <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
-      <div class="rh-docname">Rechnung</div>
-      ${posTable(m.filled)}${totBlock(m)}</div>${footBlock(w)}</div>`;
+      ${posTable(m.filled)}${totBlock(m)}${thanks}</div>${footBlock(w)}</div>`;
 }
 

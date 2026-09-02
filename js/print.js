@@ -82,7 +82,7 @@ function printDocMarkup(type, id){
   const html = buildDocHTML(type, id);
   const ui=db.settings.uiLang||'de';
   const dl=docLang(); const ddr=(type==="invoices"&&dl==="de")?"ltr":((window.WP_RTL||[]).includes(ui)?"rtl":"ltr");
-  return `<!doctype html><html lang="${type==="invoices"?dl:ui}" dir="${ddr}"><head><meta charset="utf-8"><title>TST</title>
+  return `<!doctype html><html lang="${type==="invoices"?dl:ui}" dir="${ddr}"><head><meta charset="utf-8"><title>TABAH AUTO</title>
     <style>
       @page{size:${(workshop().printPaper||db.settings.printPaper||'A4')} portrait;margin:${(workshop().printMargin||db.settings.printMargin||'8mm')}}
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -91,7 +91,10 @@ function printDocMarkup(type, id){
       .print-doc,.inv-a4{margin:0;padding:0}
       .rechnung{width:100%;max-width:190mm;margin:0 auto}
       .rh-main{display:block}
-      .rh-title{text-align:center;font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;font-weight:700;letter-spacing:.5px;margin:0;color:#d4af37}
+      .ta-head{text-align:left;margin:0 0 6px}
+      .ta-logo{max-width:88mm;height:auto;display:block}
+      .ta-rule{height:0;border-top:2px solid #0B2A4A;border-bottom:2px solid #E85D04;margin:6px 0 12px}
+      .rh-title{text-align:left;font-size:18px;font-weight:700;margin:0;color:#0B2A4A}
       .rh-legal{text-align:center;font-size:10px;margin:2px 0}
       .rh-sub{text-align:center;font-size:10px;margin-bottom:10px}
       .rh-grid{display:flex;justify-content:space-between;gap:16px;margin-bottom:10px}
@@ -101,7 +104,7 @@ function printDocMarkup(type, id){
       .meta-tbl td:first-child{font-weight:700;padding-right:10px}
       .rh-h{font-size:16px;margin:6px 0 4px}
       .pos-tbl{width:100%;border-collapse:collapse;margin-top:4px}
-      .pos-tbl th{text-align:left;border-bottom:1px solid #111;padding:3px 5px;font-size:11px;background:transparent}
+      .pos-tbl th{text-align:left;border-bottom:0;padding:5px 6px;font-size:11px;background:#0B2A4A;color:#fff}
       .pos-tbl td{border:0;border-bottom:1px solid #eee;padding:3px 5px;text-align:left}
       .pos-tbl td:nth-child(4),.pos-tbl td:nth-child(5),.pos-tbl td:nth-child(6),.pos-tbl td:nth-child(7){text-align:right}
       .rh-henry-title{text-align:center;font-size:20px;font-weight:800;letter-spacing:.4px;margin:0 0 6px;line-height:1.15}
@@ -117,8 +120,7 @@ function printDocMarkup(type, id){
       .rh-legalhint{font-size:9px;margin-top:6px;color:#333}
       .rh-foot{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #111;margin-top:10px;padding-top:6px;font-size:9px;page-break-inside:avoid}
       .rh-foot>div{flex:1}
-      .rh-band{display:block;width:100%;text-align:center;background:#111;color:#d4af37;padding:10px 0;margin:0 0 8px;border-bottom:3px solid #d4af37}
-      .rh-band .rh-title,.rh-band td{color:#d4af37;text-align:center!important;font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;letter-spacing:.5px;width:100%}
+      .rh-band{display:none}
       .rh-band .rh-doc{color:#fff}
       .rh-doc{font-size:26px;font-weight:800;letter-spacing:1px}
       .tpl-classic{padding:0}
@@ -242,7 +244,7 @@ async function exportInvoicePDF(iid){
 window.exportInvoicePDF=exportInvoicePDF;
 
 function exportEmail(type, id){
-  const subject = encodeURIComponent('Werkivo - ' + (type || t('reportWord')));
+  const subject = encodeURIComponent('TABAH AUTO - ' + (type || t('reportWord')));
   const body = encodeURIComponent(plainTextDoc(type, id).slice(0, 1800));
   window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }

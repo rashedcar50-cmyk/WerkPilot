@@ -28,7 +28,7 @@ function nav(){
 function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
- <div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="tag">${t('tag')}</div>
+ <div class="brand-mark"><img class="app-logo" src="logo-app.jpg" alt="TABAH AUTO"></div>
  <div class="field"><label>${t('user')}</label><input id="lu" autocomplete="username"></div>
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'de')}</select></div>
@@ -142,10 +142,10 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.85</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TST
+ <div class="henry-top"><span class="ver">v1.12.86</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
- <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><div class="brand-word">Werkivo</div></div><div class="muted" style="margin:6px 0 10px;font-size:.78rem">${t('tag')}</div></div><div class="nav">
+ <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><img class="app-logo" src="logo-app.jpg" alt="TABAH AUTO"></div></div><div class="nav">
  ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
  </div></aside>
  <div class="nav-scrim" id="navScrim"></div>
@@ -153,7 +153,7 @@ function render(force){
   <div class="topbar">
    <button class="ico-btn mobile-menu" id="menu" type="button" aria-label="Menu">☰</button>
    <button class="ico-btn" id="backBtn" type="button" aria-label="${t('prev')}">←</button>
-   <div class="mob-title">Werkivo</div>
+   <div class="mob-title">TABAH AUTO</div>
    <div class="tools-slot" id="toolsSlot">
     <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(c.profile?.workshopBrand||c.name)} · ${c.country}</option>`).join('')}</select>
     <input class="searchbox" id="qsearch" placeholder="${t('search')}">
@@ -1292,7 +1292,7 @@ function auditPage(){
 }
 function newWorkshopModal(){
   modal(t('newWorkshop'), `<div class="form-grid">
-    <div class="field"><label>${t('wsTrade')}</label><input id="nwBrand" placeholder="TST Nord"></div>
+    <div class="field"><label>${t('wsTrade')}</label><input id="nwBrand" placeholder="TABAH AUTO"></div>
     <div class="field"><label>${t('wsLegal')}</label><input id="nwName" placeholder="Firma UG"></div>
     <div class="field"><label>${t('country')}</label><select id="nwCountry"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="ES">España</option><option value="NL">Nederland</option></select></div>
     <div class="field"><label>${t('currency')}</label><input id="nwCur" value="EUR"></div>
@@ -1330,7 +1330,7 @@ function settings(){
   <option value="classic" ${w.invoiceTpl==='classic'?'selected':''}>${t('tplClassic')}</option>
   <option value="atelier" ${w.invoiceTpl==='atelier'?'selected':''}>${t('tplAtelier')}</option>
  </select></div>
- <div class="field span2"><label>${t('brandName')}</label><input id="wbrand" value="${esc(w.workshopBrand||'TST')}"></div>
+ <div class="field span2"><label>${t('brandName')}</label><input id="wbrand" value="${esc(w.workshopBrand||'TABAH AUTO')}"></div>
  <div class="field span2"><label>${t('legalName')}</label><input id="wname" value="${esc(w.workshopName||'')}"></div>
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(w.workshopTaxId||'')}"></div>
  <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(w.workshopSteuerNr||'')}"></div>

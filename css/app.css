@@ -184,6 +184,9 @@ th{background:#efebe3;position:sticky;top:0}
 .login-screen{background:#c5d0de}
 
 .brand-word{font-size:1.6rem;font-weight:800;letter-spacing:.5px;color:#1a2330}
+.app-logo{height:44px;width:auto;max-width:220px;display:block;object-fit:contain}
+.login-card .app-logo{height:56px;max-width:260px}
+.sidebrand .app-logo{height:36px;max-width:180px}
 .henry-skin .brand-word{color:#1a2330}
 
 input.latnum,.latnum{direction:ltr!important;unicode-bidi:isolate;font-variant-numeric:lining-nums tabular-nums;font-family:ui-sans-serif,system-ui,"Segoe UI",Arial,sans-serif}

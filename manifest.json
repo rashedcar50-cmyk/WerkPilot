@@ -1,7 +1,7 @@
 {
   "id": "/WerkPilot/",
-  "name": "Werkivo",
-  "short_name": "Werkivo",
+  "name": "TABAH AUTO",
+  "short_name": "TABAH AUTO",
   "description": "Werkstattverwaltung für Autoservice: Aufträge, Fahrzeuge, Rechnungen.",
   "start_url": "./index.html?source=pwa",
   "scope": "./",
