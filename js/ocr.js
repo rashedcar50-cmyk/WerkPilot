@@ -448,6 +448,24 @@
       img.onerror=reject; img.src=url;
     });
   }
+  function rotateDataUrl(dataUrl, deg){
+    return new Promise((resolve,reject)=>{
+      const img=new Image();
+      img.onload=()=>{
+        const r=((deg%360)+360)%360;
+        const c=document.createElement('canvas');
+        const ctx=c.getContext('2d');
+        if(r===90||r===270){ c.width=img.height; c.height=img.width; }
+        else { c.width=img.width; c.height=img.height; }
+        ctx.translate(c.width/2, c.height/2);
+        ctx.rotate(r*Math.PI/180);
+        ctx.drawImage(img, -img.width/2, -img.height/2);
+        resolve(c.toDataURL('image/jpeg',0.82));
+      };
+      img.onerror=reject;
+      img.src=dataUrl;
+    });
+  }
   function normalizeCloud(js){
     if(!js || typeof js!=='object') return {};
     const d=js.data||js.result||js.fields||js;
@@ -680,6 +698,13 @@
     const imgColor=await colorJpeg(file);
     let out=await openaiRead(imgColor);
     out=stripDemo(out);
+    if(!(out.license_plate||out.plate) || !out.owner_name){
+      try{
+        const rot=await rotateDataUrl(imgColor, 90);
+        const out2=stripDemo(await openaiRead(rot));
+        out = score(out2)>score(out) ? merge(out2,out) : merge(out,out2);
+      }catch(e){}
+    }
     const enough=(out.vin||out.license_plate) && (out.hsn||out.model||out.brand||out.make);
     if((score(out)>=55 && enough && !isDemoValue((out.owner_name||'')+(out.address||'')+(out.vin||'')+(out.license_plate||''))) ||
        (score(out)>=72 && out.owner_name && enough && !isDemoValue(out.owner_name+out.address+out.vin+out.license_plate))){
