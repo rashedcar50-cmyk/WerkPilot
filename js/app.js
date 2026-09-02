@@ -28,7 +28,7 @@ function nav(){
 function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
- <div class="brand-mark"><img class="app-logo login-logo" src="logo-invoice.jpg" alt="TABAH AUTO"></div>
+ <div class="brand-mark"><img class="app-logo login-logo" src="logo-app.jpg" alt="TABAH AUTO"></div>
  <div class="field"><label>${t('user')}</label><input id="lu" autocomplete="username"></div>
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'de')}</select></div>
@@ -142,7 +142,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.88</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
+ <div class="henry-top"><span class="ver">v1.12.89</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><img class="app-logo" src="logo-app.jpg" alt="TABAH AUTO"></div></div><div class="nav">

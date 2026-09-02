@@ -181,7 +181,7 @@ th{background:#efebe3;position:sticky;top:0}
 .henry-skin .btn{border-radius:3px}
 .henry-skin .brand-b{background:#E8A54B;color:#fff;border-radius:2px}
 .henry-skin input,.henry-skin select,.henry-skin textarea{border-radius:2px;border-color:#8aa0bd}
-.login-screen{background:#c5d0de}
+.login-screen{background:radial-gradient(1200px 600px at 70% 20%,#efe6d4 0%,#F4F1EA 55%)}
 
 .brand-word{font-size:1.6rem;font-weight:800;letter-spacing:.5px;color:#1a2330}
 .app-logo{display:block;width:auto;height:auto;object-fit:contain;object-position:left center}
@@ -189,6 +189,7 @@ th{background:#efebe3;position:sticky;top:0}
 .sidebrand .app-logo{width:100%;max-width:100%;height:auto;max-height:64px}
 .brand-mark .app-logo{width:100%}
 .mob-title{flex:1;min-width:0;overflow:hidden;display:flex;align-items:center}
+.mob-title{margin-right:10px}
 .mob-title .app-logo{width:100%;height:36px;max-width:none;max-height:36px;object-fit:contain;object-position:left center}
 .henry-skin .brand-word{color:#1a2330}
 
