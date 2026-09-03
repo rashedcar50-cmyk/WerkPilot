@@ -56,6 +56,8 @@ const seed={
  settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TABAH AUTO',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
 };
 let db=load(), session=null;
+try{ stripTstBranding(db); }catch(e){}
+
 if(window.WP){ WP.db=db; WP.session=session; }
 window.db=db;
 
@@ -126,21 +128,31 @@ function defaultWorkshopProfile(co, settings){
   p.currency=co.currency||'EUR';
   return p;
 }
+function stripTstToken(s){
+  return String(s||'')
+    .replace(/\bTST\b/gi,'')
+    .replace(/^\s*[—–-]\s*/,'')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+}
+function companyLabel(c){
+  const raw=(c && ((c.profile&&c.profile.workshopBrand)||c.name))||'TABAH AUTO';
+  const cleaned=stripTstToken(raw);
+  return cleaned||'TABAH AUTO';
+}
 function stripTstBranding(store){
   const st=store||(typeof db!=='undefined'?db:null);
   if(!st) return;
-  const drop=s=>String(s||'').replace(/^TST\b(\s*[—–-]\s*)?/i, (m,dash)=> 'TABAH AUTO'+(dash||''));
   if(st.settings){
-    const b=String(st.settings.workshopBrand||'');
-    if(/^TST\b/i.test(b) || b.trim()==='TST') st.settings.workshopBrand='TABAH AUTO';
-    if(/^TST\b/i.test(String(st.settings.workshopName||''))) st.settings.workshopName=drop(st.settings.workshopName);
+    if(/\bTST\b/i.test(String(st.settings.workshopBrand||''))) st.settings.workshopBrand='TABAH AUTO';
+    if(/\bTST\b/i.test(String(st.settings.workshopName||''))) st.settings.workshopName=stripTstToken(st.settings.workshopName)||st.settings.workshopName;
   }
   (st.companies||[]).forEach(c=>{
     if(!c) return;
-    if(/^TST\b/i.test(String(c.name||''))) c.name=drop(c.name);
+    if(/\bTST\b/i.test(String(c.name||''))) c.name=stripTstToken(c.name)||'TABAH AUTO — Autoteile und Autoservice Tabah UG';
     if(c.profile){
-      if(/^TST\b/i.test(String(c.profile.workshopBrand||''))) c.profile.workshopBrand='TABAH AUTO';
-      if(/^TST\b/i.test(String(c.profile.workshopName||''))) c.profile.workshopName=drop(c.profile.workshopName);
+      if(/\bTST\b/i.test(String(c.profile.workshopBrand||''))) c.profile.workshopBrand='TABAH AUTO';
+      if(/\bTST\b/i.test(String(c.profile.workshopName||''))) c.profile.workshopName=stripTstToken(c.profile.workshopName);
     }
   });
 }
@@ -367,3 +379,5 @@ function cloudCompanyFilter(query){
   return cid ? query.eq('company_id', cid) : query;
 }
 
+
+try{ if(typeof db!=='undefined'&&db){ stripTstBranding(db); } }catch(e){}
