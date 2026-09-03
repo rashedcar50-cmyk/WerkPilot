@@ -2,8 +2,8 @@
 function workshopInfo(){
   const s=workshop();
   return {
-    brand: s.workshopBrand || session?.company?.name || 'Werkstatt',
-    name: s.workshopName || session?.company?.name || '',
+    brand: (typeof stripTstToken==='function'?stripTstToken(s.workshopBrand):s.workshopBrand) || 'TABAH AUTO',
+    name: (typeof stripTstToken==='function'?stripTstToken(s.workshopName||session?.company?.name||''): (s.workshopName || session?.company?.name || '')),
     address: s.workshopAddress || '',
     phone: s.workshopPhone || '',
     email: s.workshopEmail || '',
