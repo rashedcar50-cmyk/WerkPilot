@@ -73,9 +73,16 @@ function load(){
   if(!merged.settings) merged.settings=clone(seed.settings);
   merged.settings={...clone(seed.settings),...merged.settings};
   if(!['ar','de','en','es','tr','sr','ru','pl'].includes(merged.settings.uiLang)) merged.settings.uiLang='de';
-  if(/^TST$/i.test(String(merged.settings.workshopBrand||'').trim())) merged.settings.workshopBrand='TABAH AUTO';
+  const dropTst=s=>String(s||'').replace(/^TST\b(\s*[—–-]\s*)?/i,'TABAH AUTO$1').replace(/^TABAH AUTO\s*[—–-]\s*TABAH AUTO/i,'TABAH AUTO');
+  if(/^TST$/i.test(String(merged.settings.workshopBrand||'').trim()) || /^TST\b/i.test(String(merged.settings.workshopBrand||'')))
+    merged.settings.workshopBrand='TABAH AUTO';
   (merged.companies||[]).forEach(c=>{
-    if(c && /^TST\b/i.test(String(c.name||''))) c.name=String(c.name).replace(/^TST\b\s*[—-]\s*/i,'TABAH AUTO — ');
+    if(!c) return;
+    if(/^TST\b/i.test(String(c.name||''))) c.name=dropTst(c.name);
+    if(c.profile){
+      if(/^TST\b/i.test(String(c.profile.workshopBrand||''))) c.profile.workshopBrand='TABAH AUTO';
+      if(/^TST\b/i.test(String(c.profile.workshopName||''))) c.profile.workshopName=dropTst(c.profile.workshopName);
+    }
   });
   restoreOpenAI(merged);
   if(window.WP && WP.Engine) WP.Engine.migrate(merged);
@@ -97,6 +104,7 @@ function load(){
   });
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
   ensureCompanyProfiles(merged);
+  stripTstBranding(merged);
   return merged;
  }catch{return clone(seed)}
 }
@@ -117,6 +125,24 @@ function defaultWorkshopProfile(co, settings){
   p.docLang=co.docLang|| (co.country==='DE'?'de':'de');
   p.currency=co.currency||'EUR';
   return p;
+}
+function stripTstBranding(store){
+  const st=store||(typeof db!=='undefined'?db:null);
+  if(!st) return;
+  const drop=s=>String(s||'').replace(/^TST\b(\s*[—–-]\s*)?/i, (m,dash)=> 'TABAH AUTO'+(dash||''));
+  if(st.settings){
+    const b=String(st.settings.workshopBrand||'');
+    if(/^TST\b/i.test(b) || b.trim()==='TST') st.settings.workshopBrand='TABAH AUTO';
+    if(/^TST\b/i.test(String(st.settings.workshopName||''))) st.settings.workshopName=drop(st.settings.workshopName);
+  }
+  (st.companies||[]).forEach(c=>{
+    if(!c) return;
+    if(/^TST\b/i.test(String(c.name||''))) c.name=drop(c.name);
+    if(c.profile){
+      if(/^TST\b/i.test(String(c.profile.workshopBrand||''))) c.profile.workshopBrand='TABAH AUTO';
+      if(/^TST\b/i.test(String(c.profile.workshopName||''))) c.profile.workshopName=drop(c.profile.workshopName);
+    }
+  });
 }
 function ensureCompanyProfiles(store){
   const st=store||db;
