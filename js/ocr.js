@@ -172,12 +172,6 @@
       kba: (hsn&&tsn)? (hsn+' '+tsn):''
     };
     const U2=upper;
-    if(/TABAH/.test(U2)){
-      out.owner_name='Rashid Tabah';
-      const am=raw.match(/THEODOR[^\n]{0,50}/i);
-      out.address=am? (am[0].replace(/\s+/g,' ').trim()+', 23769 Fehmarn') : (out.address||'Theodor-Storm-Straße 16, 23769 Fehmarn');
-      if(/OH[\s\-]*RT[\s\-]*803/.test(U2)){ out.license_plate=out.plate='OH-RT 803'; }
-    }
     if(/^\(?\d+\)?$/.test(String(out.model||'').trim())) out.model='';
     if((!out.model || out.model.length<4) && /ASTRA\s+SPORTS\s+TOURER/i.test(raw)) out.model='Astra Sports Tourer';
     if(!out.make && !out.brand && /WDB|WDD|WDF|W1K|MERCEDES/.test(U2)){
@@ -241,27 +235,10 @@
     if(looksDocNr(plate) || /WÜX|WUX\s*357|WX327/.test(String(plate).toUpperCase())) plate='';
     out.license_plate=out.plate=plate;
     if(looksFakeKba(out.hsn,out.tsn)){ out.hsn=''; out.tsn=''; }
-    const thisCar=/TABAH/.test(U) && /FEHMAR|THEODOR|OH[\s\-]*RT/.test(U);
-    if(thisCar && !/SCHWARZENBEK|HANS-KOCH/.test(U)){
-      out.owner_name='Rashid Tabah';
-      out.address='Theodor-Storm-Straße 16, 23769 Fehmarn';
-      out.license_plate=out.plate='OH-RT 803';
-      out.brand=out.make='OPEL';
-      out.model='Astra Sports Tourer';
-      if(!out.hsn) out.hsn='0035';
-      if(!out.tsn) out.tsn='ASL';
-      if(!out.year) out.year='2015';
-    }
-    const oh=U.match(/OH[\s\-]*RT[\s\-]*0?803/);
-    if(oh){ out.license_plate=out.plate='OH-RT 803'; }
-    if(raw && out.license_plate && !plateGrounded(out.license_plate, raw) && out.plate!=='OH-RT 803'){
+    if(raw && out.license_plate && !plateGrounded(out.license_plate, raw)){
       out.license_plate=out.plate='';
     }
     if(out.address && !/\d{5}/.test(out.address)) out.address='';
-    if(/KAPLAN/i.test(out.owner_name||'') && thisCar) out.owner_name='Rashid Tabah';
-    if(!out.hsn && /0035/.test(U)) out.hsn='0035';
-    if(!out.tsn && /ASL/.test(U)) out.tsn='ASL';
-    if(!out.year && /30\.04\.2015/.test(String(raw||blob))) out.year='2015';
     return stripDemo(out);
   }
   function preprocess(file, mode){
