@@ -76,8 +76,19 @@ function closeMobileMenus(){
   const scrim=$('#navScrim'); if(scrim) scrim.classList.remove('on');
   document.body.classList.remove('nav-open');
 }
+function shopUrl(){
+  const w=typeof workshop==='function'?workshop():{};
+  return String(w.shopUrl||db.settings.shopUrl||'').trim();
+}
+function openPartsShop(){
+  const u=shopUrl();
+  if(!u){ toast('Shop-URL in Einstellungen eintragen'); return; }
+  window.open(u,'_blank','noopener');
+}
 function bindShellEvents(){
  $$('[data-page]').forEach(b=>b.onclick=()=>{ closeMobileMenus(); goPage(b.dataset.page); });
+ if($('#shopBtn')) $('#shopBtn').onclick=()=>{ closeMobileMenus(); openPartsShop(); };
+ if($('#shopBtnTop')) $('#shopBtnTop').onclick=()=>{ closeMobileMenus(); openPartsShop(); };
  if($('#backBtn')) $('#backBtn').onclick=()=>{ closeMobileMenus(); goBack(); };
  const lo=$('#logout');
  if(lo) lo.onclick=()=>{audit('logout');session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
@@ -142,11 +153,12 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.90</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
+ <div class="henry-top"><span class="ver">v1.12.91</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><img class="app-logo" src="logo-app.jpg" alt="TABAH AUTO"></div></div><div class="nav">
  ${allowed.map(([k,l])=>`<button data-page="${k}" class="${session.page===k?'active':''}">${l}</button>`).join('')}
+ <button type="button" id="shopBtn" class="shop-link">🛒 Handwerkzeuge</button>
  </div></aside>
  <div class="nav-scrim" id="navScrim"></div>
  <main class="main">
@@ -160,6 +172,7 @@ function render(force){
     <select id="uiLangTop" title="${t('language')}">${langOptions(db.settings.uiLang||'de')}</select>
     ${canEdit()?`<button class="ico-btn" id="addWorkshop" type="button" title="${t('newWorkshop')}">＋</button>`:''}
    </div>
+   <button class="ico-btn" id="shopBtnTop" type="button" title="Handwerkzeuge">🛒</button>
    <button class="ico-btn mob-only" id="moreBtn" type="button" aria-label="More">⋯</button>
   </div>
   <div class="content" id="content"></div>
@@ -1331,6 +1344,7 @@ function settings(){
   <option value="atelier" ${w.invoiceTpl==='atelier'?'selected':''}>${t('tplAtelier')}</option>
  </select></div>
  <div class="field span2"><label>${t('brandName')}</label><input id="wbrand" value="${esc(w.workshopBrand||'TABAH AUTO')}"></div>
+ <div class="field span2"><label>Shop-URL (Handwerkzeuge)</label><input id="wshop" placeholder="https://…" value="${esc(w.shopUrl||'')}"></div>
  <div class="field span2"><label>${t('legalName')}</label><input id="wname" value="${esc(w.workshopName||'')}"></div>
  <div class="field"><label>USt-IdNr.</label><input id="wtax" value="${esc(w.workshopTaxId||'')}"></div>
  <div class="field"><label>Steuernummer</label><input id="wstnr" value="${esc(w.workshopSteuerNr||'')}"></div>
@@ -1382,6 +1396,7 @@ function settings(){
      workshopIban:$('#wiban').value,
      invoiceTpl:$('#itpl')?$('#itpl').value:'modern',
      workshopBrand:$('#wbrand')?$('#wbrand').value:'',
+     shopUrl:$('#wshop')?$('#wshop').value.trim():'',
      workshopName:$('#wname')?$('#wname').value:'',
      workshopSteuerNr:$('#wstnr')?$('#wstnr').value:'',
      workshopBank:$('#wbank')?$('#wbank').value:'',

@@ -286,3 +286,5 @@ body.nav-open{overflow:hidden;touch-action:none}
 
 .btn-wa{background:#128C7E;color:#fff;display:inline-flex;align-items:center;gap:6px;font-weight:800}
 .btn-wa svg{flex-shrink:0}
+
+.shop-link{margin-top:10px;background:#0B2A4A;color:#fff;border:0;border-radius:10px;padding:10px 12px;font-weight:800;text-align:start}

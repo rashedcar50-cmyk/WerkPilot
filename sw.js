@@ -1,9 +1,9 @@
-const CACHE='baymeister-v1.12.90';
+const CACHE='baymeister-v1.12.91';
 const PRECACHE=[
   './','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png',
-  './css/app.css?v=1.12.90','./i18n.js?v=1.12.90','./supabase-config.js',
-  './js/config.js?v=1.12.90','./js/engine.js?v=1.12.90','./js/core.js?v=1.12.90','./js/ocr.js?v=1.12.90','./js/cloud.js?v=1.12.90',
-  './js/lookup.js?v=1.12.90','./js/quality.js?v=1.12.90','./js/scan.js?v=1.12.90','./js/logo-invoice-data.js?v=1.12.90','./js/invoice-print.js?v=1.12.90','./js/print.js?v=1.12.90','./js/camera.js?v=1.12.90','./js/customers.js?v=1.12.90','./js/repairs.js?v=1.12.90','./js/invoice-edit.js?v=1.12.90','./js/app.js?v=1.12.90','./logo-app.jpg','./logo-invoice.jpg'
+  './css/app.css?v=1.12.91','./i18n.js?v=1.12.91','./supabase-config.js',
+  './js/config.js?v=1.12.91','./js/engine.js?v=1.12.91','./js/core.js?v=1.12.91','./js/ocr.js?v=1.12.91','./js/cloud.js?v=1.12.91',
+  './js/lookup.js?v=1.12.91','./js/quality.js?v=1.12.91','./js/scan.js?v=1.12.91','./js/logo-invoice-data.js?v=1.12.91','./js/invoice-print.js?v=1.12.91','./js/print.js?v=1.12.91','./js/camera.js?v=1.12.91','./js/customers.js?v=1.12.91','./js/repairs.js?v=1.12.91','./js/invoice-edit.js?v=1.12.91','./js/app.js?v=1.12.91','./logo-app.jpg','./logo-invoice.jpg'
 ];
 self.addEventListener('install', e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRECACHE).catch(()=>{})));
