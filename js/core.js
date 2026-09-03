@@ -11,7 +11,7 @@ const seed={
   {u:'warehouse',p:'1979C',name:'Lager',role:'warehouse'}
  ],
  companies:[
-  {id:'de',name:'TABAH AUTO — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
+  {id:'de',name:'TABAH AUTO — Autoservice und Autoteile UG',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
  customers:[
@@ -53,10 +53,10 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TABAH AUTO',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
+ settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopBrand:'TABAH AUTO',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
 };
 let db=load(), session=null;
-try{ stripTstBranding(db); }catch(e){}
+try{ stripTstBranding(db); try{migrateLegalName(db);}catch(e){}; }catch(e){}
 
 if(window.WP){ WP.db=db; WP.session=session; }
 window.db=db;
@@ -106,7 +106,7 @@ function load(){
   });
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
   ensureCompanyProfiles(merged);
-  stripTstBranding(merged);
+  stripTstBranding(merged); migrateLegalName(merged);
   return merged;
  }catch{return clone(seed)}
 }
@@ -140,6 +140,7 @@ function companyLabel(c){
   const cleaned=stripTstToken(raw);
   return cleaned||'TABAH AUTO';
 }
+function migrateLegalName(st){const right="Autoservice und Autoteile UG (haftungsbeschränkt)";const bad=/Autoteile und Autoservice Tabah UG/i;if(!st||!st.settings)return;if(bad.test(String(st.settings.workshopName||"")))st.settings.workshopName=right;if(bad.test(String(st.settings.workshopAccountHolder||"")))st.settings.workshopAccountHolder=right;(st.companies||[]).forEach(c=>{if(!c||!c.profile)return;if(bad.test(String(c.profile.workshopName||"")))c.profile.workshopName=right;if(bad.test(String(c.profile.workshopAccountHolder||"")))c.profile.workshopAccountHolder=right;});}
 function stripTstBranding(store){
   const st=store||(typeof db!=='undefined'?db:null);
   if(!st) return;
@@ -149,7 +150,7 @@ function stripTstBranding(store){
   }
   (st.companies||[]).forEach(c=>{
     if(!c) return;
-    if(/\bTST\b/i.test(String(c.name||''))) c.name=stripTstToken(c.name)||'TABAH AUTO — Autoteile und Autoservice Tabah UG';
+    if(/\bTST\b/i.test(String(c.name||''))) c.name=stripTstToken(c.name)||'TABAH AUTO — Autoservice und Autoteile UG';
     if(c.profile){
       if(/\bTST\b/i.test(String(c.profile.workshopBrand||''))) c.profile.workshopBrand='TABAH AUTO';
       if(/\bTST\b/i.test(String(c.profile.workshopName||''))) c.profile.workshopName=stripTstToken(c.profile.workshopName);
@@ -380,4 +381,4 @@ function cloudCompanyFilter(query){
 }
 
 
-try{ if(typeof db!=='undefined'&&db){ stripTstBranding(db); } }catch(e){}
+try{ if(typeof db!=='undefined'&&db){ stripTstBranding(db); try{migrateLegalName(db);}catch(e){}; } }catch(e){}
