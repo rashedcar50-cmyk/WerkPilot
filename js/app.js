@@ -104,13 +104,13 @@ function bindShellEvents(){
    document.body.classList.toggle('nav-open', open);
  };
  if($('#moreBtn')) $('#moreBtn').onclick=e=>{
+   e.preventDefault();
    e.stopPropagation();
    const side=$('#side'); if(side) side.classList.remove('open');
+   const scrim=$('#navScrim'); if(scrim) scrim.classList.remove('on');
+   document.body.classList.remove('nav-open');
    const slot=$('#toolsSlot'); if(!slot) return;
-   const open=!slot.classList.contains('open');
-   slot.classList.toggle('open', open);
-   const scrim=$('#navScrim'); if(scrim) scrim.classList.toggle('on', open);
-   document.body.classList.toggle('nav-open', open);
+   slot.classList.toggle('open');
  };
  if($('#navScrim')) $('#navScrim').onclick=closeMobileMenus;
  if(!window._menuHideBound){
@@ -153,7 +153,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.12.92</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
+ <div class="henry-top"><span class="ver">v1.12.93</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><img class="app-logo" src="logo-app.jpg" alt="TABAH AUTO"></div></div><div class="nav">
