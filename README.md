@@ -1,4 +1,4 @@
-# BayMeister / TST
+# TABAH AUTO / WerkPilot
 
 PWA لإدارة ورشة. البنية موثّقة في `ARCHITECTURE.md`.
 

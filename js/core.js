@@ -11,7 +11,7 @@ const seed={
   {u:'warehouse',p:'1979C',name:'Lager',role:'warehouse'}
  ],
  companies:[
-  {id:'de',name:'TST — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
+  {id:'de',name:'TABAH AUTO — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
  customers:[
@@ -53,7 +53,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TST',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
+ settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TABAH AUTO',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
 };
 let db=load(), session=null;
 if(window.WP){ WP.db=db; WP.session=session; }
@@ -73,6 +73,10 @@ function load(){
   if(!merged.settings) merged.settings=clone(seed.settings);
   merged.settings={...clone(seed.settings),...merged.settings};
   if(!['ar','de','en','es','tr','sr','ru','pl'].includes(merged.settings.uiLang)) merged.settings.uiLang='de';
+  if(/^TST$/i.test(String(merged.settings.workshopBrand||'').trim())) merged.settings.workshopBrand='TABAH AUTO';
+  (merged.companies||[]).forEach(c=>{
+    if(c && /^TST\b/i.test(String(c.name||''))) c.name=String(c.name).replace(/^TST\b\s*[—-]\s*/i,'TABAH AUTO — ');
+  });
   restoreOpenAI(merged);
   if(window.WP && WP.Engine) WP.Engine.migrate(merged);
   restoreOpenAI(merged);
