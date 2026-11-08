@@ -63,6 +63,50 @@ function buildDocHTML(type, id){
     body = `<table><thead><tr><th>${t('skuCol')}</th><th>${t('name')}</th><th>${t('qty')}</th><th>${t('buy')}</th><th>${t('sell')}</th></tr></thead><tbody>` +
       rows.map(x=>`<tr><td>${esc(x.sku||'')}</td><td>${esc(dLabel(x.name||''))}</td><td>${x.qty}</td><td>${money(x.buy)}</td><td>${money(x.sell)}</td></tr>`).join('') +
       `</tbody></table>`;
+  } else if(type === 'repairs'){
+    // Fix (audit 2026-11-08): repair orders had no print/PDF/share at all --
+    // this type simply fell through to the generic "no data" branch below.
+    if(id){
+      const r=(db.repairs||[]).find(x=>x.id===id);
+      title='';
+      if(!r){ body='<p>'+t('jobMissing')+'</p>'; }
+      else {
+        const v=vehicleOf(r.vehicleId)||{}; const c=customerOfVehicle(r.vehicleId)||{};
+        const partsRows=(r.parts||[]).map(p=>`<tr><td>${esc(dLabel(p.name||''))}</td><td>${p.qty||1}</td><td>${money(p.price)}</td></tr>`).join('');
+        body = `<div class="print-doc"><h1>${esc(t('jobCard'))}</h1>
+          <div class="meta">${esc(co)} · ${now}</div>
+          <p><b>${esc(t('vehicle'))}:</b> ${esc(vehicleName(r.vehicleId)||'-')}<br>
+          <b>${esc(t('customer'))}:</b> ${esc(c.name||'-')} ${c.phone?('· '+esc(c.phone)):''}<br>
+          <b>${esc(t('status'))}:</b> ${esc(stLabel(r.status||''))} · <b>${esc(t('tech'))}:</b> ${esc(dLabel(r.tech||'-'))}</p>
+          <p><b>${esc(t('complaint'))}:</b> ${esc(dLabel(r.complaint||'-'))}<br>
+          <b>${esc(t('work'))}:</b> ${esc(dLabel(r.description||'-'))}</p>
+          ${partsRows?`<table><thead><tr><th>${esc(t('name'))}</th><th>${esc(t('qty'))}</th><th>${esc(t('sell'))}</th></tr></thead><tbody>${partsRows}</tbody></table>`:''}
+          <p><b>${esc(t('labor'))}:</b> ${money(repairLaborTotal(r))} · <b>${esc(t('parts'))}:</b> ${money(repairPartsTotal(r))}</p>
+          </div>`;
+        return body;
+      }
+    } else {
+      title = t('repairOrders');
+      const rows = companyRows('repairs');
+      body = `<table><thead><tr><th>${t('vehicle')}</th><th>${t('statement')}</th><th>${t('status')}</th><th>${t('tech')}</th></tr></thead><tbody>` +
+        rows.map(r=>`<tr><td>${esc(vehicleName(r.vehicleId)||'-')}</td><td>${esc(dLabel(r.complaint||r.description||'-'))}</td><td>${esc(stLabel(r.status||''))}</td><td>${esc(dLabel(r.tech||'-'))}</td></tr>`).join('') +
+        `</tbody></table>`;
+    }
+  } else if(type === 'appointments'){
+    title = t('appointmentsTitle');
+    const rows = companyRows('appointments').slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
+    body = `<table><thead><tr><th>${t('date')}</th><th>${t('time')}</th><th>${t('vehicle')}</th><th>${t('customer')}</th><th>${t('tech')}</th><th>${t('status')}</th></tr></thead><tbody>` +
+      rows.map(a=>`<tr><td>${esc(a.date||'')}</td><td>${esc(a.time||'')}</td><td>${esc(vehicleName(a.vehicleId)||'-')}</td><td>${esc(customerName(a.customerId)||'-')}</td><td>${esc(dLabel(a.tech||'-'))}</td><td>${esc(stLabel(a.status||''))}</td></tr>`).join('') +
+      `</tbody></table>`;
+  } else if(type === 'estimates'){
+    // Fix (audit 2026-11-08): the estimates screen used to call
+    // listShareBar('invoices'), so its print/PDF/share buttons exported the
+    // unrelated invoices list instead of the estimates on screen.
+    title = t('estimates');
+    const rows = companyRows('estimates');
+    body = `<table><thead><tr><th>${t('vehicle')}</th><th>${t('partsCol')}</th><th>${t('laborCol')}</th><th>${t('discount')}</th><th>${t('tax')}</th><th>${t('total')}</th><th>${t('quoteFee')}</th></tr></thead><tbody>` +
+      rows.map(x=>`<tr><td>${esc(vehicleName(x.vehicleId)||'-')}</td><td>${money(x.parts)}</td><td>${money(x.labor)}</td><td>${money(x.discount)}</td><td>${x.tax||0}%</td><td>${money(x.total)}</td><td>${money(x.fee)}</td></tr>`).join('') +
+      `</tbody></table>`;
   } else {
     title = t('report');
     body = '<p>'+t('noData')+'</p>';

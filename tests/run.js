@@ -297,6 +297,65 @@ async function decideLogin(cand, pass){
   const oldUniformNet=Math.max(0,100-10), oldUniformTotal=Math.round(oldUniformNet*(1+19/100)*100)/100;
   assert(uniform.net===oldUniformNet && uniform.total===oldUniformTotal, 'single-rate invoices total identically under the new shared function -- no regression for the common case');
 
+  // --- Fix: printing/PDF for repair orders and appointments; estimates ---
+  // Bug that shipped before this fix: js/print.js's buildDocHTML() had no
+  // case at all for 'repairs' or 'appointments' -- any attempt to print/
+  // PDF/share them fell through to the generic branch and rendered
+  // "noData". Neither screen even offered the share buttons. Separately,
+  // the estimates screen called listShareBar('invoices'), so its share
+  // buttons exported the UNRELATED invoices list instead of the estimates
+  // actually on screen.
+  const printSandbox={
+    window:{}, console,
+    session:{company:{id:'c1',name:'Test Shop'}},
+    db:{
+      repairs:[{id:'r1',companyId:'c1',vehicleId:'v1',status:'working',complaint:'Bremsen quietschen',description:'Bremsen pruefen',tech:'Ismail',parts:[{name:'Bremsbelag',qty:2,price:30}]}],
+      appointments:[{id:'a1',companyId:'c1',vehicleId:'v1',customerId:'cu1',date:'2026-12-01',time:'09:30',tech:'Ismail',status:'confirmed'}],
+      estimates:[{id:'e1',companyId:'c1',vehicleId:'v1',parts:100,labor:50,discount:10,tax:19,total:160.1,fee:0}],
+      invoices:[], customers:[], vehicles:[], settings:{}
+    },
+    companyRows:function(k){ return (printSandbox.db[k]||[]).filter(x=>!printSandbox.session.company||x.companyId===printSandbox.session.company.id); },
+    vehicleName:vid=>'VW Golf '+vid, customerName:cid=>'Kunde '+cid,
+    vehicleOf:()=>({}), customerOfVehicle:()=>({name:'Max Mustermann',phone:'0171'}),
+    stLabel:s=>'ST:'+s, dLabel:s=>s, money:n=>'EUR'+(n||0), esc:s=>String(s==null?'':s), t:k=>k,
+    repairLaborTotal:()=>0, repairPartsTotal:r=>(r.parts||[]).reduce((s,p)=>s+(p.qty||1)*(p.price||0),0),
+    docLang:()=>'de'
+  };
+  vm.createContext(printSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/print.js'),'utf8'), printSandbox);
+
+  const repairsList=printSandbox.buildDocHTML('repairs', undefined);
+  assert(!/noData/.test(repairsList), 'PROOF OF FIX: repairs list print/PDF no longer falls through to the generic "no data" branch');
+  assert(/VW Golf v1/.test(repairsList) && /ST:working/.test(repairsList), 'repairs list print shows the actual repair data');
+
+  const repairSingle=printSandbox.buildDocHTML('repairs', 'r1');
+  assert(!/noData/.test(repairSingle) && !/jobMissing/.test(repairSingle), 'single repair work-order print finds the repair and renders it');
+  assert(/Bremsen quietschen/.test(repairSingle) && /Bremsbelag/.test(repairSingle), 'single repair work-order print shows complaint and issued parts');
+
+  const apptList=printSandbox.buildDocHTML('appointments', undefined);
+  assert(!/noData/.test(apptList), 'PROOF OF FIX: appointments print/PDF no longer falls through to the generic "no data" branch');
+  assert(/2026-12-01/.test(apptList) && /09:30/.test(apptList), 'appointments print shows the actual appointment data');
+
+  const estList=printSandbox.buildDocHTML('estimates', undefined);
+  assert(!/noData/.test(estList), 'estimates print/PDF has its own case (was already reachable via the wrong type, now has a real one)');
+  assert(/EUR160.1/.test(estList), 'estimates print shows the actual estimate total');
+
+  // Proof of bug (regression guard) + proof of fix for the estimates
+  // share-bar type mixup: the estimates() screen must call
+  // listShareBar('estimates'), never listShareBar('invoices').
+  const appSrc=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  const estimatesFnSrc=(appSrc.match(/function estimates\(\)\{[\s\S]*?\n\}/)||[''])[0];
+  assert(estimatesFnSrc.length>0, 'found the estimates() function to check');
+  assert(/listShareBar\('estimates'\)/.test(estimatesFnSrc), "PROOF OF FIX: estimates() now calls listShareBar('estimates')");
+  assert(!/listShareBar\('invoices'\)/.test(estimatesFnSrc), "PROOF OF FIX: estimates() no longer calls listShareBar('invoices')");
+
+  // Proof the new share bars are actually wired into the repairs/appointments
+  // screens (previously absent entirely).
+  const repairsSrc=fs.readFileSync(path.join(root,'js/repairs.js'),'utf8');
+  assert(/listShareBar\('repairs'\)/.test(repairsSrc), 'repairs list now offers print/PDF/share');
+  assert(/shareBar\('repairs',\s*r\.id\)/.test(repairsSrc), 'single repair work-order view now offers print/PDF/share');
+  assert(/listShareBar\('appointments'\)/.test(appSrc), 'appointments list now offers print/PDF/share');
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

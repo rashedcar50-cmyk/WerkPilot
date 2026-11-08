@@ -113,7 +113,9 @@ function repairs(){
     <div class="muted">${esc(dLabel(r.complaint||r.description||'-'))}</div>
     <div class="muted">${esc(r.tech||'-')} · ${esc(r.hours||0)} ${t('hoursShort')} · ${money(repairPartsTotal(r))}</div>
   </div>`).join('') || `<div class="card muted">${t('noOrders')}</div>`;
- $('#content').innerHTML=head(t('repairOrders'),`<div class="toolbar"><button class="btn ok" id="scanSchein">📷 ${t('scanSchein')}</button>${canEdit()?`<button class="btn primary" id="add">${t('manualOrder')}</button>`:''}</div>`)+cards+
+ $('#content').innerHTML=head(t('repairOrders'),`<div class="toolbar"><button class="btn ok" id="scanSchein">📷 ${t('scanSchein')}</button>${canEdit()?`<button class="btn primary" id="add">${t('manualOrder')}</button>`:''}</div>`)+
+ // Fix (audit 2026-11-08): repair orders had no print/PDF/share at all.
+ listShareBar('repairs')+cards+
  `<div class="bottom-action"><button class="btn ok" id="scanSchein2">📷 ${t('scanScheinOpen')}</button></div>`;
  if(canEdit() && $('#add')) $('#add').onclick=repairModal;
  $('#scanSchein').onclick=scanScheinStartRepair;
@@ -171,6 +173,7 @@ function repairDesk(rid){
     <button class="btn ok" onclick="convertRepairToInvoice('${r.id}')">${t('toInvoice')}</button>
     <button class="btn" onclick="whatsappReady('${r.id}')">${t('waReady')}</button>
   </div>
+  ${shareBar('repairs', r.id)}
  </div>`;
  $('#backRep').onclick=()=>{session.repairId=null;render()};
  const kmBtn=$('#saveKm');

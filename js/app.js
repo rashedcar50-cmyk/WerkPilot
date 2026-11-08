@@ -574,6 +574,8 @@ function showSearchResults(q){
 function appointments(){
   const rows=companyRows('appointments').slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
   $('#content').innerHTML=head(t('appointmentsTitle'))+
+  // Fix (audit 2026-11-08): appointments had no print/PDF/share at all.
+  listShareBar('appointments')+
   table([t('date'),t('time'),t('vehicle'),t('customer'),t('tech'),t('status'),t('action')],rows.map(a=>[
     esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(dLabel(a.tech||'-')),esc(stLabel(a.status||'')),
     (normStatus(a.status)==='converted')?'—':`<button class="btn small primary" onclick="appointmentToRepair('${a.id}')">${t('convertJob')}</button>`
@@ -610,7 +612,10 @@ window.appointmentToRepair=appointmentToRepair;
 function estimates(){
  const rows=companyRows('estimates');
  $('#content').innerHTML=head(t('estimates'),`<div class="toolbar"><button class="btn ok" id="scanEst">📷 ${t('scanSchein')}</button><button class="btn primary" id="add">${t('createQuote')}</button></div>`)+
- listShareBar('invoices')+
+ // Fix (audit 2026-11-08): this used to pass the invoices type here, so
+ // the print/PDF/share buttons exported the unrelated invoices list, not
+ // this estimates list.
+ listShareBar('estimates')+
  table([t('vehicle'),t('partsCol'),t('laborCol'),t('discount'),t('tax'),t('total'),t('quoteFee')],rows.map(x=>[vehicleName(x.vehicleId),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]), 'estimates');
  $('#add').onclick=()=>financeModal('estimate');
  if($('#scanEst')) $('#scanEst').onclick=()=>scanScheinStartRepair('estimate');
