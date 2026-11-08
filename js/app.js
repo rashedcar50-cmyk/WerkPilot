@@ -33,12 +33,14 @@ function login(){
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'de')}</select></div>
  <button class="btn primary full" id="loginBtn">${t('login')}</button>
+ <p style="margin-top:10px"><a href="#" id="forgotPassLink">${t('forgotPassword')}</a></p>
  <div class="login-fail" id="loginErr"></div><p class="muted" style="margin-top:14px;font-size:.8rem"><a href="impressum.html">${t('impressum')}</a> · <a href="privacy.html">${t('privacy')}</a></p>
  </div></div>`;
  if(typeof scrubUiLang==='function') scrubUiLang($('#app'));
  window._loginFails = window._loginFails || 0;
  const lg=$('#loginLang');
  if(lg){ lg.onchange=()=>{db.settings.uiLang=lg.value;save();login();}; }
+ if($('#forgotPassLink')) $('#forgotPassLink').onclick=(e)=>{ e.preventDefault(); forgotPasswordModal(); };
  $('#loginBtn').onclick=async ()=>{
   if(lg) {db.settings.uiLang=lg.value;save();}
   if(window._loginFails>=5) return $('#loginErr').textContent=t('loginBlocked');
@@ -64,7 +66,7 @@ function login(){
   if(freshAccount || legacyDefault){
     return forcePasswordSetup(cand, freshAccount);
   }
-  completeLogin(cand);
+  completeLogin(cand, pass);
  };
 }
 
@@ -72,24 +74,37 @@ function login(){
 // granted, shared by the normal path and the post-first-time-setup path
 // below -- so "set a real password" always leads here via the exact same
 // code a normal login uses, never a parallel shortcut.
-function completeLogin(cand){
+function completeLogin(cand, plainPass){
   const startPage=(location.search.match(/[?&]page=([a-z]+)/)||[])[1]||'dashboard';
   session={user:WP.Engine.publicUser(cand),company:db.companies[0],page:startPage};
   audit('login');
-  syncAllCloud().finally(async ()=>{
-    WP.run("afterLogin", session);
-    if(/share=1/.test(location.search) || await consumeSharedWhatsApp()){
-      session.page='customers';
-      render();
-      setTimeout(()=>{
-        customerModal();
+  // Cloud identity fix (2026-11-08): if this account has been linked to
+  // a cloud account (cand.cloudEmail), sign into Supabase Auth with the
+  // SAME password they just typed locally -- AWAITED before sync runs --
+  // so the sync calls below (and any RLS policy on the Supabase side)
+  // see a real authenticated user instead of just the public anon key.
+  // A missing link, a wrong/stale cloud password, or no cloud configured
+  // at all are all silently tolerated -- this never blocks the local
+  // login that already succeeded above.
+  (async()=>{
+    if(cand.cloudEmail && plainPass && window.WP && WP.CloudAuth){
+      try{ await WP.CloudAuth.signInCloud(cand.cloudEmail, plainPass); }catch(e){}
+    }
+    syncAllCloud().finally(async ()=>{
+      WP.run("afterLogin", session);
+      if(/share=1/.test(location.search) || await consumeSharedWhatsApp()){
+        session.page='customers';
+        render();
         setTimeout(()=>{
-          applySharedFileTo('#doc');
-          if(window._sharedWaFile) ingestScheinFile(window._sharedWaFile);
-        }, 250);
-      }, 200);
-    } else render();
-  });
+          customerModal();
+          setTimeout(()=>{
+            applySharedFileTo('#doc');
+            if(window._sharedWaFile) ingestScheinFile(window._sharedWaFile);
+          }, 250);
+        }, 200);
+      } else render();
+    });
+  })();
 }
 
 // Security fix (audit 2026-11-08): a blocking, no-cancel modal -- the only
@@ -100,11 +115,19 @@ function completeLogin(cand){
 // this session is allowed to start, so the password box is never
 // pre-filled with the value that got them here.
 function forcePasswordSetup(cand, freshAccount){
+  // Cloud identity fix (2026-11-08): while someone is already here
+  // choosing a real password, also offer to link this account to a
+  // real Supabase Auth identity with that SAME password -- the natural,
+  // lowest-friction place to do it. Optional: leaving the email field
+  // blank keeps the account exactly as local-only as it is today.
+  const cloudAvailable=window.WP && WP.CloudAuth && WP.CloudAuth.cloudAuthAvailable();
   $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal">
    <div class="modal-head"><h2>${t('setPasswordTitle')||'Set a password'}</h2></div>
    <p class="muted" style="margin:0 0 12px">${freshAccount ? (t('setPasswordFreshHint')||'This account has no password yet. Choose one now.') : (t('setPasswordLegacyHint')||'This account is still using a default password that is public in this app\'s own source history. Choose a new one now.')}</p>
    <div class="field"><label>${t('newPassword')||t('pass')}</label><input id="fps1" type="password" autocomplete="new-password"></div>
    <div class="field"><label>${t('newPasswordConfirm')||t('pass')}</label><input id="fps2" type="password" autocomplete="new-password"></div>
+   ${cloudAvailable?`<div class="field"><label>${t('linkCloudEmailLabel')}</label><input id="fpsEmail" type="email" autocomplete="email" value="${esc(cand.cloudEmail||'')}" placeholder="name@example.com"></div>
+   <p class="muted" style="font-size:.8rem;margin:0 0 10px">${t('linkCloudEmailHint')}</p>`:''}
    <div class="login-fail" id="fpsErr"></div>
    <div class="toolbar" style="margin-top:14px"><button class="btn primary" id="fpsSave">${t('save')}</button></div>
   </div></div>`;
@@ -116,11 +139,97 @@ function forcePasswordSetup(cand, freshAccount){
     if(p1!==p2){ err.textContent=t('setPasswordMismatch')||'Passwords do not match.'; return; }
     if(WP.Engine.isLegacyDefaultPassword(cand.u, p1)){ err.textContent=t('setPasswordStillDefault')||'Choose a password other than the old default.'; return; }
     cand.p=WP.Engine.hashPassAsync ? await WP.Engine.hashPassAsync(p1) : p1;
+    const email=cloudAvailable && $('#fpsEmail') ? $('#fpsEmail').value.trim() : '';
+    if(email){
+      const r=await WP.CloudAuth.linkAccountToCloud(email, p1);
+      if(r.ok){ cand.cloudEmail=email; }
+      else if(r.error){ toast(t('linkCloudFailed')); }
+    }
     save(true);
     closeModal();
-    completeLogin(cand);
+    completeLogin(cand, p1);
   };
 }
+
+// Cloud identity fix (2026-11-08): request-a-reset-link modal, reached
+// from the login screen's "Forgot password?" link. Always shows the
+// SAME generic message regardless of whether the typed email is
+// actually linked to any account -- see js/auth.js's
+// requestPasswordReset for why that's safe to do unconditionally
+// (Supabase's own resetPasswordForEmail already never reveals which
+// case it was).
+function forgotPasswordModal(){
+  applyUiLang();
+  const cloudAvailable=window.WP && WP.CloudAuth && WP.CloudAuth.cloudAuthAvailable();
+  $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal">
+   <div class="modal-head"><h2>${t('resetPasswordTitle')}</h2><button type="button" class="btn ghost small" id="fpClose">✕</button></div>
+   ${cloudAvailable?`
+   <p class="muted" style="margin:0 0 12px">${t('resetPasswordHint')}</p>
+   <div class="field"><label>${t('resetPasswordEmailLabel')}</label><input id="fpEmail" type="email" autocomplete="email" placeholder="name@example.com"></div>
+   <div id="fpMsg" class="muted" style="margin:8px 0"></div>
+   <div class="toolbar" style="margin-top:14px"><button class="btn primary" id="fpSend">${t('resetPasswordSendBtn')}</button></div>
+   `:`<p class="muted">${t('resetPasswordUnavailable')}</p>`}
+  </div></div>`;
+  if(typeof scrubUiLang==='function') try{ scrubUiLang($('#modalRoot')); }catch(e){}
+  if($('#fpClose')) $('#fpClose').onclick=closeModal;
+  if($('#fpSend')) $('#fpSend').onclick=async()=>{
+    const email=$('#fpEmail').value.trim();
+    const msg=$('#fpMsg');
+    if(!email){ msg.textContent=t('resetPasswordEmailLabel'); return; }
+    $('#fpSend').disabled=true;
+    await WP.CloudAuth.requestPasswordReset(email);
+    // Deliberately the SAME message whether or not this email is
+    // actually registered -- never branch this on the result.
+    msg.textContent=t('resetPasswordSentGeneric');
+    $('#fpSend').disabled=false;
+  };
+}
+window.forgotPasswordModal=forgotPasswordModal;
+
+// Cloud identity fix (2026-11-08): the screen a user lands on after
+// clicking the link from the password-reset email. Shown instead of
+// the normal login screen whenever the URL carries Supabase's recovery
+// marker (see js/auth.js's isRecoveryLink). Handles an invalid/expired
+// link with one clear, combined message rather than silently failing.
+function passwordResetScreen(){
+  applyUiLang();
+  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
+   <div class="brand-mark"><img class="app-logo login-logo" src="logo-app.jpg" alt="TABAH AUTO"></div>
+   <h2>${t('resetPasswordSetTitle')}</h2>
+   <p class="muted" style="margin:0 0 12px">${t('resetPasswordSetHint')}</p>
+   <div class="field"><label>${t('newPassword')}</label><input id="rp1" type="password" autocomplete="new-password"></div>
+   <div class="field"><label>${t('newPasswordConfirm')}</label><input id="rp2" type="password" autocomplete="new-password"></div>
+   <div class="login-fail" id="rpErr"></div>
+   <button class="btn primary full" id="rpSave">${t('save')}</button>
+   <p style="margin-top:14px"><a href="#" id="rpBackToLogin">${t('login')}</a></p>
+  </div></div>`;
+  if(typeof scrubUiLang==='function') scrubUiLang($('#app'));
+  $('#rpBackToLogin').onclick=(e)=>{ e.preventDefault(); WP.CloudAuth.clearRecoveryParamsFromUrl(); login(); };
+  $('#rpSave').onclick=async()=>{
+    const p1=$('#rp1').value, p2=$('#rp2').value, err=$('#rpErr');
+    if(!p1 || p1.length<6){ err.textContent=t('setPasswordTooShort'); return; }
+    if(p1!==p2){ err.textContent=t('setPasswordMismatch'); return; }
+    const r=await WP.CloudAuth.completePasswordReset(p1);
+    if(!r.ok){ err.textContent=t('resetLinkInvalid'); return; }
+    // Keep the local account's password in lockstep, so the next login
+    // works with the new password through EITHER path, and the old one
+    // stops working through either path too.
+    if(r.email){
+      const u=(db.users||[]).find(x=>x.cloudEmail===r.email);
+      if(u){ u.p = WP.Engine.hashPassAsync ? await WP.Engine.hashPassAsync(p1) : p1; save(true); }
+    }
+    WP.CloudAuth.clearRecoveryParamsFromUrl();
+    toast(t('resetPasswordDone'));
+    login();
+  };
+}
+window.passwordResetScreen=passwordResetScreen;
+
+function boot(){
+  if(window.WP && WP.CloudAuth && WP.CloudAuth.isRecoveryLink()){ return passwordResetScreen(); }
+  login();
+}
+window.boot=boot;
 
 function closeMobileMenus(){
   const side=$('#side'); if(side) side.classList.remove('open');
@@ -1429,6 +1538,16 @@ function settings(){
  <div class="field"><label>${t('ownerGf')}</label><input id="wowner" value="${esc(w.workshopOwner||'')}"></div>
  <div class="field"><label>${t('newPass')}</label><input id="newpass" type="password" placeholder="${t('passUnchanged')}"></div>
  </div>
+ ${(window.WP && WP.CloudAuth && WP.CloudAuth.cloudAuthAvailable())?`<div class="card" style="margin-top:12px">
+  <b>${t('linkCloudSectionTitle')}</b>
+  <p class="muted" style="font-size:.85rem">${t('linkCloudEmailHint')}</p>
+  <div class="form-grid">
+   <div class="field"><label>${t('linkCloudEmailLabel')}</label><input id="cloudEmail" type="email" autocomplete="email" value="${esc((db.users.find(x=>x.u===session.user.u)||{}).cloudEmail||'')}" placeholder="name@example.com"></div>
+   <div class="field"><label>${t('linkCloudCurrentPass')}</label><input id="cloudCurPass" type="password" autocomplete="current-password"></div>
+  </div>
+  <button class="btn" id="linkCloudBtn">${t('linkCloudBtn')}</button>
+  <span id="linkCloudMsg" class="muted" style="margin-left:10px"></span>
+ </div>`:''}
  <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
   <button class="btn primary" id="saveset">${t('save')}</button>
@@ -1440,6 +1559,17 @@ function settings(){
  </div>
  </div>`;
  if($('#lang')) $('#lang').onchange=()=>{db.settings.uiLang=$('#lang').value;save();applyUiLang();render();};
+ if($('#linkCloudBtn')) $('#linkCloudBtn').onclick=async()=>{
+   const email=$('#cloudEmail').value.trim(), curPass=$('#cloudCurPass').value;
+   const msg=$('#linkCloudMsg');
+   const u=db.users.find(x=>x.u===session.user.u);
+   if(!email || !curPass){ msg.textContent=t('linkCloudFailed'); return; }
+   if(!u || !(await WP.Engine.passOk(u.p, curPass))){ msg.textContent=t('loginBad'); return; }
+   msg.textContent='...';
+   const r=await WP.CloudAuth.linkAccountToCloud(email, curPass);
+   if(r.ok){ u.cloudEmail=email; save(true); msg.textContent=t('linkCloudOk'); }
+   else{ msg.textContent=t('linkCloudFailed'); }
+ };
  $('#saveset').onclick=()=>{
   try{
    db.settings.font=+$('#font').value||16;
@@ -1469,7 +1599,28 @@ function settings(){
      printMargin:$('#pmargin')?$('#pmargin').value:'8mm',
      printColor:$('#pcolor')?$('#pcolor').value!=='0':true
    });
-   const np=$('#newpass')&&$('#newpass').value; if(np){ const u=db.users.find(x=>x.u===session.user.u); if(u){u.p=np;session.user.p=np;} }
+   const np=$('#newpass')&&$('#newpass').value;
+   if(np){
+     // Security fix (audit 2026-11-08): this used to store the new
+     // password as plain text (`u.p=np`) with no length check and no
+     // check against the old published defaults -- bypassing every
+     // protection the login flow enforces (see forcePasswordSetup).
+     // Now hashed and validated the same way, and kept in sync with the
+     // linked cloud account (if any) so local and cloud logins never
+     // drift apart.
+     const u=db.users.find(x=>x.u===session.user.u);
+     if(u){
+       if(np.length<6){ toast(t('setPasswordTooShort')); return render(); }
+       if(WP.Engine.isLegacyDefaultPassword(u.u, np)){ toast(t('setPasswordStillDefault')); return render(); }
+       (async()=>{
+         u.p = WP.Engine.hashPassAsync ? await WP.Engine.hashPassAsync(np) : np;
+         if(u.cloudEmail && typeof syncCloudPassword==='function'){ try{ await syncCloudPassword(u.cloudEmail, np); }catch(e){} }
+         save(true);
+         toast(t('saved'));
+       })();
+       return render();
+     }
+   }
    save(true);
    if(typeof restoreOpenAI==='function') restoreOpenAI(db);
    applyUiLang();toast(t('saved'));render();
@@ -1552,6 +1703,16 @@ function simpleModal(title,fields,onSave){
   try{
     if(window.supabase && window.SUPABASE_URL && window.SUPABASE_KEY){
       window.supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+      // Cloud identity fix (2026-11-08): the SDK fires this event only
+      // after it has itself validated a recovery link's token against
+      // the server (signature + expiry) -- never for an ordinary
+      // sign-in. js/auth.js's completePasswordReset checks this flag so
+      // an invalid/expired/tampered recovery link can never "succeed"
+      // just because this browser happens to already have an unrelated
+      // valid session open in another tab.
+      window.supabaseClient.auth.onAuthStateChange((event)=>{
+        if(event==='PASSWORD_RECOVERY') window._wpRecoveryConfirmed=true;
+      });
     }
   }catch(e){ console.warn('supabase init', e); }
 
@@ -1566,4 +1727,4 @@ function simpleModal(title,fields,onSave){
   window.openPartsLink = openPartsLink;
 
 
-login();
+boot();

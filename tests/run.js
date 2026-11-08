@@ -518,6 +518,95 @@ async function decideLogin(cand, pass){
   assert(!/\$\('#add'\)\.onclick=repairModal;/.test(repairsSrc2), "PROOF OF BUG regression guard: the bare `onclick=repairModal` reference is gone");
   assert(/\$\('#add'\)\.onclick=\(\)=>repairModal\(\);/.test(repairsSrc2), 'PROOF OF FIX: the button now calls repairModal() with no arguments, so a click Event can never be mistaken for an existing record');
 
+  // --- Cloud Auth: js/auth.js's pure link-handling logic --------------------
+  // js/auth.js detects Supabase's password-recovery redirect (either the
+  // implicit-flow #access_token=...&type=recovery hash, or the PKCE
+  // ?code=... query param) to show the "set a new password" screen instead
+  // of the normal login screen. Tested directly against the real functions.
+  function loadAuth(locationStub){
+    const sandbox={window:{}, console, location:locationStub};
+    vm.createContext(sandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/auth.js'),'utf8'), sandbox);
+    return sandbox.window.WP.CloudAuth;
+  }
+  const CA_normal=loadAuth({origin:'https://example.test', pathname:'/WerkPilot/', hash:'', search:''});
+  assert(CA_normal.isRecoveryLink()===false, 'a normal login URL (no recovery markers) is not treated as a recovery link');
+
+  const CA_implicit=loadAuth({origin:'https://example.test', pathname:'/WerkPilot/', hash:'#access_token=abc123&type=recovery', search:''});
+  assert(CA_implicit.isRecoveryLink()===true, 'PROOF OF FIX: a Supabase implicit-flow recovery hash (#...&type=recovery) is detected');
+
+  const CA_pkce=loadAuth({origin:'https://example.test', pathname:'/WerkPilot/', hash:'', search:'?code=abcdef123456'});
+  assert(CA_pkce.isRecoveryLink()===true, 'PROOF OF FIX: a Supabase PKCE-flow recovery link (?code=...) is detected');
+
+  assert(CA_normal.redirectBase()==='https://example.test/WerkPilot/', 'redirectBase strips query/hash so it works as a stable Supabase redirect target, adapting automatically to whatever origin serves the app (localhost while testing, the real domain in production)');
+
+  // --- Cloud Auth: an invalid/expired recovery link must never silently --
+  // --- "succeed" just because an unrelated valid session already exists --
+  // Bug found live in a real browser while testing this feature: navigating
+  // to a garbage #access_token=...&type=recovery link, in a browser tab that
+  // ALREADY had a genuinely-authenticated session from something unrelated,
+  // let the password "reset" go through anyway -- completePasswordReset was
+  // only checking "does ANY session exist", not "did THIS link's token
+  // actually get validated by the server". Fixed by requiring the SDK's own
+  // PASSWORD_RECOVERY event (fired only after it validates a token's
+  // signature+expiry against the server) before trusting an implicit-flow
+  // session as a real recovery.
+  function loadAuthWithFakeSupabase(locationStub, {recoveryConfirmed}){
+    const fakeUser={email:'someone-already-logged-in@example.test'};
+    const fakeSession={user:fakeUser};
+    const sandbox={
+      window:{ _wpRecoveryConfirmed: recoveryConfirmed,
+        supabaseClient:{ auth:{
+          getSession: async()=>({data:{session:fakeSession}}),
+          updateUser: async()=>({data:{}, error:null})
+        }}
+      },
+      console, location:locationStub, URLSearchParams, history:{replaceState:()=>{}}
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/auth.js'),'utf8'), sandbox);
+    return sandbox;
+  }
+  const bogusUrl={origin:'https://example.test', pathname:'/WerkPilot/', hash:'#access_token=totally-bogus&type=recovery', search:''};
+  const sbxNoConfirm=loadAuthWithFakeSupabase(bogusUrl, {recoveryConfirmed:false});
+  const resultNoConfirm=await sbxNoConfirm.window.WP.CloudAuth.completePasswordReset('NewPass#1');
+  assert(resultNoConfirm.ok===false, 'PROOF OF FIX: a bogus recovery link is REJECTED even though an unrelated session already exists (no PASSWORD_RECOVERY event seen)');
+
+  const sbxConfirmed=loadAuthWithFakeSupabase(bogusUrl, {recoveryConfirmed:true});
+  const resultConfirmed=await sbxConfirmed.window.WP.CloudAuth.completePasswordReset('NewPass#1');
+  assert(resultConfirmed.ok===true, 'a genuine recovery link (SDK confirmed via PASSWORD_RECOVERY) is still accepted normally');
+  assert(sbxConfirmed.window._wpRecoveryConfirmed===false, 'the recovery confirmation is consumed (one-time use) after a successful reset');
+
+  const appSrc4=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(/onAuthStateChange\(\(event\)=>\{\s*\n\s*if\(event==='PASSWORD_RECOVERY'\) window\._wpRecoveryConfirmed=true;/.test(appSrc4), 'app.js registers the PASSWORD_RECOVERY listener right where the Supabase client is created');
+
+  // --- Cloud Auth: wiring into the real login flow -------------------------
+  // Proof the plaintext password typed at login is threaded through to
+  // completeLogin (needed to silently sign into the linked cloud account
+  // with the SAME password) in both the normal-login and
+  // post-first-time-setup paths, and that the cloud sign-in is AWAITED
+  // before cloud sync runs (otherwise sync would still use the
+  // unauthenticated anon key for that first batch of calls).
+  const appSrc3=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(/completeLogin\(cand,\s*pass\)/.test(appSrc3), 'the normal login path passes the typed password to completeLogin');
+  assert(/completeLogin\(cand,\s*p1\)/.test(appSrc3), 'the post-first-time-setup path passes the newly-chosen password to completeLogin');
+  assert(/await WP\.CloudAuth\.signInCloud\(cand\.cloudEmail,\s*plainPass\)/.test(appSrc3), 'completeLogin awaits the cloud sign-in');
+  const cloudSignInIdx=appSrc3.indexOf('await WP.CloudAuth.signInCloud(cand.cloudEmail');
+  const syncAllCloudIdx=appSrc3.indexOf('syncAllCloud().finally');
+  assert(cloudSignInIdx>0 && syncAllCloudIdx>cloudSignInIdx, 'PROOF OF FIX: cloud sign-in happens BEFORE cloud sync starts, so sync calls carry a real authenticated session, not just the anon key');
+
+  // --- Settings page: password change must be hashed + validated ----------
+  // Bug found while wiring cloud auth into password changes: the Settings
+  // page's own "new password" field stored the password in PLAIN TEXT
+  // (`u.p=np`), with no minimum length and no check against the old
+  // published defaults -- bypassing every protection forcePasswordSetup
+  // enforces, and silently letting someone "change" their password right
+  // back to a known default.
+  assert(!/u\.p=np;session\.user\.p=np;/.test(appSrc3), 'PROOF OF BUG regression guard: the Settings page no longer stores a new password as plain text');
+  assert(/u\.p = WP\.Engine\.hashPassAsync \? await WP\.Engine\.hashPassAsync\(np\) : np;/.test(appSrc3), 'PROOF OF FIX: the Settings page now hashes a new password the same way login’s forced-setup flow does');
+  assert(/if\(np\.length<6\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now enforces the same minimum password length');
+  assert(/WP\.Engine\.isLegacyDefaultPassword\(u\.u,\s*np\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now rejects reusing an old published default password');
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

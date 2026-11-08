@@ -17,6 +17,4 @@ begin
   end loop;
 end $$;
 
-drop function if exists public.current_company_id();
-drop policy if exists "user_profiles_self_read" on public.user_profiles;
-drop table if exists public.user_profiles;
+drop function if exists public.user_has_company(text);
