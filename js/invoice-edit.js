@@ -209,7 +209,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     const totals=computeInvoiceTotals(lines, discount);
     const parts=totals.teile, labor=totals.leist, net=totals.net, total=totals.total;
     const custIdFinal=custId||veh.customerId||'';
-    const obj={id:existing?existing.id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custIdFinal,parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
+    const obj={id:existing?existing.id:id('i'),cloudId:existing&&existing.cloudId,companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custIdFinal,parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
       type:kind==='bar'?'Barverkauf':'Rechnung', payment:payCode($('#pay')&&$('#pay').value), paid:['cash','card'].includes(payCode($('#pay')&&$('#pay').value)),
       number:existing?existing.number:nextInvoiceNumber(), lines, repairId:existing&&existing.repairId, auftrag:existing&&existing.auftrag, updatedAt:new Date().toISOString()};
     lines.forEach(rememberKatyArticle);

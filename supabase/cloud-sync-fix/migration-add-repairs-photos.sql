@@ -1,0 +1,22 @@
+-- WerkPilot: add repairs.photos (applied 2026-11-08)
+--
+-- js/cloud.js's upsertRepairCloud always sent a `photos` field, but
+-- the real `repairs` table never had that column -- every repair
+-- save with any before/after photo attached would have been rejected
+-- by PostgREST ("could not find the 'photos' column"). repairs is
+-- the one table WerkPilot created for itself (no FK to companies, no
+-- RLS policy referencing company_memberships -- confirmed earlier in
+-- this engagement), so adding a column here carries none of the
+-- cross-system risk the company_id fix had to navigate on the other
+-- 8 tables.
+--
+-- Tested locally first (disposable Supabase stack): applied cleanly,
+-- then a real insert carrying `photos:'[]'` succeeded and the value
+-- round-tripped correctly.
+--
+-- APPLIED to production (jljzobaggesefsdeslrf) 2026-11-08 by Claude
+-- Code, within the scope the owner authorized this session for
+-- WerkPilot's own database. Idempotent (IF NOT EXISTS) -- safe to
+-- run again.
+
+alter table repairs add column if not exists photos text;

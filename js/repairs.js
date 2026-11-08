@@ -243,7 +243,7 @@ function repairModal(existing){
     return {sku:(sku||'').trim(), name:(name||sku||'').trim(), qty:Number(qty||1), price:Number(price||0)};
   });
   const obj={
-    id:r.id||id('r'), companyId:session.company.id, vehicleId:$('#rv').value,
+    id:r.id||id('r'), cloudId:r.cloudId, companyId:session.company.id, vehicleId:$('#rv').value,
     complaint:$('#rc').value, description:$('#rd').value,
     jobs:$('#rjobs').value.split('\n').map(x=>x.trim()).filter(Boolean),
     parts:parsedParts, tech:$('#rt').value, hours:$('#rh').value,
