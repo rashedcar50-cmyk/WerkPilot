@@ -124,6 +124,42 @@ same command, same USING/WITH CHECK condition, only the compared
 columns are now text instead of bigint. No policy's access logic
 changes, nothing gets newly exposed or newly restricted.
 
+## Fourth pass (same day): the schema is much bigger than it looked
+
+Pass 3's migration failed live against production again, this time on
+`work_orders` — a table WerkPilot's code has never touched. Reading
+`pg_policies` schema-wide (read-only) found **36 policies across 23
+tables** depend on `company_memberships.company_id`, not 16 across 7.
+Only 8 of those 23 tables are WerkPilot's own (`customers`, `vehicles`,
+`inventory`, `purchases`, `appointments`, `invoices`, `expenses`,
+`company_memberships`); the other 15 (`activity_logs`, `app_settings`,
+`attachments`, `bank_transactions`, `employees`, `estimates`,
+`estimate_items`, `inventory_movements`, `invoice_items`, `journal`,
+`payments`, `payroll`, `suppliers`, `time_entries`, `work_orders`, plus
+`companies` itself) belong to a much larger shop-management schema
+this Supabase project also hosts. `repairs` is WerkPilot's one
+genuinely own table — no policy, no FK, which is why it never
+surfaced in passes 1–3.
+
+At that scale, hand-writing 36 `CREATE POLICY` statements risked a
+silent mistake (wrong role, wrong permissive flag, a missed cast).
+`migration-fix-company-id-type.sql` was rewritten to **capture each
+dependent policy's live definition** from `pg_policies` — table, name,
+permissive/restrictive, roles, command, USING, WITH CHECK — drop it,
+make the type change, then recreate it from the captured text,
+injecting an explicit `::text` cast only on comparisons against a
+column outside our 9 tables (left bigint, untouched). The whole thing
+runs inside one explicit `BEGIN`/`COMMIT`, exactly as requested: if
+anything fails anywhere, nothing commits and no policy is ever left
+dropped-but-not-recreated. `rollback.sql` was rewritten the same way,
+in reverse (stripping the cast back out), and tested both to fail
+safely on real data and to succeed cleanly without it. See
+`local-test-log.md` for the full run, including direct inspection of
+the recreated policies on tables outside WerkPilot (confirming the
+cast landed exactly right and nothing else about those policies
+changed) and proof this version is idempotent (safe to re-run) where
+the earlier hand-written passes were not.
+
 ## What's in this folder
 
 - `migration-fix-company-id-type.sql` — the fix: drop the 16
