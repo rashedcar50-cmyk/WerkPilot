@@ -421,6 +421,103 @@ async function decideLogin(cand, pass){
   const escaped=escSandbox.esc(payload);
   assert(!escaped.includes('<') && !escaped.includes('>'), 'esc() neutralizes angle brackets in a customer-name/plate-style XSS payload');
 
+  // --- Account migration: existing installs must not be locked out -------
+  // The user explicitly asked that removing the hardcoded defaults not be
+  // treated as a complete auth fix by itself: an EXISTING production
+  // install already has real user records sitting in localStorage (from
+  // before this change ever existed), and core.js's load() merges the new
+  // seed (p:null) with whatever is actually persisted via a shallow
+  // `{...base,...raw}` spread. This test runs the REAL load() function
+  // (not a recreation of its logic) against a simulated pre-existing
+  // install's localStorage, to prove the merge really does preserve real
+  // passwords rather than wiping them to null on upgrade.
+  function makeLocalStorage(initial){
+    const store={...initial};
+    return {
+      getItem:k=>(k in store? store[k] : null),
+      setItem:(k,v)=>{ store[k]=String(v); },
+      removeItem:k=>{ delete store[k]; }
+    };
+  }
+  function loadCoreWith(localStorageInitial){
+    // core.js only ever reads window.WP (absent -> falsy, so it skips the
+    // optional WP.Engine.migrate call) and writes window.db -- a plain
+    // object is enough, no real WP/Engine needed for this test.
+    const sandbox={
+      window:{addEventListener:()=>{}}, console,
+      document:{createElement:()=>({}), querySelectorAll:()=>[]},
+      localStorage: makeLocalStorage(localStorageInitial)
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/core.js'),'utf8'), sandbox);
+    return sandbox;
+  }
+
+  // Case 1: a real existing install, already running before this fix,
+  // still has its original plaintext passwords in storage -- exactly
+  // what every current production browser has right now.
+  const existingInstall={
+    users:[
+      {u:'admin',p:'1980D',name:'Admin',role:'manager'},
+      {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'},
+      {u:'accountant',p:'1978B',name:'Buchhaltung',role:'accountant'},
+      {u:'ismail',p:'1977A',name:'Ismail',role:'mechanic'},
+      {u:'warehouse',p:'1979C',name:'Lager',role:'warehouse'}
+    ],
+    customers:[{id:'c1',companyId:'de',name:'Real Customer GmbH'}],
+    settings:{uiLang:'de'}
+  };
+  const upgraded=loadCoreWith({baymeister_v1: JSON.stringify(existingInstall)});
+  const mergedUsers=upgraded.window.db.users;
+  assert(mergedUsers.find(u=>u.u==='Rashid').p==='1976R', 'PROOF OF FIX: an existing install\'s real (pre-fix) password survives the upgrade -- load() does not reset it to null');
+  assert(mergedUsers.find(u=>u.u==='admin').p==='1980D', 'existing admin password also survives the upgrade unchanged');
+  assert(upgraded.window.db.customers.find(c=>c.id==='c1').name==='Real Customer GmbH', 'existing real business data (not demo data) survives the upgrade');
+
+  // Case 2: an account that had ALREADY been rotated through the new
+  // forced-setup flow (e.g. a second deploy after some users already set
+  // real passwords) must keep that real password too, not regress to null.
+  const partiallyRotated={
+    users:[
+      {u:'admin',p:'5f4dcc3b5aa765d61d8327deb882cf99',name:'Admin',role:'manager'},
+      {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'}
+    ]
+  };
+  const upgraded2=loadCoreWith({baymeister_v1: JSON.stringify(partiallyRotated)});
+  assert(upgraded2.window.db.users.find(u=>u.u==='admin').p==='5f4dcc3b5aa765d61d8327deb882cf99', 'an already-rotated (hashed/custom) password survives a later upgrade unchanged');
+
+  // Case 3: a genuinely brand-new install (nothing in localStorage yet) --
+  // this is the ONLY case where p:null should apply, and it's correct
+  // here because there is no existing user to lock out.
+  const freshInstall=loadCoreWith({});
+  assert(freshInstall.window.db.users.every(u=>u.p===null), 'a genuinely fresh install (no prior data) seeds p:null for every account -- correct, nothing existing to break');
+
+  // Case 4: combine with the real login decision (from the earlier
+  // credential-rotation test) to prove the end-to-end migration path:
+  // the REAL merged user record for an unrotated existing account still
+  // correctly routes through forced rotation rather than straight login
+  // or an outright lockout.
+  const realRashid=mergedUsers.find(u=>u.u==='Rashid');
+  const migDecision=await decideLogin(realRashid, '1976R');
+  assert(migDecision.ok && migDecision.legacyDefault && migDecision.forcesSetup, 'end-to-end: a real migrated existing account typing its known password is forced to rotate, not locked out and not let straight in');
+  const migWrong=await decideLogin(realRashid, 'totally-wrong-guess');
+  assert(!migWrong.ok, 'end-to-end: a migrated existing account is still protected against a wrong password guess');
+
+  // --- Fix: "Manueller Auftrag" silently failed to create a repair order --
+  // Bug (found while running the full login->customer->vehicle->repair->
+  // invoice->preview cycle in a real browser, per the user's explicit
+  // request to test the whole cycle, not just the login fix in isolation):
+  // repairs.js wired the "new repair order" button as a BARE function
+  // reference -- `$('#add').onclick=repairModal` -- so the click Event
+  // itself was passed in as repairModal's `existing` argument. Since an
+  // Event is truthy, repairModal treated it as an EDIT of that (nonexistent)
+  // record: it looked up `db.repairs.findIndex(x=>x.id===existing.id)`
+  // (undefined on an Event, never found) and did nothing instead of
+  // pushing a new repair. The modal still closed with no visible error,
+  // so this was invisible without actually clicking through the UI.
+  const repairsSrc2=fs.readFileSync(path.join(root,'js/repairs.js'),'utf8');
+  assert(!/\$\('#add'\)\.onclick=repairModal;/.test(repairsSrc2), "PROOF OF BUG regression guard: the bare `onclick=repairModal` reference is gone");
+  assert(/\$\('#add'\)\.onclick=\(\)=>repairModal\(\);/.test(repairsSrc2), 'PROOF OF FIX: the button now calls repairModal() with no arguments, so a click Event can never be mistaken for an existing record');
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

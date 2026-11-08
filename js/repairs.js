@@ -117,7 +117,15 @@ function repairs(){
  // Fix (audit 2026-11-08): repair orders had no print/PDF/share at all.
  listShareBar('repairs')+cards+
  `<div class="bottom-action"><button class="btn ok" id="scanSchein2">📷 ${t('scanScheinOpen')}</button></div>`;
- if(canEdit() && $('#add')) $('#add').onclick=repairModal;
+ // Correctness fix (audit 2026-11-08): this used to be `onclick=repairModal`
+ // -- a bare function reference, so the click Event itself got passed in as
+ // repairModal's `existing` argument. A truthy `existing` makes repairModal
+ // treat it as EDITING that (nonexistent) record: it looks up
+ // `db.repairs.findIndex(x=>x.id===existing.id)` (undefined on an Event,
+ // so never found) and silently does nothing instead of pushing a new
+ // repair -- "Manueller Auftrag" appeared to work (modal closed, no error)
+ // but never actually created anything.
+ if(canEdit() && $('#add')) $('#add').onclick=()=>repairModal();
  $('#scanSchein').onclick=scanScheinStartRepair;
  if($('#scanSchein2')) $('#scanSchein2').onclick=scanScheinStartRepair;
 }

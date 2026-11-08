@@ -11,9 +11,15 @@ const storeKey='baymeister_v1';
 // as "needs first-time setup" and walks the user through picking a real
 // password before granting a session, rather than failing the login or
 // (the old behavior) silently accepting a value anyone could read in
-// source. See REQUIRES_PASSWORD_SETUP in app.js and
-// LEGACY_DEFAULT_PASSWORDS below, which also forces a one-time rotation
-// for any *existing* installation still using the old published values.
+// source. See the freshAccount/legacyDefault checks in app.js's login()
+// and engine.js's LEGACY_DEFAULT_PASSWORDS, which also forces a one-time
+// rotation for any *existing* installation still using the old published
+// values. Critically: this `{...base,...raw}` merge in load() below is a
+// shallow spread, so an existing install's own persisted `raw.users`
+// (with whatever real password each account actually has) always wins
+// over this fresh seed -- `p:null` only ever applies to a genuinely new
+// install with no stored data yet. See tests/run.js's "account migration"
+// section for a test that pins this down directly.
 const seed={
  users:[
   {u:'admin',p:null,name:'Admin',role:'manager'},
@@ -67,6 +73,19 @@ const seed={
  audit:[],
  settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopBrand:'TABAH AUTO',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
 };
+// Correctness fix (audit 2026-11-08): this const used to sit AFTER
+// `let db=load()` below -- but load() calls ensureCompanyProfiles(), which
+// calls defaultWorkshopProfile(), which reads this very array. Referencing
+// a `const` before its own declaration has executed throws a
+// ReferenceError (temporal dead zone), which load()'s outer try/catch
+// swallowed silently, making it fall back to `clone(seed)` -- discarding
+// ALL persisted data (every customer, vehicle, repair, invoice) on EVERY
+// single page load, with no visible error. Moving this one array literal
+// above `let db=load()` is the entire fix: nothing else changes. See
+// tests/run.js's "account migration" section for a test that pins this
+// down directly (it reproduces the data loss and proves this fix keeps it
+// from happening).
+const WORKSHOP_KEYS=['workshopBrand','workshopName','workshopAddress','workshopPhone','workshopEmail','workshopTaxId','workshopSteuerNr','workshopCourt','workshopOwner','workshopBank','workshopIban','workshopAccountHolder','workshopHrb','workshopBic','workshopSitz','hourlyRate','invoiceSeq','auftragSeq','paymentDays','invoiceTpl','printPaper','printMargin','printColor'];
 let db=load(), session=null;
 try{ stripTstBranding(db); try{migrateLegalName(db);}catch(e){}; }catch(e){}
 
@@ -125,7 +144,6 @@ function load(){
   return merged;
  }catch{return clone(seed)}
 }
-const WORKSHOP_KEYS=['workshopBrand','workshopName','workshopAddress','workshopPhone','workshopEmail','workshopTaxId','workshopSteuerNr','workshopCourt','workshopOwner','workshopBank','workshopIban','workshopAccountHolder','workshopHrb','workshopBic','workshopSitz','hourlyRate','invoiceSeq','auftragSeq','paymentDays','invoiceTpl','printPaper','printMargin','printColor'];
 function defaultWorkshopProfile(co, settings){
   const s=settings||(typeof db!=='undefined'&&db&&db.settings)||seed.settings;
   const isDe=co.id==='de' || co.country==='DE';
