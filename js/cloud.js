@@ -255,8 +255,10 @@ async function upsertAppointmentCloud(a){
     const sb=window.supabaseClient; if(!sb) return;
     const customerCloudId = await resolveCloudId('customers', a.customerId, upsertCustomerCloud);
     const vehicleCloudId = await resolveCloudId('vehicles', a.vehicleId, upsertVehicleCloud);
-    const startAt = a.date ? new Date(a.date+'T'+(a.time||'00:00')+':00').toISOString() : null;
-    const row={company_id:a.companyId||'de',customer_id:customerCloudId,vehicle_id:vehicleCloudId,status:a.status||'confirmed',start_at:startAt,notes:a.note||'',metadata:{tech:a.tech||'',time:a.time||''}};
+    const startAt = new Date((a.date||new Date().toISOString().slice(0,10))+'T'+(a.time||'00:00')+':00').toISOString();
+    const vehicleLocal=(db.vehicles||[]).find(x=>x.id===a.vehicleId);
+    const title = a.note || (vehicleLocal?(vehicleLocal.plate||vehicleLocal.make||'Termin'):'Termin');
+    const row={company_id:a.companyId||'de',customer_id:customerCloudId,vehicle_id:vehicleCloudId,title,status:a.status||'confirmed',start_at:startAt,notes:a.note||'',metadata:{tech:a.tech||'',time:a.time||''}};
     if(a.cloudId){
       const {error}=await sb.from('appointments').update(row).eq('id',a.cloudId);
       if(error){ console.warn('upsertAppointment',error.message); markSyncError(a,error.message); } else markSyncOk(a);
