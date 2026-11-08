@@ -213,6 +213,90 @@ async function decideLogin(cand, pass){
   assert(E.isLegacyDefaultPassword('Rashid','MyR3al-Pass!')===false,'a real custom password is never flagged as the legacy default');
   assert(E.isLegacyDefaultPassword('someone-not-in-the-table','1976R')===false,'an unrelated username is never matched against another account\'s old default');
 
+  // --- Fix: invoice preview must not mutate the database -------------------
+  // Bug that shipped before this fix: js/invoice-print.js's ensureKd(), called
+  // every time an invoice is rendered (preview, print, PDF, email), silently
+  // allocated a brand-new customer number (kdNr) and WROTE it straight into
+  // db.customers + called save() -- a real, permanent write triggered by what
+  // is supposed to be a read-only render. Opening a preview for an invoice
+  // whose customer had no number yet was enough to hand out and persist one,
+  // even if the invoice itself was never saved.
+  const ipSandbox={window:{WP:{}}, console, db:{customers:[{id:'cust-no-kd',name:'Walk-in Test'}]}, save:function(){ipSandbox._saveCalls=(ipSandbox._saveCalls||0)+1;}, _saveCalls:0};
+  vm.createContext(ipSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8'), ipSandbox);
+
+  const custBefore=JSON.parse(JSON.stringify(ipSandbox.db.customers[0]));
+  const renderedCust=ipSandbox.ensureKd(ipSandbox.db.customers[0]);
+  assert(!!renderedCust.kdNr, 'preview still shows a customer number for display, even if unassigned yet');
+  assert(JSON.stringify(ipSandbox.db.customers[0])===JSON.stringify(custBefore), 'PROOF OF FIX: previewing/rendering never mutates the stored customer record');
+  assert(ipSandbox._saveCalls===0, 'PROOF OF FIX: previewing/rendering never calls save() -- no database write happens on read');
+  // Proof of bug (regression guard): the exact vulnerable pattern -- ensureKd
+  // writing into db.customers and calling save() -- is gone from the source.
+  const ipSrc=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+  const ensureKdBody=(ipSrc.match(/function ensureKd\(cust\)\{[\s\S]*?\n\}/)||[''])[0];
+  assert(!/save\(\)/.test(ensureKdBody), 'ensureKd() no longer calls save() -- it is purely a display fallback now');
+
+  // assignKdNr -- the one place a number is now actually persisted -- only
+  // fires when explicitly called (i.e. at real invoice-save time), assigns
+  // exactly once, and never overwrites a customer who already has a number.
+  ipSandbox.assignKdNr('cust-no-kd');
+  assert(ipSandbox._saveCalls===1, 'assignKdNr persists (calls save()) exactly once when actually invoked');
+  assert(!!ipSandbox.db.customers[0].kdNr, 'assignKdNr actually wrote a kdNr onto the real customer record');
+  const assignedKd=ipSandbox.db.customers[0].kdNr;
+  ipSandbox.assignKdNr('cust-no-kd');
+  assert(ipSandbox._saveCalls===1, 'assignKdNr is a no-op (no extra save) for a customer who already has a number');
+  assert(ipSandbox.db.customers[0].kdNr===assignedKd, 'assignKdNr never reassigns/overwrites an existing customer number');
+
+  // --- Fix: unify tax/discount/rounding between edit, preview, and print ---
+  // Bug that shipped before this fix: the editor's save handler (and
+  // lookup.js's createInvoiceAuto) applied ONE flat header tax rate to the
+  // whole discounted sum, ignoring that each line carries its own tax rate
+  // (the per-row "MwSt." field) -- while print/preview (invoiceModel) always
+  // computed VAT per line's own rate with the discount prorated across rate
+  // buckets. For a mixed-rate invoice (e.g. parts at 19%, a line at 7%), the
+  // amount booked to the journal/debt list could differ from the amount the
+  // printed document actually shows the customer.
+  const mixedLines=[
+    {name:'Bremsbelaege', qty:1, price:100, tax:19, kind:'parts'},
+    {name:'Reifenentsorgung', qty:1, price:50, tax:7, kind:'parts'},
+    {name:'Arbeitswert', qty:2, price:60, tax:19, kind:'labor'}
+  ];
+  // Proof of bug (regression guard): recompute totals the OLD (flat-rate) way
+  // and show it disagrees with the new shared function on mixed-rate lines.
+  const oldParts=mixedLines.filter(l=>l.kind!=='labor').reduce((s,l)=>s+l.qty*l.price,0);
+  const oldLabor=mixedLines.filter(l=>l.kind==='labor').reduce((s,l)=>s+l.qty*l.price,0);
+  const oldNet=Math.max(0, oldParts+oldLabor-0);
+  const oldTotal=Math.round(oldNet*(1+19/100)*100)/100;
+  const newTotals=ipSandbox.computeInvoiceTotals(mixedLines, 0);
+  assert(oldTotal!==newTotals.total, 'PROOF OF BUG: the old flat-19%-on-everything total disagrees with the correct per-line-tax total on mixed-rate lines');
+  // Expected correct total: 100@19% + 50@7% + 120@19% -> net=270, vat=(100*.19+50*.07+120*.19)=20.9+3.5... =>
+  const expectedVat=Math.round((100*0.19+50*0.07+120*0.19)*100)/100;
+  const expectedTotal=Math.round((270+expectedVat)*100)/100;
+  assert(newTotals.net===270, 'computeInvoiceTotals: net sums all lines minus discount, independent of tax rate');
+  assert(newTotals.total===expectedTotal, 'computeInvoiceTotals: total correctly applies each line\'s own tax rate ('+newTotals.total+' vs expected '+expectedTotal+')');
+
+  // PROOF OF FIX: the editor's save path and print's preview path now reach
+  // the identical total for the same mixed-rate invoice, because both call
+  // computeInvoiceTotals. (Re-deriving app.js's save-handler arithmetic here
+  // would require a full DOM; instead we assert both real call sites -- the
+  // editor's save handler in invoice-edit.js and createInvoiceAuto in
+  // lookup.js -- now route through this one shared function, so they cannot
+  // drift from what print shows.)
+  const editSrc=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+  const lookupSrc=fs.readFileSync(path.join(root,'js/lookup.js'),'utf8');
+  assert(/computeInvoiceTotals\(lines,\s*discount\)/.test(editSrc), 'invoice-edit.js save handler now computes totals via the shared function');
+  assert(!/net\*\(1\+tax\/100\)/.test(editSrc), 'invoice-edit.js no longer has the old flat-single-rate total formula');
+  assert(/computeInvoiceTotals\(lines,\s*discount\)/.test(lookupSrc), 'lookup.js createInvoiceAuto now computes totals via the shared function');
+  assert(!/net\*\(1\+tax\/100\)/.test(lookupSrc), 'lookup.js no longer has the old flat-single-rate total formula');
+
+  // Zero-regression check: a single-rate invoice (the overwhelming common
+  // case -- everything at 19%, no discount) totals identically to the old
+  // formula, so ordinary invoices are completely unaffected by this fix.
+  const uniformLines=[{name:'Oelfilter',qty:1,price:40,tax:19,kind:'parts'},{name:'Arbeitswert',qty:1,price:60,tax:19,kind:'labor'}];
+  const uniform=ipSandbox.computeInvoiceTotals(uniformLines, 10);
+  const oldUniformNet=Math.max(0,100-10), oldUniformTotal=Math.round(oldUniformNet*(1+19/100)*100)/100;
+  assert(uniform.net===oldUniformNet && uniform.total===oldUniformTotal, 'single-rate invoices total identically under the new shared function -- no regression for the common case');
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
