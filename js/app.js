@@ -566,7 +566,7 @@ function showSearchResults(q){
   $('#content').innerHTML=head(t('searchResults')+': '+esc(q))+`
   <div class="card"><b>${t('customers')}</b>${s.customers.length?table([t('name'),t('phone'),t('email')],s.customers.map(c=>[esc(c.name),esc(c.phone),esc(c.email)]),'s_c'):'<p class="muted">'+t('noResults')+'</p>'}</div>
   <div class="card" style="margin-top:10px"><b>${t('vehicles')}</b>${s.vehicles.length?table([t('plate'),'VIN',t('make'),t('model'),'km'],s.vehicles.map(v=>[esc(v.plate),esc(v.vin),esc(v.make),esc(v.model),v.km||'-']),'s_v'):'<p class="muted">'+t('noResults')+'</p>'}</div>
-  <div class="card" style="margin-top:10px"><b>${t('repairs')}</b>${s.repairs.length?table([t('vehicle'),t('statement'),t('status')],s.repairs.map(r=>[vehicleName(r.vehicleId),esc(dLabel(r.description)),esc(stLabel(r.status))]),'s_r'):'<p class="muted">'+t('noResults')+'</p>'}</div>
+  <div class="card" style="margin-top:10px"><b>${t('repairs')}</b>${s.repairs.length?table([t('vehicle'),t('statement'),t('status')],s.repairs.map(r=>[esc(vehicleName(r.vehicleId)),esc(dLabel(r.description)),esc(stLabel(r.status))]),'s_r'):'<p class="muted">'+t('noResults')+'</p>'}</div>
   <div class="card" style="margin-top:10px"><b>${t('inventory')}</b>${s.inventory.length?table(['SKU',t('name'),t('qty')],s.inventory.map(i=>[esc(i.sku),esc(dLabel(i.name)),i.qty]),'s_i'):'<p class="muted">'+t('noResults')+'</p>'}</div>`;
 }
 
@@ -577,7 +577,7 @@ function appointments(){
   // Fix (audit 2026-11-08): appointments had no print/PDF/share at all.
   listShareBar('appointments')+
   table([t('date'),t('time'),t('vehicle'),t('customer'),t('tech'),t('status'),t('action')],rows.map(a=>[
-    esc(a.date),esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId)),esc(dLabel(a.tech||'-')),esc(stLabel(a.status||'')),
+    esc(a.date),esc(a.time),esc(vehicleName(a.vehicleId)),esc(customerName(a.customerId)),esc(dLabel(a.tech||'-')),esc(stLabel(a.status||'')),
     (normStatus(a.status)==='converted')?'—':`<button class="btn small primary" onclick="appointmentToRepair('${a.id}')">${t('convertJob')}</button>`
   ]),'appointments')+
   `<div class="bottom-action"><button class="btn primary" id="add">${t('newApptBtn')}</button></div>`;
@@ -616,7 +616,7 @@ function estimates(){
  // the print/PDF/share buttons exported the unrelated invoices list, not
  // this estimates list.
  listShareBar('estimates')+
- table([t('vehicle'),t('partsCol'),t('laborCol'),t('discount'),t('tax'),t('total'),t('quoteFee')],rows.map(x=>[vehicleName(x.vehicleId),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]), 'estimates');
+ table([t('vehicle'),t('partsCol'),t('laborCol'),t('discount'),t('tax'),t('total'),t('quoteFee')],rows.map(x=>[esc(vehicleName(x.vehicleId)),money(x.parts),money(x.labor),money(x.discount),x.tax+'%',money(x.total),money(x.fee)]), 'estimates');
  $('#add').onclick=()=>financeModal('estimate');
  if($('#scanEst')) $('#scanEst').onclick=()=>scanScheinStartRepair('estimate');
 }
@@ -631,7 +631,7 @@ function invoices(){
  $('#content').innerHTML=head(title,`<div class="toolbar"><button class="btn ok" id="scanInv">📷 ${t('scanSchein')}</button><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">${t('cashSale')}</button>${filter||payFilter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
  listShareBar('invoices')+
  table([t('invoiceNo'),t('type'),t('vehicle'),t('total'),t('payment'),t('design')],rows.map(x=>[
-  esc(x.number||x.id)+(x.status==='storno'?' · STORNO':''), esc(x.type||''), vehicleName(x.vehicleId)||'—', money(x.total), esc(payLabel(x.payment||'-')),
+  esc(x.number||x.id)+(x.status==='storno'?' · STORNO':''), esc(x.type||''), esc(vehicleName(x.vehicleId))||'—', money(x.total), esc(payLabel(x.payment||'-')),
   `<button class="btn small primary" onclick="previewInvoice('${x.id}')">${t('preview')}</button>
    <button class="btn small" onclick="editInvoice('${x.id}')">${t('edit')}</button>
    <button class="btn small bad" onclick="deleteInvoice('${x.id}')">${t('del')}</button>
@@ -1274,7 +1274,7 @@ function reports(){
  ${top.length?table([t('parts'),t('qty')],top.map(([n,q])=>[esc(dLabel(n)),q]),'top_parts'):`<p class="muted">${t('noData')}</p>`}
  </div>
  <div class="card" style="margin-top:12px"><b>${t('customerDebts')}</b>
- ${unpaid.length?table([t('invoiceNo'),t('vehicle'),t('total')],unpaid.map(x=>[`<button class="btn small" onclick="previewInvoice('${x.id}')">${esc(x.number||x.id)}</button>`,vehicleName(x.vehicleId),money(x.total)]),'unpaid'):`<p class="muted">${t('noDebts')}</p>`}
+ ${unpaid.length?table([t('invoiceNo'),t('vehicle'),t('total')],unpaid.map(x=>[`<button class="btn small" onclick="previewInvoice('${x.id}')">${esc(x.number||x.id)}</button>`,esc(vehicleName(x.vehicleId)),money(x.total)]),'unpaid'):`<p class="muted">${t('noDebts')}</p>`}
  </div>`;
 }
 function integrations(){

@@ -356,6 +356,71 @@ async function decideLogin(cand, pass){
   assert(/shareBar\('repairs',\s*r\.id\)/.test(repairsSrc), 'single repair work-order view now offers print/PDF/share');
   assert(/listShareBar\('appointments'\)/.test(appSrc), 'appointments list now offers print/PDF/share');
 
+  // --- Fix: remove hardcoded OCR.space API key fallback -------------------
+  // Bug that shipped before this fix: js/ocr.js's spaceRead() fell back to
+  // a real, hardcoded OCR.space API key ('K81772188988957') shipped in
+  // public client source whenever the workshop hadn't configured its own
+  // key -- so every install, and anyone reading the repo, silently shared
+  // (and could drain the quota of) that one embedded key.
+  const ocrSrc=fs.readFileSync(path.join(root,'js/ocr.js'),'utf8');
+  assert(!/K81772188988957/.test(ocrSrc), 'PROOF OF FIX: the hardcoded OCR.space key is gone from the source entirely');
+  let fetchCalls=0;
+  const sharedDb={settings:{}};
+  const ocrSandbox={window:{WP:{}, db:sharedDb}, console, db:sharedDb,
+    setTimeout, clearTimeout, URLSearchParams, AbortController,
+    fetch:async function(){ fetchCalls++; return {json:async()=>({ParsedResults:[]})}; }
+  };
+  vm.createContext(ocrSandbox);
+  vm.runInContext(ocrSrc, ocrSandbox);
+  const OCR2=ocrSandbox.window.WP.OCR;
+  const noKeyResult=await OCR2.spaceRead('aGVsbG8=');
+  assert(fetchCalls===0, 'PROOF OF FIX: with no OCR.space key configured, spaceRead never calls out to OCR.space at all (no silent embedded-key usage)');
+  assert(JSON.stringify(noKeyResult)==='{}', 'spaceRead returns {} (not an error) when no key is configured, so the other OCR fallback tiers still run');
+  ocrSandbox.db.settings.ocrSpaceKey='workshop-own-test-key';
+  await OCR2.spaceRead('aGVsbG8=');
+  assert(fetchCalls===1, 'spaceRead still works normally once the workshop configures its OWN key in Settings');
+
+  // --- Fix: XSS -- customerName()/vehicleName() must always be esc()'d ----
+  // Bug that shipped before this fix: js/customers.js's vehicles table
+  // inserted customerName(v.customerId) straight into an HTML table cell
+  // with NO escaping, unlike every sibling cell in the same row (which all
+  // call esc()) -- the exact inconsistency flagged in the i18n/XSS audit.
+  // The same inconsistency existed for vehicleName() in five spots in
+  // js/app.js. Both helpers return free text (customer name / plate+make+
+  // model) that can come from manual entry or OCR-scanned documents, so an
+  // HTML/script payload in a saved name or plate would execute for every
+  // user who views that table.
+  const custSrc=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
+  assert(!custSrc.includes("customerName(v.customerId),esc(v.plate"), 'PROOF OF BUG regression guard: the exact unescaped customerName() call in the vehicles table is gone');
+  assert(custSrc.includes("esc(customerName(v.customerId)),esc(v.plate"), 'PROOF OF FIX: customers.js vehicles table now escapes customerName()');
+
+  const appSrc2=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  const uneescapedSpots=[
+    "s.repairs.map(r=>[vehicleName(r.vehicleId),esc(dLabel(r.description))",
+    "esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId))",
+    "rows.map(x=>[vehicleName(x.vehicleId),money(x.parts)",
+    "esc(x.type||''), vehicleName(x.vehicleId)||'—'",
+    "unpaid.map(x=>[`<button class=\"btn small\" onclick=\"previewInvoice('${x.id}')\">${esc(x.number||x.id)}</button>`,vehicleName(x.vehicleId)"
+  ];
+  uneescapedSpots.forEach((spot,i)=>assert(!appSrc2.includes(spot), 'PROOF OF BUG regression guard #'+(i+1)+': an unescaped vehicleName() table cell is gone from app.js'));
+  const escapedSpots=[
+    "s.repairs.map(r=>[esc(vehicleName(r.vehicleId)),esc(dLabel(r.description))",
+    "esc(a.time),esc(vehicleName(a.vehicleId)),esc(customerName(a.customerId))",
+    "rows.map(x=>[esc(vehicleName(x.vehicleId)),money(x.parts)",
+    "esc(x.type||''), esc(vehicleName(x.vehicleId))||'—'",
+    "unpaid.map(x=>[`<button class=\"btn small\" onclick=\"previewInvoice('${x.id}')\">${esc(x.number||x.id)}</button>`,esc(vehicleName(x.vehicleId))"
+  ];
+  escapedSpots.forEach((spot,i)=>assert(appSrc2.includes(spot), 'PROOF OF FIX #'+(i+1)+': app.js now escapes vehicleName() at this table cell'));
+
+  // Behavioral proof: esc() itself actually neutralizes an HTML payload
+  // such as a customer name or plate could contain.
+  const escSandbox={window:{}, console};
+  vm.createContext(escSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/lookup.js'),'utf8'), escSandbox);
+  const payload='<img src=x onerror=alert(1)>';
+  const escaped=escSandbox.esc(payload);
+  assert(!escaped.includes('<') && !escaped.includes('>'), 'esc() neutralizes angle brackets in a customer-name/plate-style XSS payload');
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
