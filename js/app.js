@@ -44,12 +44,35 @@ function login(){
   if(window._loginFails>=5) return $('#loginErr').textContent=t('loginBlocked');
   const name=$('#lu').value.trim(), pass=$('#lp').value;
   const cand=(db.users||[]).find(x=>x.u===name);
-  const ok=cand && WP.Engine && await WP.Engine.passOk(cand.p, pass);
+  // Security fix (audit 2026-11-08): an account with no password yet
+  // (cand.p==null, a fresh seed -- see core.js) can never pass the normal
+  // passOk check by design, so it is routed straight to first-time setup
+  // instead of being rejected as "wrong password". An account still on
+  // the old published default (see engine.js's LEGACY_DEFAULT_PASSWORDS)
+  // passes the normal check first -- proving the person typing it really
+  // does know that value -- and is then forced to replace it before a
+  // session is granted, rather than being let in on a value anyone could
+  // read in this app's own public source history.
+  const freshAccount=cand && cand.p==null;
+  const legacyDefault=cand && !freshAccount && WP.Engine.isLegacyDefaultPassword(cand.u, pass);
+  const ok=freshAccount || (cand && WP.Engine && await WP.Engine.passOk(cand.p, pass));
   if(!ok){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
-  if(cand.p===pass && WP.Engine.hashPassAsync){
+  if(!freshAccount && !legacyDefault && cand.p===pass && WP.Engine.hashPassAsync){
     try{ cand.p=await WP.Engine.hashPassAsync(pass); save(true); }catch(e){}
   }
   window._loginFails=0;
+  if(freshAccount || legacyDefault){
+    return forcePasswordSetup(cand, freshAccount);
+  }
+  completeLogin(cand);
+ };
+}
+
+// Security fix (audit 2026-11-08): the one place a session is actually
+// granted, shared by the normal path and the post-first-time-setup path
+// below -- so "set a real password" always leads here via the exact same
+// code a normal login uses, never a parallel shortcut.
+function completeLogin(cand){
   const startPage=(location.search.match(/[?&]page=([a-z]+)/)||[])[1]||'dashboard';
   session={user:WP.Engine.publicUser(cand),company:db.companies[0],page:startPage};
   audit('login');
@@ -67,7 +90,36 @@ function login(){
       }, 200);
     } else render();
   });
- };
+}
+
+// Security fix (audit 2026-11-08): a blocking, no-cancel modal -- the only
+// way out is setting a real password, never a dismiss/X button. Reached
+// either for a brand-new account (freshAccount, cand.p was null) or for
+// one that just proved it still knows the old published default (see
+// engine.js's LEGACY_DEFAULT_PASSWORDS): both need a real password before
+// this session is allowed to start, so the password box is never
+// pre-filled with the value that got them here.
+function forcePasswordSetup(cand, freshAccount){
+  $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal">
+   <div class="modal-head"><h2>${t('setPasswordTitle')||'Set a password'}</h2></div>
+   <p class="muted" style="margin:0 0 12px">${freshAccount ? (t('setPasswordFreshHint')||'This account has no password yet. Choose one now.') : (t('setPasswordLegacyHint')||'This account is still using a default password that is public in this app\'s own source history. Choose a new one now.')}</p>
+   <div class="field"><label>${t('newPassword')||t('pass')}</label><input id="fps1" type="password" autocomplete="new-password"></div>
+   <div class="field"><label>${t('newPasswordConfirm')||t('pass')}</label><input id="fps2" type="password" autocomplete="new-password"></div>
+   <div class="login-fail" id="fpsErr"></div>
+   <div class="toolbar" style="margin-top:14px"><button class="btn primary" id="fpsSave">${t('save')}</button></div>
+  </div></div>`;
+  if(typeof scrubUiLang==='function') try{ scrubUiLang($('#modalRoot')); }catch(e){}
+  $('#fpsSave').onclick=async ()=>{
+    const p1=$('#fps1').value, p2=$('#fps2').value;
+    const err=$('#fpsErr');
+    if(!p1 || p1.length<6){ err.textContent=t('setPasswordTooShort')||'Password must be at least 6 characters.'; return; }
+    if(p1!==p2){ err.textContent=t('setPasswordMismatch')||'Passwords do not match.'; return; }
+    if(WP.Engine.isLegacyDefaultPassword(cand.u, p1)){ err.textContent=t('setPasswordStillDefault')||'Choose a password other than the old default.'; return; }
+    cand.p=WP.Engine.hashPassAsync ? await WP.Engine.hashPassAsync(p1) : p1;
+    save(true);
+    closeModal();
+    completeLogin(cand);
+  };
 }
 
 function closeMobileMenus(){

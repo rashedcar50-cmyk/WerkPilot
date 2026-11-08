@@ -15,7 +15,7 @@ window.WP_LANGS = [
 window.WP_ALLOWED_LANGS = ['de','ar','en','tr','sr','ru','pl','es'];
 
 window.WP_I18N = {
-en:{positions:'Positions',quickEntry:'Quick entry',colPos:'Pos',colArt:'Type',colQty:'Qty',colPrice:'Unit',colSum:'Sum',colVat:'VAT',orderNo:'Part no.',apply:'Apply',henryHint:'Enter number and press Enter.',catalog:'Catalog',pasteHint:'Paste lines',paste:'Paste',laborDefault:'Labor',app:'Werkivo',tag:'WORKSHOP. DIGITAL. EFFICIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',
+en:{positions:'Positions',quickEntry:'Quick entry',colPos:'Pos',colArt:'Type',colQty:'Qty',colPrice:'Unit',colSum:'Sum',colVat:'VAT',orderNo:'Part no.',apply:'Apply',henryHint:'Enter number and press Enter.',catalog:'Catalog',pasteHint:'Paste lines',paste:'Paste',laborDefault:'Labor',app:'Werkivo',tag:'WORKSHOP. DIGITAL. EFFICIENT.',user:'Username',pass:'Password',login:'Sign in',logout:'Logout',setPasswordTitle:'Set a password',setPasswordFreshHint:'This account has no password yet. Choose one now.',setPasswordLegacyHint:'This account is still using a default password that is public in this app\'s own source history. Choose a new one now.',newPassword:'New password',newPasswordConfirm:'Confirm new password',setPasswordTooShort:'Password must be at least 6 characters.',setPasswordMismatch:'Passwords do not match.',setPasswordStillDefault:'Choose a password other than the old default.',
 cashSale:'Cash sale',netParts:'Net parts',netLabor:'Net labor',vat19:'VAT 19%',
 dash:'Today',todayBoard:'Today',carsInShop:'Cars in shop',openJobs:'Open jobs',todayAppts:'Appointments today',lowStock:'Low stock',sales:'Sales',netApprox:'Approx. net',
 stockAlert:'Stock alert',maintDue:'Service due',
@@ -56,7 +56,7 @@ prev:'Previous',next:'Next',cancelBtn:'Cancel',
 font:'Font size',language:'Program language',hourly:'Labor hourly rate €',phone:'Workshop / WhatsApp phone',
 invoiceNote:'Invoices stay in German when the active company is in Germany.',
 saved:'Saved',backup:'Export backup',sync:'Sync from cloud',reset:'Reset demo data'},
-de:{positions:'Positionen',quickEntry:'Schnellerfassung',colPos:'Pos',colArt:'Art',colQty:'Menge',colPrice:'E-Preis',colSum:'Summe',colVat:'MwSt.',orderNo:'Bestellnummer',apply:'Übernehmen',henryHint:'Nummer eingeben und Enter.',catalog:'Katalog',pasteHint:'Zeilen einfügen',paste:'Einfügen',laborDefault:'Arbeitswert',app:'Werkivo',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Benutzername',pass:'Passwort',login:'Anmelden',logout:'Abmelden',
+de:{positions:'Positionen',quickEntry:'Schnellerfassung',colPos:'Pos',colArt:'Art',colQty:'Menge',colPrice:'E-Preis',colSum:'Summe',colVat:'MwSt.',orderNo:'Bestellnummer',apply:'Übernehmen',henryHint:'Nummer eingeben und Enter.',catalog:'Katalog',pasteHint:'Zeilen einfügen',paste:'Einfügen',laborDefault:'Arbeitswert',app:'Werkivo',tag:'WERKSTATT. DIGITAL. EFFIZIENT.',user:'Benutzername',pass:'Passwort',login:'Anmelden',logout:'Abmelden',setPasswordTitle:'Passwort festlegen',setPasswordFreshHint:'Für dieses Konto ist noch kein Passwort eingerichtet. Legen Sie jetzt eines fest.',setPasswordLegacyHint:'Dieses Konto verwendet noch ein Standardpasswort, das im öffentlichen Quellcode-Verlauf dieser App sichtbar ist. Legen Sie jetzt ein neues fest.',newPassword:'Neues Passwort',newPasswordConfirm:'Neues Passwort bestätigen',setPasswordTooShort:'Das Passwort muss mindestens 6 Zeichen haben.',setPasswordMismatch:'Die Passwörter stimmen nicht überein.',setPasswordStillDefault:'Wählen Sie ein anderes Passwort als das alte Standardpasswort.',
 cashSale:'Barverkauf',netParts:'Netto Teile',netLabor:'Netto Leistungen',vat19:'MwSt. 19%',
 dash:'Heute',todayBoard:'Heute',carsInShop:'Fahrzeuge in der Werkstatt',openJobs:'Offene Aufträge',todayAppts:'Termine heute',lowStock:'Lagerengpass',sales:'Umsatz',netApprox:'Näherungsweise Netto',
 stockAlert:'Lagerhinweis',maintDue:'Fällige Wartung',
@@ -97,7 +97,7 @@ prev:'Zurück',next:'Weiter',cancelBtn:'Abbrechen',
 font:'Schriftgröße',language:'Programmsprache',hourly:'Stundensatz €',phone:'Werkstatt / WhatsApp',
 invoiceNote:'Rechnungen bleiben auf Deutsch, wenn die aktive Firma in Deutschland ist.',
 saved:'Gespeichert',backup:'Backup exportieren',sync:'Aus Cloud synchronisieren',reset:'Demodaten löschen'},
-ar:{positions:'البنود',quickEntry:'إدخال سريع',colPos:'م',colArt:'النوع',colQty:'العدد',colPrice:'السعر',colSum:'المجموع',colVat:'الضريبة',orderNo:'رقم القطعة',apply:'اعتماد',henryHint:'اكتب الرقم واضغط Enter.',catalog:'الكتالوج',pasteHint:'لصق الأسطر',paste:'لصق',laborDefault:'أجور عمل',app:'Werkivo',tag:'ورشة. رقمية. فعالة.',user:'اسم المستخدم',pass:'كلمة المرور',login:'دخول',logout:'خروج',
+ar:{positions:'البنود',quickEntry:'إدخال سريع',colPos:'م',colArt:'النوع',colQty:'العدد',colPrice:'السعر',colSum:'المجموع',colVat:'الضريبة',orderNo:'رقم القطعة',apply:'اعتماد',henryHint:'اكتب الرقم واضغط Enter.',catalog:'الكتالوج',pasteHint:'لصق الأسطر',paste:'لصق',laborDefault:'أجور عمل',app:'Werkivo',tag:'ورشة. رقمية. فعالة.',user:'اسم المستخدم',pass:'كلمة المرور',login:'دخول',logout:'خروج',setPasswordTitle:'تعيين كلمة مرور',setPasswordFreshHint:'لا توجد كلمة مرور لهذا الحساب بعد. اختر واحدة الآن.',setPasswordLegacyHint:'لا يزال هذا الحساب يستخدم كلمة مرور افتراضية ظاهرة في سجل كود التطبيق العلني. اختر كلمة مرور جديدة الآن.',newPassword:'كلمة المرور الجديدة',newPasswordConfirm:'تأكيد كلمة المرور الجديدة',setPasswordTooShort:'يجب ألا تقل كلمة المرور عن 6 أحرف.',setPasswordMismatch:'كلمتا المرور غير متطابقتين.',setPasswordStillDefault:'اختر كلمة مرور غير الكلمة الافتراضية القديمة.',
 cashSale:'بيع نقدي',netParts:'صافي القطع',netLabor:'صافي الأجور',vat19:'الضريبة 19%',
 dash:'الرئيسية',todayBoard:'لوحة اليوم',carsInShop:'سيارات داخل الورشة',openJobs:'أوامر مفتوحة',todayAppts:'مواعيد اليوم',lowStock:'نقص مخزون',sales:'المبيعات',netApprox:'صافي تقريبي',
 stockAlert:'تنبيه مخزون',maintDue:'صيانة مستحقة',
@@ -143,7 +143,7 @@ saved:'تم الحفظ',backup:'تصدير نسخة احتياطية',sync:'مز
   if(!window.WP_I18N[code]) window.WP_I18N[code]=Object.assign({}, window.WP_I18N.en);
 });
 Object.assign(window.WP_I18N.es,{
-app:'Werkivo',tag:'TALLER. DIGITAL. EFICIENTE.',user:'Usuario',pass:'Contraseña',login:'Entrar',logout:'Salir',
+app:'Werkivo',tag:'TALLER. DIGITAL. EFICIENTE.',user:'Usuario',pass:'Contraseña',login:'Entrar',logout:'Salir',setPasswordTitle:'Establecer contraseña',setPasswordFreshHint:'Esta cuenta aún no tiene contraseña. Elija una ahora.',setPasswordLegacyHint:'Esta cuenta todavía usa una contraseña predeterminada que es pública en el historial del código fuente de esta app. Elija una nueva ahora.',newPassword:'Nueva contraseña',newPasswordConfirm:'Confirmar nueva contraseña',setPasswordTooShort:'La contraseña debe tener al menos 6 caracteres.',setPasswordMismatch:'Las contraseñas no coinciden.',setPasswordStillDefault:'Elija una contraseña distinta de la predeterminada anterior.',
 cashSale:'Venta al contado',netParts:'Neto recambios',netLabor:'Neto mano de obra',vat19:'IVA 19%',
 dash:'Hoy',todayBoard:'Hoy',carsInShop:'Coches en el taller',openJobs:'Órdenes abiertas',todayAppts:'Citas hoy',lowStock:'Stock bajo',sales:'Ventas',netApprox:'Neto aprox.',
 stockAlert:'Aviso de stock',maintDue:'Mantenimiento pendiente',
@@ -186,7 +186,7 @@ invoiceNote:'Las facturas legales de Alemania permanecen en alemán.',
 saved:'Guardado',backup:'Exportar copia',sync:'Sincronizar nube',reset:'Borrar datos demo'
 });
 window.WP_I18N.tr=Object.assign({},window.WP_I18N.de,{
-  tag:'ATÖLYE. DİJİTAL. VERİMLİ.',user:'Kullanıcı adı',pass:'Şifre',login:'Giriş',logout:'Çıkış',
+  tag:'ATÖLYE. DİJİTAL. VERİMLİ.',user:'Kullanıcı adı',pass:'Şifre',login:'Giriş',logout:'Çıkış',setPasswordTitle:'Şifre belirle',setPasswordFreshHint:'Bu hesabın henüz şifresi yok. Şimdi bir tane seçin.',setPasswordLegacyHint:'Bu hesap hâlâ, bu uygulamanın herkese açık kaynak kodu geçmişinde görünen varsayılan bir şifre kullanıyor. Şimdi yeni bir şifre seçin.',newPassword:'Yeni şifre',newPasswordConfirm:'Yeni şifreyi onayla',setPasswordTooShort:'Şifre en az 6 karakter olmalı.',setPasswordMismatch:'Şifreler eşleşmiyor.',setPasswordStillDefault:'Eski varsayılandan farklı bir şifre seçin.',
   dash:'Bugün',todayBoard:'Bugün',carsInShop:'Atölyedeki araçlar',openJobs:'Açık işler',todayAppts:'Bugünkü randevular',lowStock:'Düşük stok',sales:'Ciro',
   customers:'Müşteriler',vehicles:'Araçlar',repairs:'İş emirleri',appointments:'Randevular',
   estimates:'Teklifler',invoices:'Faturalar ve peşin satış',purchases:'Alımlar',inventory:'Depo ve parçalar',
@@ -197,7 +197,7 @@ window.WP_I18N.tr=Object.assign({},window.WP_I18N.de,{
   invoiceNote:'Aktif firma Almanya’daysa fatura Almanca basılır.'
 });
 window.WP_I18N.sr=Object.assign({},window.WP_I18N.de,{
-  tag:'RADIONICA. DIGITALNO. EFIKASNO.',user:'Korisničko ime',pass:'Lozinka',login:'Prijava',logout:'Odjava',
+  tag:'RADIONICA. DIGITALNO. EFIKASNO.',user:'Korisničko ime',pass:'Lozinka',login:'Prijava',logout:'Odjava',setPasswordTitle:'Postavi lozinku',setPasswordFreshHint:'Ovaj nalog još uvek nema lozinku. Izaberite je sada.',setPasswordLegacyHint:'Ovaj nalog i dalje koristi podrazumevanu lozinku koja je javna u istoriji izvornog koda ove aplikacije. Izaberite novu sada.',newPassword:'Nova lozinka',newPasswordConfirm:'Potvrdi novu lozinku',setPasswordTooShort:'Lozinka mora imati najmanje 6 karaktera.',setPasswordMismatch:'Lozinke se ne podudaraju.',setPasswordStillDefault:'Izaberite drugu lozinku umesto stare podrazumevane.',
   dash:'Danas',todayBoard:'Danas',carsInShop:'Vozila u radionici',openJobs:'Otvoreni nalozi',todayAppts:'Termini danas',lowStock:'Niska zaliha',sales:'Promet',
   customers:'Klijenti',vehicles:'Vozila',repairs:'Nalozi',appointments:'Termini',
   estimates:'Ponude',invoices:'Računi i gotovina',purchases:'Nabavke',inventory:'Magacin i delovi',
@@ -208,7 +208,7 @@ window.WP_I18N.sr=Object.assign({},window.WP_I18N.de,{
   invoiceNote:'Ako je aktivna firma u Nemačkoj, račun ostaje na nemačkom.'
 });
 window.WP_I18N.ru=Object.assign({},window.WP_I18N.de,{
-  tag:'МАСТЕРСКАЯ. ЦИФРОВО. ЭФФЕКТИВНО.',user:'Логин',pass:'Пароль',login:'Вход',logout:'Выход',
+  tag:'МАСТЕРСКАЯ. ЦИФРОВО. ЭФФЕКТИВНО.',user:'Логин',pass:'Пароль',login:'Вход',logout:'Выход',setPasswordTitle:'Установить пароль',setPasswordFreshHint:'У этой учётной записи ещё нет пароля. Выберите его сейчас.',setPasswordLegacyHint:'Эта учётная запись всё ещё использует пароль по умолчанию, который виден в публичной истории исходного кода приложения. Выберите новый пароль сейчас.',newPassword:'Новый пароль',newPasswordConfirm:'Подтвердите новый пароль',setPasswordTooShort:'Пароль должен содержать не менее 6 символов.',setPasswordMismatch:'Пароли не совпадают.',setPasswordStillDefault:'Выберите пароль, отличный от старого по умолчанию.',
   dash:'Сегодня',todayBoard:'Сегодня',carsInShop:'Авто в цехе',openJobs:'Открытые заказы',todayAppts:'Записи на сегодня',lowStock:'Мало на складе',sales:'Оборот',
   customers:'Клиенты',vehicles:'Автомобили',repairs:'Заказ-наряды',appointments:'Записи',
   estimates:'Сметы',invoices:'Счета и наличные',purchases:'Закупки',inventory:'Склад и запчасти',
@@ -219,7 +219,7 @@ window.WP_I18N.ru=Object.assign({},window.WP_I18N.de,{
   invoiceNote:'Если фирма в Германии, счёт печатается по-немецки.'
 });
 window.WP_I18N.pl=Object.assign({},window.WP_I18N.de,{
-  tag:'WARSZTAT. CYFROWO. EFEKTYWNIE.',user:'Użytkownik',pass:'Hasło',login:'Zaloguj',logout:'Wyloguj',
+  tag:'WARSZTAT. CYFROWO. EFEKTYWNIE.',user:'Użytkownik',pass:'Hasło',login:'Zaloguj',logout:'Wyloguj',setPasswordTitle:'Ustaw hasło',setPasswordFreshHint:'To konto nie ma jeszcze hasła. Wybierz je teraz.',setPasswordLegacyHint:'To konto nadal używa domyślnego hasła, które jest widoczne w publicznej historii kodu źródłowego tej aplikacji. Wybierz teraz nowe.',newPassword:'Nowe hasło',newPasswordConfirm:'Potwierdź nowe hasło',setPasswordTooShort:'Hasło musi mieć co najmniej 6 znaków.',setPasswordMismatch:'Hasła nie są identyczne.',setPasswordStillDefault:'Wybierz inne hasło niż stare domyślne.',
   dash:'Dziś',todayBoard:'Dziś',carsInShop:'Auta w warsztacie',openJobs:'Otwarte zlecenia',todayAppts:'Terminy dziś',lowStock:'Niski stan',sales:'Obrót',
   customers:'Klienci',vehicles:'Pojazdy',repairs:'Zlecenia',appointments:'Terminy',
   estimates:'Oferty',invoices:'Faktury i sprzedaż gotówkowa',purchases:'Zakupy',inventory:'Magazyn i części',

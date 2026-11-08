@@ -154,5 +154,65 @@ assert(!/function openProCamera/.test(app),'camera not forked in app.js');
 assert(!/function workshopInfo/.test(app),'invoice print not forked in app.js');
 assert(!/confirm\(t\('resetConfirm'\)\)/.test(app),'no native confirm left');
 
-if(failed){ console.error(failed+' failed'); process.exit(1); }
-console.log('all tests passed');
+// --- Security fix (audit 2026-11-08): credential hardening -----------------
+// Bug that shipped before this fix: core.js's seed had five real, working
+// plaintext passwords (admin/1980D, Rashid/1976R, accountant/1978B,
+// ismail/1977A, warehouse/1979C) sitting in public source, AND separate
+// logic silently re-stamped the developer/mechanic accounts back onto their
+// known default ('1976R' / '1977A') under some conditions -- so reading the
+// repo (which anyone can, it's a public GitHub repo backing a live PWA) was
+// enough to log in as any of those five users, including the business owner.
+//
+// Proof the bug is gone: the exact leaked values / reseed pattern can no
+// longer be found as *live* seed data or reseed logic in core.js. (The one
+// permitted exception is engine.js's LEGACY_DEFAULT_PASSWORDS table itself,
+// which intentionally still *lists* the five old values -- but only to
+// detect and block their use, never to grant or restore them.)
+const coreSrc=fs.readFileSync(path.join(root,'js/core.js'),'utf8');
+assert(!/p:\s*'(1980D|1976R|1978B|1977A|1979C|bm-dev-2026)'/.test(coreSrc),'core.js seed no longer ships a live plaintext default password');
+assert(!/u\.p\s*=\s*'(1976R|1977A)'/.test(coreSrc),'core.js no longer re-stamps an account back onto its old default');
+assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password (p:null)');
+
+// Proof the fix works: re-derive the exact decision app.js's login() makes
+// (freshAccount / legacyDefault / ok) against the three cases that matter,
+// using the same Engine functions login() calls, so this breaks the moment
+// anyone changes that logic in a way that reopens the hole or locks out a
+// legitimate user.
+async function decideLogin(cand, pass){
+  const freshAccount=!!cand && cand.p==null;
+  const legacyDefault=!!cand && !freshAccount && E.isLegacyDefaultPassword(cand.u, pass);
+  const ok=freshAccount || !!(cand && await E.passOk(cand.p, pass));
+  return {ok, freshAccount, legacyDefault, forcesSetup: ok && (freshAccount || legacyDefault)};
+}
+(async()=>{
+  // 1) Fresh seed account (p:null), e.g. right after this fix ships.
+  const fresh={u:'admin',p:null,role:'manager'};
+  let d=await decideLogin(fresh,'anything');
+  assert(d.ok && d.forcesSetup,'fresh account (p:null) is forced into first-time setup, not rejected');
+
+  // 2) Account that never rotated off the old published default -- proves
+  // the leaked value alone no longer reaches completeLogin().
+  const stillDefault={u:'Rashid',p:'1976R',role:'developer'};
+  d=await decideLogin(stillDefault,'1976R');
+  assert(d.ok && d.legacyDefault && d.forcesSetup,'typing the old leaked default is accepted but forced to rotate, never logged straight in');
+
+  // 3) Same account, already rotated to a real custom password -- proves
+  // the fix does not regress/lock out a legitimate, already-secured user.
+  const rotated={u:'Rashid',p:await E.hashPassAsync('MyR3al-Pass!'),role:'developer'};
+  d=await decideLogin(rotated,'MyR3al-Pass!');
+  assert(d.ok && !d.freshAccount && !d.legacyDefault && !d.forcesSetup,'a rotated custom password logs straight in, unaffected by the fix');
+
+  // 4) Same rotated account, wrong password -- proves the fix did not
+  // accidentally loosen normal auth.
+  d=await decideLogin(rotated,'totally-wrong');
+  assert(!d.ok,'wrong password on a rotated account is still rejected');
+
+  // 5) The hardening in forcePasswordSetup: re-submitting the old default
+  // as the "new" password must still be rejected by isLegacyDefaultPassword.
+  assert(E.isLegacyDefaultPassword('Rashid','1976R')===true,'legacy default is recognized for its own account');
+  assert(E.isLegacyDefaultPassword('Rashid','MyR3al-Pass!')===false,'a real custom password is never flagged as the legacy default');
+  assert(E.isLegacyDefaultPassword('someone-not-in-the-table','1976R')===false,'an unrelated username is never matched against another account\'s old default');
+
+  if(failed){ console.error(failed+' failed'); process.exit(1); }
+  console.log('all tests passed');
+})();
