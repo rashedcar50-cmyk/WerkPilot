@@ -25,17 +25,12 @@ companies they can see)
 | ID | Name | Country | Evidence of real use |
 |---|---|---|---|
 | `de` | TABAH AUTO — Autoservice und Autoteile UG | DE | **Real.** The app's own settings carry a real, specific registered business name, address, court of registration, and banking/tax identifiers for this entity (not shown here — financial identifiers, already known to the owner, not meaningfully protected by omission but also not useful to restate) that do not exist for `es` at all. This is the company the live app is actually configured for. |
-| `es` | Auto Service España | ES | **No evidence of real use found in the code.** Carries no equivalent registered-business details anywhere in settings — just a placeholder name and country code. Appears to be scaffolding for a possible future second location, not an active one. |
+| `es` | Auto Service España | ES | **Confirmed by the owner (2026-11-08): created by them, currently unused.** Kept as-is, with all its existing data — not archived, not merged, not deleted. |
 
-**This pass could not confirm actual record counts** (how many real
-customers/invoices/etc. exist under each company id in the live
-database) without the blocked production read above. **If you want
-this confirmed precisely**, the fastest way is the Supabase dashboard's
-own Table Editor (`customers`, `vehicles`, `invoices`, …, filtered by
-`company_id`) — a minute of looking, with your own access, settles it
-definitively. Everything below treats `es` as not-actively-used based
-on the code evidence, but is written so it's trivial to extend to `es`
-later if that turns out to be wrong.
+No code change was needed to honor this — `migration-fix-rls.sql` and
+`provision-user.js` already treat every company id uniformly; "unused"
+only affects who gets granted access to it (nobody, for now, except the
+owner), never whether its data is touched.
 
 ### Accounts (from the same seed — no passwords or keys shown)
 
@@ -55,24 +50,32 @@ grant (via `provision-user.js`, added in `fix-report-07`) is a
 linked to a cloud identity and syncing through RLS — it does not change
 anything about local-only usage.
 
-## Proposed cloud access grant per account (a recommendation — nothing
-applied)
+## Cloud access grant per account — owner's decision (2026-11-08)
 
-Per the instruction not to grant both companies automatically, and
-given `es` shows no evidence of real use:
+`es` (Auto Service España) is confirmed by the owner as a real company
+they created, currently unused but **to be kept with all its data** —
+not archived, not deleted, not merged into `de`. `de` (TABAH AUTO)
+stays the default company (already true in the existing code —
+`db.companies[0]` is `de`, no change needed). The owner's own account
+gets both companies; every staff account gets only the company its
+real work is tied to, per their role, with company data kept separated
+(already enforced by `migration-fix-rls.sql`'s per-row `company_id`
+check — confirmed by `rls-test.js`: a grant for one company cannot read
+or write another).
 
-| Account | Proposed `company_ids` grant | Role (for reference/future use) | Reasoning |
+| Account | `company_ids` grant | Role | Reasoning |
 |---|---|---|---|
-| `Rashid` | `de` | `developer` | Real business is `de` only; grant `es` later only if the owner confirms it becomes a real second location |
-| `admin` | `de` | `manager` | Same |
-| `accountant` | `de` | `accountant` | All real invoicing/bookkeeping activity found is under `de` |
-| `ismail` | `de` | `mechanic` | Day-to-day repair work is tied to a physical location; no evidence of `es` operations |
-| `warehouse` | `de` | `warehouse` | Inventory/purchases are tied to a physical location, same reasoning |
+| `Rashid` | `de,es` | `developer` | Owner — explicit access to both companies |
+| `admin` | `de` | `manager` | Day-to-day operations are in `de` |
+| `accountant` | `de` | `accountant` | All real invoicing/bookkeeping activity is under `de` |
+| `ismail` | `de` | `mechanic` | Repair work is tied to the `de` location |
+| `warehouse` | `de` | `warehouse` | Inventory/purchases are tied to the `de` location |
 
-This is a **recommendation**, not an action taken — no account has been
-granted anything in production. The decision to grant `de` only (vs.
-`de,es` to exactly preserve today's unrestricted local access) is the
-owner's to make; `provision-user.js` supports either with one command
+This table is ready to execute via `provision-user.js` — one command
+per account, run by the owner with their own `service_role` key (see
+"What's left" below). No account has been granted anything in
+production yet; this table records the decision so provisioning is a
+single pass, not five separate judgment calls.
 per account, once each person has linked their own cloud identity.
 
 ## 2. Email sending — options, what's needed, what it costs
