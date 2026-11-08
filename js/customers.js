@@ -164,7 +164,7 @@ function vehicles(){
  listShareBar('vehicles')+
  table([t('photo'),t('customer'),t('plate'),'VIN',t('make'),t('model'),t('year'),t('action')],rows.map(v=>[
    carThumb(v),
-   customerName(v.customerId),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
+   esc(customerName(v.customerId)),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
    canEdit()?`<button class="btn small" onclick="editVehicle('${v.id}')">${t('edit')}</button> <button class="btn small" onclick="addVehiclePhoto('${v.id}')">${t('photo')}</button>`:'—'
  ]), 'vehicles');
  if(canEdit()){

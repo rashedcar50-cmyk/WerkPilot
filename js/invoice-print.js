@@ -79,15 +79,59 @@ function nextKdNr(){
   const n=(nums.length?Math.max(...nums):1000)+1;
   return String(n).padStart(4,'0');
 }
+// Security/correctness fix (audit 2026-11-08): preview/print must never
+// write to the database -- it used to assign and *save* a real customer
+// number (kdNr) as a side effect of simply opening a preview or rendering
+// a PDF/email, which meant previewing invoices in any order could quietly
+// hand out customer numbers out of order, with no invoice ever actually
+// having been saved. Assigning a customer's permanent number now happens
+// exactly once, deliberately, at the moment an invoice is actually saved
+// for them (see assignKdNr below). This function is now read-only: if a
+// customer still has no number yet, it fills one in for THIS render only,
+// without writing or saving anything.
 function ensureKd(cust){
   if(!cust || !cust.id) return cust||{};
-  if(!cust.kdNr && !cust.number){
-    cust.kdNr=nextKdNr();
-    const i=db.customers.findIndex(x=>x.id===cust.id);
-    if(i>=0){ db.customers[i].kdNr=cust.kdNr; save(); }
-  }
+  if(!cust.kdNr && !cust.number) return Object.assign({}, cust, {kdNr:nextKdNr()});
   return cust;
 }
+function assignKdNr(custId){
+  if(!custId) return;
+  const i=(db.customers||[]).findIndex(x=>x.id===custId);
+  if(i<0) return;
+  const cust=db.customers[i];
+  if(cust.kdNr || cust.number) return;
+  cust.kdNr=nextKdNr();
+  save();
+  try{ if(typeof upsertCustomerCloud==='function') upsertCustomerCloud(cust); }catch(e){}
+}
+window.assignKdNr=assignKdNr;
+// Correctness fix (audit 2026-11-08): single source of truth for an
+// invoice's net/VAT/total from its lines + discount. Before this, the
+// editor (on save) and lookup.js's createInvoiceAuto applied one flat tax
+// rate to the whole discounted sum, ignoring each line's own tax rate --
+// while this print module already computed VAT per line's own rate with
+// the discount prorated across rate buckets. A mixed-rate invoice could
+// therefore book one total (in the journal/debt list) and print a
+// different one on the document handed to the customer. All three call
+// sites now compute totals through this one function.
+function computeInvoiceTotals(lines, discount){
+  const rows=(lines||[]).map(ln=>({sum:Math.round(lineSum(ln)*100)/100, tax:Number(ln.tax||19), labor:isLaborLine(ln)}));
+  const teile=Math.round(rows.filter(l=>!l.labor).reduce((s,l)=>s+l.sum,0)*100)/100;
+  const leist=Math.round(rows.filter(l=>l.labor).reduce((s,l)=>s+l.sum,0)*100)/100;
+  const disc=Number(discount||0);
+  const netBefore=teile+leist;
+  const net=Math.round((netBefore-disc)*100)/100;
+  const vat19=rows.filter(l=>l.tax===19).reduce((s,l)=>s+l.sum*0.19,0);
+  const vat7=rows.filter(l=>l.tax===7).reduce((s,l)=>s+l.sum*0.07,0);
+  const vatOther=rows.filter(l=>![19,7].includes(l.tax)).reduce((s,l)=>s+l.sum*(l.tax||0)/100,0);
+  const factor=netBefore>0?net/netBefore:1;
+  const vat19s=Math.round(vat19*factor*100)/100;
+  const vat7s=Math.round(vat7*factor*100)/100;
+  const vat=Math.round((vat19+vat7+vatOther)*factor*100)/100;
+  const total=Math.round((net+vat)*100)/100;
+  return {teile,leist,net,vat,vat19s,vat7s,total};
+}
+window.computeInvoiceTotals=computeInvoiceTotals;
 function deDate(d){
   try{ return new Date(d||Date.now()).toLocaleDateString('de-DE'); }catch(e){ return d||''; }
 }
@@ -104,7 +148,7 @@ function lineSum(ln){ return Number(ln.qty||1)*Number(ln.price||0); }
 function isLaborLine(ln){ if(ln.kind==='parts'||ln.kind==='قطعة'||ln.kind==='Ersatzteil') return false; if(ln.kind==='labor'||ln.kind==='اجر'||ln.kind==='أجور') return true; return /lohn|أجر|اجور|أجور|عمالة|arbeit|Arbeitswert|Leist/i.test(String(ln.name||ln.sku||ln.kind||'')); }
 function invoiceModel(x){
   const w=workshopInfo();
-  const cust=customerOfVehicle(x.vehicleId) || db.customers.find(c=>c.id===x.customerId) || {};
+  let cust=customerOfVehicle(x.vehicleId) || db.customers.find(c=>c.id===x.customerId) || {};
   const veh=vehicleOf(x.vehicleId) || {};
   const lines=(x.lines&&x.lines.length)?x.lines:[{sku:'',name:'Arbeitswert',qty:1,price:x.labor||0,tax:19}].filter(l=>lineSum(l)||l.name);
   const filled=lines.map((ln,i)=>{
@@ -116,20 +160,8 @@ function invoiceModel(x){
       tax:Number(ln.tax||x.tax||19), sum:Math.round(lineSum(ln)*100)/100
     };
   });
-  const teile=Math.round(filled.filter(l=>l.kind!=='Arbeitsleistung').reduce((s,l)=>s+l.sum,0)*100)/100;
-  const leist=Math.round(filled.filter(l=>l.kind==='Arbeitsleistung').reduce((s,l)=>s+l.sum,0)*100)/100;
-  const disc=Number(x.discount||0);
-  const netBefore=teile+leist;
-  const net=Math.round((netBefore-disc)*100)/100;
-  const vat19=filled.filter(l=>Number(l.tax)===19).reduce((s,l)=>s+l.sum*0.19,0);
-  const vat7=filled.filter(l=>Number(l.tax)===7).reduce((s,l)=>s+l.sum*0.07,0);
-  const vatOther=filled.filter(l=>![19,7].includes(Number(l.tax))).reduce((s,l)=>s+l.sum*(Number(l.tax)||0)/100,0);
-  const factor=netBefore>0?net/netBefore:1;
-  const vat=Math.round((vat19+vat7+vatOther)*factor*100)/100;
-  const vat19s=Math.round(vat19*factor*100)/100;
-  const vat7s=Math.round(vat7*factor*100)/100;
-  const total=Math.round((net+vat)*100)/100;
-  ensureKd(cust);
+  const {teile,leist,net,vat,vat19s,vat7s,total}=computeInvoiceTotals(lines, x.discount);
+  cust=ensureKd(cust);
   const kd=cust.kdNr||cust.number||'';
   const beleg=String(x.number||'').replace(/^RE-\d+-/,'') || x.number || '';
   const repair=(db.repairs||[]).find(r=>r.id===x.repairId) || (db.repairs||[]).filter(r=>r.vehicleId===x.vehicleId).slice(-1)[0];

@@ -115,7 +115,20 @@
     if(!u) return null;
     return {u:u.u,name:u.name,role:u.role,companies:u.companies||null};
   }
-  W.Engine={norm,is,isOpen,flow,validateVehicle,validateInvoice,migrate,touch,index,looksHashed,hashPass,hashPassAsync,passOk,publicUser,ALIAS,OPEN};
+  // Security fix (audit 2026-11-08): these five values were this app's
+  // real, shipped-in-source default passwords until this commit (see
+  // core.js's seed.users). Keeping them here, in exactly one place, is
+  // deliberate and safe: this table is read-only and only ever used to
+  // *detect* that an installation is still on a publicly-known value so
+  // the login flow can force a one-time rotation -- it never grants
+  // access on its own (passOk/the stored password still has to match
+  // first), and nothing re-seeds these values anywhere anymore.
+  const LEGACY_DEFAULT_PASSWORDS={admin:'1980D',Rashid:'1976R',accountant:'1978B',ismail:'1977A',warehouse:'1979C'};
+  function isLegacyDefaultPassword(username, plain){
+    const legacy=LEGACY_DEFAULT_PASSWORDS[username];
+    return legacy!=null && String(plain)===legacy;
+  }
+  W.Engine={norm,is,isOpen,flow,validateVehicle,validateInvoice,migrate,touch,index,looksHashed,hashPass,hashPassAsync,passOk,publicUser,isLegacyDefaultPassword,ALIAS,OPEN};
 })(window.WP=window.WP||{});
 window.normStatus=function(s){ return (WP.Engine&&WP.Engine.norm(s))||s; };
 window.isOpenStatus=function(s){ return !!(WP.Engine&&WP.Engine.isOpen(s)); };

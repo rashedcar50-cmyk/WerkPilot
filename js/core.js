@@ -2,13 +2,31 @@
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const storeKey='baymeister_v1';
+// Security fix (audit 2026-11-08): these five accounts used to ship with
+// real, working plaintext passwords baked directly into this public
+// source file -- readable by anyone who opened the deployed site's dev
+// tools or the public GitHub repo, forever, even after rotation, because
+// git history keeps every past commit. `p:null` means "this account
+// exists but has no password yet" -- app.js's login handler treats that
+// as "needs first-time setup" and walks the user through picking a real
+// password before granting a session, rather than failing the login or
+// (the old behavior) silently accepting a value anyone could read in
+// source. See the freshAccount/legacyDefault checks in app.js's login()
+// and engine.js's LEGACY_DEFAULT_PASSWORDS, which also forces a one-time
+// rotation for any *existing* installation still using the old published
+// values. Critically: this `{...base,...raw}` merge in load() below is a
+// shallow spread, so an existing install's own persisted `raw.users`
+// (with whatever real password each account actually has) always wins
+// over this fresh seed -- `p:null` only ever applies to a genuinely new
+// install with no stored data yet. See tests/run.js's "account migration"
+// section for a test that pins this down directly.
 const seed={
  users:[
-  {u:'admin',p:'1980D',name:'Admin',role:'manager'},
-  {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'},
-  {u:'accountant',p:'1978B',name:'Buchhaltung',role:'accountant'},
-  {u:'ismail',p:'1977A',name:'Ismail',role:'mechanic'},
-  {u:'warehouse',p:'1979C',name:'Lager',role:'warehouse'}
+  {u:'admin',p:null,name:'Admin',role:'manager'},
+  {u:'Rashid',p:null,name:'Rashid Tabah',role:'developer'},
+  {u:'accountant',p:null,name:'Buchhaltung',role:'accountant'},
+  {u:'ismail',p:null,name:'Ismail',role:'mechanic'},
+  {u:'warehouse',p:null,name:'Lager',role:'warehouse'}
  ],
  companies:[
   {id:'de',name:'TABAH AUTO — Autoservice und Autoteile UG',country:'DE',currency:'EUR',docLang:'de'},
@@ -55,6 +73,19 @@ const seed={
  audit:[],
  settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopBrand:'TABAH AUTO',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
 };
+// Correctness fix (audit 2026-11-08): this const used to sit AFTER
+// `let db=load()` below -- but load() calls ensureCompanyProfiles(), which
+// calls defaultWorkshopProfile(), which reads this very array. Referencing
+// a `const` before its own declaration has executed throws a
+// ReferenceError (temporal dead zone), which load()'s outer try/catch
+// swallowed silently, making it fall back to `clone(seed)` -- discarding
+// ALL persisted data (every customer, vehicle, repair, invoice) on EVERY
+// single page load, with no visible error. Moving this one array literal
+// above `let db=load()` is the entire fix: nothing else changes. See
+// tests/run.js's "account migration" section for a test that pins this
+// down directly (it reproduces the data loss and proves this fix keeps it
+// from happening).
+const WORKSHOP_KEYS=['workshopBrand','workshopName','workshopAddress','workshopPhone','workshopEmail','workshopTaxId','workshopSteuerNr','workshopCourt','workshopOwner','workshopBank','workshopIban','workshopAccountHolder','workshopHrb','workshopBic','workshopSitz','hourlyRate','invoiceSeq','auftragSeq','paymentDays','invoiceTpl','printPaper','printMargin','printColor'];
 let db=load(), session=null;
 try{ stripTstBranding(db); try{migrateLegalName(db);}catch(e){}; }catch(e){}
 
@@ -91,16 +122,19 @@ function load(){
   restoreOpenAI(merged);
 
   if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
-  if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'});
+  // No known password is ever auto-injected here anymore -- see the note
+  // above seed.users. A missing developer account still gets created (the
+  // app needs one to function), just without a value anyone can read in
+  // source; app.js's first-time-setup flow asks for a real password
+  // before granting that account a session.
+  if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'Rashid',p:null,name:'Rashid Tabah',role:'developer'});
   merged.users.forEach(u=>{
     if(u.role==='developer' && (u.u==='owner' || u.u==='Rashid')){
       u.u='Rashid';
-      if(!u.p || u.p==='bm-dev-2026') u.p='1976R';
       if(!u.name || u.name==='صاحب الورشة / تطوير') u.name='Rashid Tabah';
     }
     if(u.role==='mechanic' && (u.u==='mechanic' || u.u==='ismail')){
       u.u='ismail';
-      if(!u.p) u.p='1977A';
       if(!u.name) u.name='Ismail';
     }
   });
@@ -110,7 +144,6 @@ function load(){
   return merged;
  }catch{return clone(seed)}
 }
-const WORKSHOP_KEYS=['workshopBrand','workshopName','workshopAddress','workshopPhone','workshopEmail','workshopTaxId','workshopSteuerNr','workshopCourt','workshopOwner','workshopBank','workshopIban','workshopAccountHolder','workshopHrb','workshopBic','workshopSitz','hourlyRate','invoiceSeq','auftragSeq','paymentDays','invoiceTpl','printPaper','printMargin','printColor'];
 function defaultWorkshopProfile(co, settings){
   const s=settings||(typeof db!=='undefined'&&db&&db.settings)||seed.settings;
   const isDe=co.id==='de' || co.country==='DE';

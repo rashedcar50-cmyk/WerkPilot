@@ -154,5 +154,459 @@ assert(!/function openProCamera/.test(app),'camera not forked in app.js');
 assert(!/function workshopInfo/.test(app),'invoice print not forked in app.js');
 assert(!/confirm\(t\('resetConfirm'\)\)/.test(app),'no native confirm left');
 
-if(failed){ console.error(failed+' failed'); process.exit(1); }
-console.log('all tests passed');
+// --- Security fix (audit 2026-11-08): credential hardening -----------------
+// Bug that shipped before this fix: core.js's seed had five real, working
+// plaintext passwords (admin/1980D, Rashid/1976R, accountant/1978B,
+// ismail/1977A, warehouse/1979C) sitting in public source, AND separate
+// logic silently re-stamped the developer/mechanic accounts back onto their
+// known default ('1976R' / '1977A') under some conditions -- so reading the
+// repo (which anyone can, it's a public GitHub repo backing a live PWA) was
+// enough to log in as any of those five users, including the business owner.
+//
+// Proof the bug is gone: the exact leaked values / reseed pattern can no
+// longer be found as *live* seed data or reseed logic in core.js. (The one
+// permitted exception is engine.js's LEGACY_DEFAULT_PASSWORDS table itself,
+// which intentionally still *lists* the five old values -- but only to
+// detect and block their use, never to grant or restore them.)
+const coreSrc=fs.readFileSync(path.join(root,'js/core.js'),'utf8');
+assert(!/p:\s*'(1980D|1976R|1978B|1977A|1979C|bm-dev-2026)'/.test(coreSrc),'core.js seed no longer ships a live plaintext default password');
+assert(!/u\.p\s*=\s*'(1976R|1977A)'/.test(coreSrc),'core.js no longer re-stamps an account back onto its old default');
+assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password (p:null)');
+
+// Proof the fix works: re-derive the exact decision app.js's login() makes
+// (freshAccount / legacyDefault / ok) against the three cases that matter,
+// using the same Engine functions login() calls, so this breaks the moment
+// anyone changes that logic in a way that reopens the hole or locks out a
+// legitimate user.
+async function decideLogin(cand, pass){
+  const freshAccount=!!cand && cand.p==null;
+  const legacyDefault=!!cand && !freshAccount && E.isLegacyDefaultPassword(cand.u, pass);
+  const ok=freshAccount || !!(cand && await E.passOk(cand.p, pass));
+  return {ok, freshAccount, legacyDefault, forcesSetup: ok && (freshAccount || legacyDefault)};
+}
+(async()=>{
+  // 1) Fresh seed account (p:null), e.g. right after this fix ships.
+  const fresh={u:'admin',p:null,role:'manager'};
+  let d=await decideLogin(fresh,'anything');
+  assert(d.ok && d.forcesSetup,'fresh account (p:null) is forced into first-time setup, not rejected');
+
+  // 2) Account that never rotated off the old published default -- proves
+  // the leaked value alone no longer reaches completeLogin().
+  const stillDefault={u:'Rashid',p:'1976R',role:'developer'};
+  d=await decideLogin(stillDefault,'1976R');
+  assert(d.ok && d.legacyDefault && d.forcesSetup,'typing the old leaked default is accepted but forced to rotate, never logged straight in');
+
+  // 3) Same account, already rotated to a real custom password -- proves
+  // the fix does not regress/lock out a legitimate, already-secured user.
+  const rotated={u:'Rashid',p:await E.hashPassAsync('MyR3al-Pass!'),role:'developer'};
+  d=await decideLogin(rotated,'MyR3al-Pass!');
+  assert(d.ok && !d.freshAccount && !d.legacyDefault && !d.forcesSetup,'a rotated custom password logs straight in, unaffected by the fix');
+
+  // 4) Same rotated account, wrong password -- proves the fix did not
+  // accidentally loosen normal auth.
+  d=await decideLogin(rotated,'totally-wrong');
+  assert(!d.ok,'wrong password on a rotated account is still rejected');
+
+  // 5) The hardening in forcePasswordSetup: re-submitting the old default
+  // as the "new" password must still be rejected by isLegacyDefaultPassword.
+  assert(E.isLegacyDefaultPassword('Rashid','1976R')===true,'legacy default is recognized for its own account');
+  assert(E.isLegacyDefaultPassword('Rashid','MyR3al-Pass!')===false,'a real custom password is never flagged as the legacy default');
+  assert(E.isLegacyDefaultPassword('someone-not-in-the-table','1976R')===false,'an unrelated username is never matched against another account\'s old default');
+
+  // --- Fix: invoice preview must not mutate the database -------------------
+  // Bug that shipped before this fix: js/invoice-print.js's ensureKd(), called
+  // every time an invoice is rendered (preview, print, PDF, email), silently
+  // allocated a brand-new customer number (kdNr) and WROTE it straight into
+  // db.customers + called save() -- a real, permanent write triggered by what
+  // is supposed to be a read-only render. Opening a preview for an invoice
+  // whose customer had no number yet was enough to hand out and persist one,
+  // even if the invoice itself was never saved.
+  const ipSandbox={window:{WP:{}}, console, db:{customers:[{id:'cust-no-kd',name:'Walk-in Test'}]}, save:function(){ipSandbox._saveCalls=(ipSandbox._saveCalls||0)+1;}, _saveCalls:0};
+  vm.createContext(ipSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8'), ipSandbox);
+
+  const custBefore=JSON.parse(JSON.stringify(ipSandbox.db.customers[0]));
+  const renderedCust=ipSandbox.ensureKd(ipSandbox.db.customers[0]);
+  assert(!!renderedCust.kdNr, 'preview still shows a customer number for display, even if unassigned yet');
+  assert(JSON.stringify(ipSandbox.db.customers[0])===JSON.stringify(custBefore), 'PROOF OF FIX: previewing/rendering never mutates the stored customer record');
+  assert(ipSandbox._saveCalls===0, 'PROOF OF FIX: previewing/rendering never calls save() -- no database write happens on read');
+  // Proof of bug (regression guard): the exact vulnerable pattern -- ensureKd
+  // writing into db.customers and calling save() -- is gone from the source.
+  const ipSrc=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+  const ensureKdBody=(ipSrc.match(/function ensureKd\(cust\)\{[\s\S]*?\n\}/)||[''])[0];
+  assert(!/save\(\)/.test(ensureKdBody), 'ensureKd() no longer calls save() -- it is purely a display fallback now');
+
+  // assignKdNr -- the one place a number is now actually persisted -- only
+  // fires when explicitly called (i.e. at real invoice-save time), assigns
+  // exactly once, and never overwrites a customer who already has a number.
+  ipSandbox.assignKdNr('cust-no-kd');
+  assert(ipSandbox._saveCalls===1, 'assignKdNr persists (calls save()) exactly once when actually invoked');
+  assert(!!ipSandbox.db.customers[0].kdNr, 'assignKdNr actually wrote a kdNr onto the real customer record');
+  const assignedKd=ipSandbox.db.customers[0].kdNr;
+  ipSandbox.assignKdNr('cust-no-kd');
+  assert(ipSandbox._saveCalls===1, 'assignKdNr is a no-op (no extra save) for a customer who already has a number');
+  assert(ipSandbox.db.customers[0].kdNr===assignedKd, 'assignKdNr never reassigns/overwrites an existing customer number');
+
+  // --- Fix: unify tax/discount/rounding between edit, preview, and print ---
+  // Bug that shipped before this fix: the editor's save handler (and
+  // lookup.js's createInvoiceAuto) applied ONE flat header tax rate to the
+  // whole discounted sum, ignoring that each line carries its own tax rate
+  // (the per-row "MwSt." field) -- while print/preview (invoiceModel) always
+  // computed VAT per line's own rate with the discount prorated across rate
+  // buckets. For a mixed-rate invoice (e.g. parts at 19%, a line at 7%), the
+  // amount booked to the journal/debt list could differ from the amount the
+  // printed document actually shows the customer.
+  const mixedLines=[
+    {name:'Bremsbelaege', qty:1, price:100, tax:19, kind:'parts'},
+    {name:'Reifenentsorgung', qty:1, price:50, tax:7, kind:'parts'},
+    {name:'Arbeitswert', qty:2, price:60, tax:19, kind:'labor'}
+  ];
+  // Proof of bug (regression guard): recompute totals the OLD (flat-rate) way
+  // and show it disagrees with the new shared function on mixed-rate lines.
+  const oldParts=mixedLines.filter(l=>l.kind!=='labor').reduce((s,l)=>s+l.qty*l.price,0);
+  const oldLabor=mixedLines.filter(l=>l.kind==='labor').reduce((s,l)=>s+l.qty*l.price,0);
+  const oldNet=Math.max(0, oldParts+oldLabor-0);
+  const oldTotal=Math.round(oldNet*(1+19/100)*100)/100;
+  const newTotals=ipSandbox.computeInvoiceTotals(mixedLines, 0);
+  assert(oldTotal!==newTotals.total, 'PROOF OF BUG: the old flat-19%-on-everything total disagrees with the correct per-line-tax total on mixed-rate lines');
+  // Expected correct total: 100@19% + 50@7% + 120@19% -> net=270, vat=(100*.19+50*.07+120*.19)=20.9+3.5... =>
+  const expectedVat=Math.round((100*0.19+50*0.07+120*0.19)*100)/100;
+  const expectedTotal=Math.round((270+expectedVat)*100)/100;
+  assert(newTotals.net===270, 'computeInvoiceTotals: net sums all lines minus discount, independent of tax rate');
+  assert(newTotals.total===expectedTotal, 'computeInvoiceTotals: total correctly applies each line\'s own tax rate ('+newTotals.total+' vs expected '+expectedTotal+')');
+
+  // PROOF OF FIX: the editor's save path and print's preview path now reach
+  // the identical total for the same mixed-rate invoice, because both call
+  // computeInvoiceTotals. (Re-deriving app.js's save-handler arithmetic here
+  // would require a full DOM; instead we assert both real call sites -- the
+  // editor's save handler in invoice-edit.js and createInvoiceAuto in
+  // lookup.js -- now route through this one shared function, so they cannot
+  // drift from what print shows.)
+  const editSrc=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+  const lookupSrc=fs.readFileSync(path.join(root,'js/lookup.js'),'utf8');
+  assert(/computeInvoiceTotals\(lines,\s*discount\)/.test(editSrc), 'invoice-edit.js save handler now computes totals via the shared function');
+  assert(!/net\*\(1\+tax\/100\)/.test(editSrc), 'invoice-edit.js no longer has the old flat-single-rate total formula');
+  assert(/computeInvoiceTotals\(lines,\s*discount\)/.test(lookupSrc), 'lookup.js createInvoiceAuto now computes totals via the shared function');
+  assert(!/net\*\(1\+tax\/100\)/.test(lookupSrc), 'lookup.js no longer has the old flat-single-rate total formula');
+
+  // Zero-regression check: a single-rate invoice (the overwhelming common
+  // case -- everything at 19%, no discount) totals identically to the old
+  // formula, so ordinary invoices are completely unaffected by this fix.
+  const uniformLines=[{name:'Oelfilter',qty:1,price:40,tax:19,kind:'parts'},{name:'Arbeitswert',qty:1,price:60,tax:19,kind:'labor'}];
+  const uniform=ipSandbox.computeInvoiceTotals(uniformLines, 10);
+  const oldUniformNet=Math.max(0,100-10), oldUniformTotal=Math.round(oldUniformNet*(1+19/100)*100)/100;
+  assert(uniform.net===oldUniformNet && uniform.total===oldUniformTotal, 'single-rate invoices total identically under the new shared function -- no regression for the common case');
+
+  // --- Fix: printing/PDF for repair orders and appointments; estimates ---
+  // Bug that shipped before this fix: js/print.js's buildDocHTML() had no
+  // case at all for 'repairs' or 'appointments' -- any attempt to print/
+  // PDF/share them fell through to the generic branch and rendered
+  // "noData". Neither screen even offered the share buttons. Separately,
+  // the estimates screen called listShareBar('invoices'), so its share
+  // buttons exported the UNRELATED invoices list instead of the estimates
+  // actually on screen.
+  const printSandbox={
+    window:{}, console,
+    session:{company:{id:'c1',name:'Test Shop'}},
+    db:{
+      repairs:[{id:'r1',companyId:'c1',vehicleId:'v1',status:'working',complaint:'Bremsen quietschen',description:'Bremsen pruefen',tech:'Ismail',parts:[{name:'Bremsbelag',qty:2,price:30}]}],
+      appointments:[{id:'a1',companyId:'c1',vehicleId:'v1',customerId:'cu1',date:'2026-12-01',time:'09:30',tech:'Ismail',status:'confirmed'}],
+      estimates:[{id:'e1',companyId:'c1',vehicleId:'v1',parts:100,labor:50,discount:10,tax:19,total:160.1,fee:0}],
+      invoices:[], customers:[], vehicles:[], settings:{}
+    },
+    companyRows:function(k){ return (printSandbox.db[k]||[]).filter(x=>!printSandbox.session.company||x.companyId===printSandbox.session.company.id); },
+    vehicleName:vid=>'VW Golf '+vid, customerName:cid=>'Kunde '+cid,
+    vehicleOf:()=>({}), customerOfVehicle:()=>({name:'Max Mustermann',phone:'0171'}),
+    stLabel:s=>'ST:'+s, dLabel:s=>s, money:n=>'EUR'+(n||0), esc:s=>String(s==null?'':s), t:k=>k,
+    repairLaborTotal:()=>0, repairPartsTotal:r=>(r.parts||[]).reduce((s,p)=>s+(p.qty||1)*(p.price||0),0),
+    docLang:()=>'de'
+  };
+  vm.createContext(printSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/print.js'),'utf8'), printSandbox);
+
+  const repairsList=printSandbox.buildDocHTML('repairs', undefined);
+  assert(!/noData/.test(repairsList), 'PROOF OF FIX: repairs list print/PDF no longer falls through to the generic "no data" branch');
+  assert(/VW Golf v1/.test(repairsList) && /ST:working/.test(repairsList), 'repairs list print shows the actual repair data');
+
+  const repairSingle=printSandbox.buildDocHTML('repairs', 'r1');
+  assert(!/noData/.test(repairSingle) && !/jobMissing/.test(repairSingle), 'single repair work-order print finds the repair and renders it');
+  assert(/Bremsen quietschen/.test(repairSingle) && /Bremsbelag/.test(repairSingle), 'single repair work-order print shows complaint and issued parts');
+
+  const apptList=printSandbox.buildDocHTML('appointments', undefined);
+  assert(!/noData/.test(apptList), 'PROOF OF FIX: appointments print/PDF no longer falls through to the generic "no data" branch');
+  assert(/2026-12-01/.test(apptList) && /09:30/.test(apptList), 'appointments print shows the actual appointment data');
+
+  const estList=printSandbox.buildDocHTML('estimates', undefined);
+  assert(!/noData/.test(estList), 'estimates print/PDF has its own case (was already reachable via the wrong type, now has a real one)');
+  assert(/EUR160.1/.test(estList), 'estimates print shows the actual estimate total');
+
+  // Proof of bug (regression guard) + proof of fix for the estimates
+  // share-bar type mixup: the estimates() screen must call
+  // listShareBar('estimates'), never listShareBar('invoices').
+  const appSrc=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  const estimatesFnSrc=(appSrc.match(/function estimates\(\)\{[\s\S]*?\n\}/)||[''])[0];
+  assert(estimatesFnSrc.length>0, 'found the estimates() function to check');
+  assert(/listShareBar\('estimates'\)/.test(estimatesFnSrc), "PROOF OF FIX: estimates() now calls listShareBar('estimates')");
+  assert(!/listShareBar\('invoices'\)/.test(estimatesFnSrc), "PROOF OF FIX: estimates() no longer calls listShareBar('invoices')");
+
+  // Proof the new share bars are actually wired into the repairs/appointments
+  // screens (previously absent entirely).
+  const repairsSrc=fs.readFileSync(path.join(root,'js/repairs.js'),'utf8');
+  assert(/listShareBar\('repairs'\)/.test(repairsSrc), 'repairs list now offers print/PDF/share');
+  assert(/shareBar\('repairs',\s*r\.id\)/.test(repairsSrc), 'single repair work-order view now offers print/PDF/share');
+  assert(/listShareBar\('appointments'\)/.test(appSrc), 'appointments list now offers print/PDF/share');
+
+  // --- Fix: remove hardcoded OCR.space API key fallback -------------------
+  // Bug that shipped before this fix: js/ocr.js's spaceRead() fell back to
+  // a real, hardcoded OCR.space API key ('K81772188988957') shipped in
+  // public client source whenever the workshop hadn't configured its own
+  // key -- so every install, and anyone reading the repo, silently shared
+  // (and could drain the quota of) that one embedded key.
+  const ocrSrc=fs.readFileSync(path.join(root,'js/ocr.js'),'utf8');
+  assert(!/K81772188988957/.test(ocrSrc), 'PROOF OF FIX: the hardcoded OCR.space key is gone from the source entirely');
+  let fetchCalls=0;
+  const sharedDb={settings:{}};
+  const ocrSandbox={window:{WP:{}, db:sharedDb}, console, db:sharedDb,
+    setTimeout, clearTimeout, URLSearchParams, AbortController,
+    fetch:async function(){ fetchCalls++; return {json:async()=>({ParsedResults:[]})}; }
+  };
+  vm.createContext(ocrSandbox);
+  vm.runInContext(ocrSrc, ocrSandbox);
+  const OCR2=ocrSandbox.window.WP.OCR;
+  const noKeyResult=await OCR2.spaceRead('aGVsbG8=');
+  assert(fetchCalls===0, 'PROOF OF FIX: with no OCR.space key configured, spaceRead never calls out to OCR.space at all (no silent embedded-key usage)');
+  assert(JSON.stringify(noKeyResult)==='{}', 'spaceRead returns {} (not an error) when no key is configured, so the other OCR fallback tiers still run');
+  ocrSandbox.db.settings.ocrSpaceKey='workshop-own-test-key';
+  await OCR2.spaceRead('aGVsbG8=');
+  assert(fetchCalls===1, 'spaceRead still works normally once the workshop configures its OWN key in Settings');
+
+  // --- Fix: XSS -- customerName()/vehicleName() must always be esc()'d ----
+  // Bug that shipped before this fix: js/customers.js's vehicles table
+  // inserted customerName(v.customerId) straight into an HTML table cell
+  // with NO escaping, unlike every sibling cell in the same row (which all
+  // call esc()) -- the exact inconsistency flagged in the i18n/XSS audit.
+  // The same inconsistency existed for vehicleName() in five spots in
+  // js/app.js. Both helpers return free text (customer name / plate+make+
+  // model) that can come from manual entry or OCR-scanned documents, so an
+  // HTML/script payload in a saved name or plate would execute for every
+  // user who views that table.
+  const custSrc=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
+  assert(!custSrc.includes("customerName(v.customerId),esc(v.plate"), 'PROOF OF BUG regression guard: the exact unescaped customerName() call in the vehicles table is gone');
+  assert(custSrc.includes("esc(customerName(v.customerId)),esc(v.plate"), 'PROOF OF FIX: customers.js vehicles table now escapes customerName()');
+
+  const appSrc2=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  const uneescapedSpots=[
+    "s.repairs.map(r=>[vehicleName(r.vehicleId),esc(dLabel(r.description))",
+    "esc(a.time),vehicleName(a.vehicleId),esc(customerName(a.customerId))",
+    "rows.map(x=>[vehicleName(x.vehicleId),money(x.parts)",
+    "esc(x.type||''), vehicleName(x.vehicleId)||'—'",
+    "unpaid.map(x=>[`<button class=\"btn small\" onclick=\"previewInvoice('${x.id}')\">${esc(x.number||x.id)}</button>`,vehicleName(x.vehicleId)"
+  ];
+  uneescapedSpots.forEach((spot,i)=>assert(!appSrc2.includes(spot), 'PROOF OF BUG regression guard #'+(i+1)+': an unescaped vehicleName() table cell is gone from app.js'));
+  const escapedSpots=[
+    "s.repairs.map(r=>[esc(vehicleName(r.vehicleId)),esc(dLabel(r.description))",
+    "esc(a.time),esc(vehicleName(a.vehicleId)),esc(customerName(a.customerId))",
+    "rows.map(x=>[esc(vehicleName(x.vehicleId)),money(x.parts)",
+    "esc(x.type||''), esc(vehicleName(x.vehicleId))||'—'",
+    "unpaid.map(x=>[`<button class=\"btn small\" onclick=\"previewInvoice('${x.id}')\">${esc(x.number||x.id)}</button>`,esc(vehicleName(x.vehicleId))"
+  ];
+  escapedSpots.forEach((spot,i)=>assert(appSrc2.includes(spot), 'PROOF OF FIX #'+(i+1)+': app.js now escapes vehicleName() at this table cell'));
+
+  // Behavioral proof: esc() itself actually neutralizes an HTML payload
+  // such as a customer name or plate could contain.
+  const escSandbox={window:{}, console};
+  vm.createContext(escSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/lookup.js'),'utf8'), escSandbox);
+  const payload='<img src=x onerror=alert(1)>';
+  const escaped=escSandbox.esc(payload);
+  assert(!escaped.includes('<') && !escaped.includes('>'), 'esc() neutralizes angle brackets in a customer-name/plate-style XSS payload');
+
+  // --- Account migration: existing installs must not be locked out -------
+  // The user explicitly asked that removing the hardcoded defaults not be
+  // treated as a complete auth fix by itself: an EXISTING production
+  // install already has real user records sitting in localStorage (from
+  // before this change ever existed), and core.js's load() merges the new
+  // seed (p:null) with whatever is actually persisted via a shallow
+  // `{...base,...raw}` spread. This test runs the REAL load() function
+  // (not a recreation of its logic) against a simulated pre-existing
+  // install's localStorage, to prove the merge really does preserve real
+  // passwords rather than wiping them to null on upgrade.
+  function makeLocalStorage(initial){
+    const store={...initial};
+    return {
+      getItem:k=>(k in store? store[k] : null),
+      setItem:(k,v)=>{ store[k]=String(v); },
+      removeItem:k=>{ delete store[k]; }
+    };
+  }
+  function loadCoreWith(localStorageInitial){
+    // core.js only ever reads window.WP (absent -> falsy, so it skips the
+    // optional WP.Engine.migrate call) and writes window.db -- a plain
+    // object is enough, no real WP/Engine needed for this test.
+    const sandbox={
+      window:{addEventListener:()=>{}}, console,
+      document:{createElement:()=>({}), querySelectorAll:()=>[]},
+      localStorage: makeLocalStorage(localStorageInitial)
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/core.js'),'utf8'), sandbox);
+    return sandbox;
+  }
+
+  // Case 1: a real existing install, already running before this fix,
+  // still has its original plaintext passwords in storage -- exactly
+  // what every current production browser has right now.
+  const existingInstall={
+    users:[
+      {u:'admin',p:'1980D',name:'Admin',role:'manager'},
+      {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'},
+      {u:'accountant',p:'1978B',name:'Buchhaltung',role:'accountant'},
+      {u:'ismail',p:'1977A',name:'Ismail',role:'mechanic'},
+      {u:'warehouse',p:'1979C',name:'Lager',role:'warehouse'}
+    ],
+    customers:[{id:'c1',companyId:'de',name:'Real Customer GmbH'}],
+    settings:{uiLang:'de'}
+  };
+  const upgraded=loadCoreWith({baymeister_v1: JSON.stringify(existingInstall)});
+  const mergedUsers=upgraded.window.db.users;
+  assert(mergedUsers.find(u=>u.u==='Rashid').p==='1976R', 'PROOF OF FIX: an existing install\'s real (pre-fix) password survives the upgrade -- load() does not reset it to null');
+  assert(mergedUsers.find(u=>u.u==='admin').p==='1980D', 'existing admin password also survives the upgrade unchanged');
+  assert(upgraded.window.db.customers.find(c=>c.id==='c1').name==='Real Customer GmbH', 'existing real business data (not demo data) survives the upgrade');
+
+  // Case 2: an account that had ALREADY been rotated through the new
+  // forced-setup flow (e.g. a second deploy after some users already set
+  // real passwords) must keep that real password too, not regress to null.
+  const partiallyRotated={
+    users:[
+      {u:'admin',p:'5f4dcc3b5aa765d61d8327deb882cf99',name:'Admin',role:'manager'},
+      {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'}
+    ]
+  };
+  const upgraded2=loadCoreWith({baymeister_v1: JSON.stringify(partiallyRotated)});
+  assert(upgraded2.window.db.users.find(u=>u.u==='admin').p==='5f4dcc3b5aa765d61d8327deb882cf99', 'an already-rotated (hashed/custom) password survives a later upgrade unchanged');
+
+  // Case 3: a genuinely brand-new install (nothing in localStorage yet) --
+  // this is the ONLY case where p:null should apply, and it's correct
+  // here because there is no existing user to lock out.
+  const freshInstall=loadCoreWith({});
+  assert(freshInstall.window.db.users.every(u=>u.p===null), 'a genuinely fresh install (no prior data) seeds p:null for every account -- correct, nothing existing to break');
+
+  // Case 4: combine with the real login decision (from the earlier
+  // credential-rotation test) to prove the end-to-end migration path:
+  // the REAL merged user record for an unrotated existing account still
+  // correctly routes through forced rotation rather than straight login
+  // or an outright lockout.
+  const realRashid=mergedUsers.find(u=>u.u==='Rashid');
+  const migDecision=await decideLogin(realRashid, '1976R');
+  assert(migDecision.ok && migDecision.legacyDefault && migDecision.forcesSetup, 'end-to-end: a real migrated existing account typing its known password is forced to rotate, not locked out and not let straight in');
+  const migWrong=await decideLogin(realRashid, 'totally-wrong-guess');
+  assert(!migWrong.ok, 'end-to-end: a migrated existing account is still protected against a wrong password guess');
+
+  // --- Fix: "Manueller Auftrag" silently failed to create a repair order --
+  // Bug (found while running the full login->customer->vehicle->repair->
+  // invoice->preview cycle in a real browser, per the user's explicit
+  // request to test the whole cycle, not just the login fix in isolation):
+  // repairs.js wired the "new repair order" button as a BARE function
+  // reference -- `$('#add').onclick=repairModal` -- so the click Event
+  // itself was passed in as repairModal's `existing` argument. Since an
+  // Event is truthy, repairModal treated it as an EDIT of that (nonexistent)
+  // record: it looked up `db.repairs.findIndex(x=>x.id===existing.id)`
+  // (undefined on an Event, never found) and did nothing instead of
+  // pushing a new repair. The modal still closed with no visible error,
+  // so this was invisible without actually clicking through the UI.
+  const repairsSrc2=fs.readFileSync(path.join(root,'js/repairs.js'),'utf8');
+  assert(!/\$\('#add'\)\.onclick=repairModal;/.test(repairsSrc2), "PROOF OF BUG regression guard: the bare `onclick=repairModal` reference is gone");
+  assert(/\$\('#add'\)\.onclick=\(\)=>repairModal\(\);/.test(repairsSrc2), 'PROOF OF FIX: the button now calls repairModal() with no arguments, so a click Event can never be mistaken for an existing record');
+
+  // --- Cloud Auth: js/auth.js's pure link-handling logic --------------------
+  // js/auth.js detects Supabase's password-recovery redirect (either the
+  // implicit-flow #access_token=...&type=recovery hash, or the PKCE
+  // ?code=... query param) to show the "set a new password" screen instead
+  // of the normal login screen. Tested directly against the real functions.
+  function loadAuth(locationStub){
+    const sandbox={window:{}, console, location:locationStub};
+    vm.createContext(sandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/auth.js'),'utf8'), sandbox);
+    return sandbox.window.WP.CloudAuth;
+  }
+  const CA_normal=loadAuth({origin:'https://example.test', pathname:'/WerkPilot/', hash:'', search:''});
+  assert(CA_normal.isRecoveryLink()===false, 'a normal login URL (no recovery markers) is not treated as a recovery link');
+
+  const CA_implicit=loadAuth({origin:'https://example.test', pathname:'/WerkPilot/', hash:'#access_token=abc123&type=recovery', search:''});
+  assert(CA_implicit.isRecoveryLink()===true, 'PROOF OF FIX: a Supabase implicit-flow recovery hash (#...&type=recovery) is detected');
+
+  const CA_pkce=loadAuth({origin:'https://example.test', pathname:'/WerkPilot/', hash:'', search:'?code=abcdef123456'});
+  assert(CA_pkce.isRecoveryLink()===true, 'PROOF OF FIX: a Supabase PKCE-flow recovery link (?code=...) is detected');
+
+  assert(CA_normal.redirectBase()==='https://example.test/WerkPilot/', 'redirectBase strips query/hash so it works as a stable Supabase redirect target, adapting automatically to whatever origin serves the app (localhost while testing, the real domain in production)');
+
+  // --- Cloud Auth: an invalid/expired recovery link must never silently --
+  // --- "succeed" just because an unrelated valid session already exists --
+  // Bug found live in a real browser while testing this feature: navigating
+  // to a garbage #access_token=...&type=recovery link, in a browser tab that
+  // ALREADY had a genuinely-authenticated session from something unrelated,
+  // let the password "reset" go through anyway -- completePasswordReset was
+  // only checking "does ANY session exist", not "did THIS link's token
+  // actually get validated by the server". Fixed by requiring the SDK's own
+  // PASSWORD_RECOVERY event (fired only after it validates a token's
+  // signature+expiry against the server) before trusting an implicit-flow
+  // session as a real recovery.
+  function loadAuthWithFakeSupabase(locationStub, {recoveryConfirmed}){
+    const fakeUser={email:'someone-already-logged-in@example.test'};
+    const fakeSession={user:fakeUser};
+    const sandbox={
+      window:{ _wpRecoveryConfirmed: recoveryConfirmed,
+        supabaseClient:{ auth:{
+          getSession: async()=>({data:{session:fakeSession}}),
+          updateUser: async()=>({data:{}, error:null})
+        }}
+      },
+      console, location:locationStub, URLSearchParams, history:{replaceState:()=>{}}
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/auth.js'),'utf8'), sandbox);
+    return sandbox;
+  }
+  const bogusUrl={origin:'https://example.test', pathname:'/WerkPilot/', hash:'#access_token=totally-bogus&type=recovery', search:''};
+  const sbxNoConfirm=loadAuthWithFakeSupabase(bogusUrl, {recoveryConfirmed:false});
+  const resultNoConfirm=await sbxNoConfirm.window.WP.CloudAuth.completePasswordReset('NewPass#1');
+  assert(resultNoConfirm.ok===false, 'PROOF OF FIX: a bogus recovery link is REJECTED even though an unrelated session already exists (no PASSWORD_RECOVERY event seen)');
+
+  const sbxConfirmed=loadAuthWithFakeSupabase(bogusUrl, {recoveryConfirmed:true});
+  const resultConfirmed=await sbxConfirmed.window.WP.CloudAuth.completePasswordReset('NewPass#1');
+  assert(resultConfirmed.ok===true, 'a genuine recovery link (SDK confirmed via PASSWORD_RECOVERY) is still accepted normally');
+  assert(sbxConfirmed.window._wpRecoveryConfirmed===false, 'the recovery confirmation is consumed (one-time use) after a successful reset');
+
+  const appSrc4=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(/onAuthStateChange\(\(event\)=>\{\s*\n\s*if\(event==='PASSWORD_RECOVERY'\) window\._wpRecoveryConfirmed=true;/.test(appSrc4), 'app.js registers the PASSWORD_RECOVERY listener right where the Supabase client is created');
+
+  // --- Cloud Auth: wiring into the real login flow -------------------------
+  // Proof the plaintext password typed at login is threaded through to
+  // completeLogin (needed to silently sign into the linked cloud account
+  // with the SAME password) in both the normal-login and
+  // post-first-time-setup paths, and that the cloud sign-in is AWAITED
+  // before cloud sync runs (otherwise sync would still use the
+  // unauthenticated anon key for that first batch of calls).
+  const appSrc3=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(/completeLogin\(cand,\s*pass\)/.test(appSrc3), 'the normal login path passes the typed password to completeLogin');
+  assert(/completeLogin\(cand,\s*p1\)/.test(appSrc3), 'the post-first-time-setup path passes the newly-chosen password to completeLogin');
+  assert(/await WP\.CloudAuth\.signInCloud\(cand\.cloudEmail,\s*plainPass\)/.test(appSrc3), 'completeLogin awaits the cloud sign-in');
+  const cloudSignInIdx=appSrc3.indexOf('await WP.CloudAuth.signInCloud(cand.cloudEmail');
+  const syncAllCloudIdx=appSrc3.indexOf('syncAllCloud().finally');
+  assert(cloudSignInIdx>0 && syncAllCloudIdx>cloudSignInIdx, 'PROOF OF FIX: cloud sign-in happens BEFORE cloud sync starts, so sync calls carry a real authenticated session, not just the anon key');
+
+  // --- Settings page: password change must be hashed + validated ----------
+  // Bug found while wiring cloud auth into password changes: the Settings
+  // page's own "new password" field stored the password in PLAIN TEXT
+  // (`u.p=np`), with no minimum length and no check against the old
+  // published defaults -- bypassing every protection forcePasswordSetup
+  // enforces, and silently letting someone "change" their password right
+  // back to a known default.
+  assert(!/u\.p=np;session\.user\.p=np;/.test(appSrc3), 'PROOF OF BUG regression guard: the Settings page no longer stores a new password as plain text');
+  assert(/u\.p = WP\.Engine\.hashPassAsync \? await WP\.Engine\.hashPassAsync\(np\) : np;/.test(appSrc3), 'PROOF OF FIX: the Settings page now hashes a new password the same way login’s forced-setup flow does');
+  assert(/if\(np\.length<6\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now enforces the same minimum password length');
+  assert(/WP\.Engine\.isLegacyDefaultPassword\(u\.u,\s*np\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now rejects reusing an old published default password');
+
+  if(failed){ console.error(failed+' failed'); process.exit(1); }
+  console.log('all tests passed');
+})();

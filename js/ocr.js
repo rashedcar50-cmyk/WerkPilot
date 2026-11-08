@@ -628,7 +628,17 @@
   }
   async function spaceRead(img){
     try{
-      const key=(window.db && db.settings && db.settings.ocrSpaceKey) || 'K81772188988957';
+      // Security fix (audit 2026-11-08): this used to fall back to a real,
+      // hardcoded OCR.space API key shipped in public client source, so
+      // every install silently sent vehicle-document scans through that
+      // one embedded key -- usable (and its quota drainable) by anyone who
+      // reads the repo. OCR.space is now only used if the workshop has
+      // configured its own key in Settings; otherwise this tier is simply
+      // skipped (the other OCR tiers running alongside it still apply).
+      // This does not add or choose a new OCR provider/subscription --
+      // that choice is still open -- it only removes the silent fallback.
+      const key=(window.db && db.settings && db.settings.ocrSpaceKey) || '';
+      if(!key) return {};
       const body=new URLSearchParams();
       body.set('base64Image', img.indexOf('data:')===0?img:('data:image/jpeg;base64,'+img));
       body.set('language','ger');
@@ -719,7 +729,7 @@
     out.ocrQuality=q;
     return out;
   }
-  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields,vinCheckOk,grounded,stripDemo,dropUngrounded};
+  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields,vinCheckOk,grounded,stripDemo,dropUngrounded,spaceRead};
 })(window.WP=window.WP||{});
 window.parseVehicleOCR=function(text){ return WP.OCR.parse(text); };
 window.preprocessSchein=function(file){ return WP.OCR.preprocess(file,'contrast'); };

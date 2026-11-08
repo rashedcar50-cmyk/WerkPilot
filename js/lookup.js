@@ -393,12 +393,14 @@ function createInvoiceAuto(payload){
   if(!lines.length) throw new Error('no-lines');
   const veh=payload.vehicleId && typeof vehicleOf==='function' ? vehicleOf(payload.vehicleId) : null;
   const custId=payload.customerId || (veh&&veh.customerId) || '';
-  const parts=lines.filter(l=>l.kind!=='labor').reduce((s,l)=>s+l.qty*l.price,0);
-  const labor=lines.filter(l=>l.kind==='labor').reduce((s,l)=>s+l.qty*l.price,0);
   const discount=Number(payload.discount||0)||0;
   const tax=Number(payload.tax||19)||19;
-  const net=Math.max(0,parts+labor-discount);
-  const total=Math.round(net*(1+tax/100)*100)/100;
+  // Correctness fix (audit 2026-11-08): computeInvoiceTotals (js/invoice-print.js)
+  // derives net/total per line's own tax rate, exactly like the editor's save
+  // path and the print/preview path -- so this auto-created invoice books the
+  // same total that it would print.
+  const totals=computeInvoiceTotals(lines, discount);
+  const parts=totals.teile, labor=totals.leist, net=totals.net, total=totals.total;
   const inv={
     id:payload.id || (typeof id==='function'?id('i'):('i'+Date.now())),
     companyId:session.company.id,
@@ -423,6 +425,7 @@ function createInvoiceAuto(payload){
   };
   db.invoices=db.invoices||[];
   db.invoices.push(inv);
+  if(custId && typeof assignKdNr==='function') assignKdNr(custId);
   try{ if(typeof archiveBeleg==='function') archiveBeleg(inv); }catch(e){}
   try{ if(typeof upsertInvoiceCloud==='function') upsertInvoiceCloud(inv); }catch(e){}
   db.journal=db.journal||[];

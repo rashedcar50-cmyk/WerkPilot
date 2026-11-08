@@ -90,9 +90,13 @@ function refreshInvoiceSums(){
     if(tr && tr.querySelector('.c-sum')) tr.querySelector('.c-sum').textContent=(l.qty*l.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
   });
   const disc=latNum($('#fd')?.value||0);
-  const tax=latNum($('#ft')?.value||19);
-  const net=Math.max(0, lines.reduce((s,l)=>s+l.qty*l.price,0)-disc);
-  const gross=net*(1+tax/100);
+  // Correctness fix (audit 2026-11-08): this running total, shown while
+  // still editing, used a flat header tax rate -- now it matches the exact
+  // per-line-tax computation the save and print paths use, via
+  // computeInvoiceTotals (js/invoice-print.js), so the number on screen
+  // never disagrees with what gets saved or printed for mixed-rate lines.
+  const totals=computeInvoiceTotals(lines, disc);
+  const net=totals.net, gross=totals.total;
   const fmt=n=>(Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
   if($('#henryEK')) $('#henryEK').textContent=fmt(net);
   if($('#henryVK')) $('#henryVK').textContent=fmt(gross);
@@ -198,15 +202,21 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     let custId=$('#fcust')?.value||'';
     if(custId==='walkin') custId='';
     const veh=vehicleOf($('#fv')&&$('#fv').value)||{};
-    let parts=lines.filter(x=>!isLaborLine(x)).reduce((s,x)=>s+x.qty*x.price,0);
-    let labor=lines.filter(isLaborLine).reduce((s,x)=>s+x.qty*x.price,0);
     const discount=latNum($('#fd')?.value), tax=latNum($('#ft')?.value)||19;
-    let net=Math.max(0,parts+labor-discount), total=net*(1+tax/100);
-    parts=Math.round(parts*100)/100; labor=Math.round(labor*100)/100; net=Math.round(net*100)/100; total=Math.round(total*100)/100;
-    const obj={id:existing?existing.id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custId||veh.customerId||'',parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
+    // Correctness fix (audit 2026-11-08): computeInvoiceTotals (js/invoice-print.js)
+    // derives net/total per line's own tax rate, exactly like the print/preview
+    // path -- so a mixed-rate invoice books the same total here that it prints.
+    const totals=computeInvoiceTotals(lines, discount);
+    const parts=totals.teile, labor=totals.leist, net=totals.net, total=totals.total;
+    const custIdFinal=custId||veh.customerId||'';
+    const obj={id:existing?existing.id:id('i'),companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custIdFinal,parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
       type:kind==='bar'?'Barverkauf':'Rechnung', payment:payCode($('#pay')&&$('#pay').value), paid:['cash','card'].includes(payCode($('#pay')&&$('#pay').value)),
       number:existing?existing.number:nextInvoiceNumber(), lines, repairId:existing&&existing.repairId, auftrag:existing&&existing.auftrag, updatedAt:new Date().toISOString()};
     lines.forEach(rememberKatyArticle);
+    // Customer numbers are assigned only when an invoice is actually saved
+    // for that customer -- never as a side effect of preview (see
+    // js/invoice-print.js's ensureKd/assignKdNr).
+    if(custIdFinal) assignKdNr(custIdFinal);
     if(existing){
       const i=db.invoices.findIndex(x=>x.id===existing.id);
       if(i>=0) db.invoices[i]=obj; else db.invoices.push(obj);
