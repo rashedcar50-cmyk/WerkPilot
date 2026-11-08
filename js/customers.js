@@ -70,12 +70,16 @@ function customerModal(existing){
  </div>`,()=>{
   const firma=$('#cfirma').value.trim();
   const person=$('#n').value.trim();
-  const c={id:c0.id||id('c'),companyId:c0.companyId||session.company.id,cloudId:c0.cloudId,
+  let c={id:c0.id||id('c'),companyId:c0.companyId||session.company.id,cloudId:c0.cloudId,
     type:$('#ctype').value, name:firma||person, contact:person, companyName:firma,
     taxId:$('#ctax').value.trim(), phone:$('#ph').value, email:$('#em').value, address:$('#ad').value, kdNr:$('#kd').value.trim()};
   if(!c.kdNr) c.kdNr=nextKdNr();
   if(!c.name)return toast(t('needName'));
-  if(existing){ const i=db.customers.findIndex(x=>x.id===c0.id); if(i>=0) db.customers[i]={...db.customers[i],...c}; audit('customer.update',c.name); }
+  if(existing){
+    const i=db.customers.findIndex(x=>x.id===c0.id);
+    if(i>=0){ db.customers[i]={...db.customers[i],...c}; c=db.customers[i]; }
+    audit('customer.update',c.name);
+  }
   else { db.customers.push(c); audit('customer.create',c.name); }
   const plate=$('#vplate').value.trim(), vin=$('#vvin').value.trim();
   let veh=null;

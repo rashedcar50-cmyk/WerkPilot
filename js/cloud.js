@@ -4,6 +4,36 @@ async function sbReady(){
   return !!(window.supabaseClient);
 }
 
+/* ===== Relation helpers =====
+   The real tables use numeric bigint ids for relations (customer_id,
+   vehicle_id, ...), but WerkPilot's local records use string ids
+   (e.g. "c_abc123"). resolveCloudId looks up the related local
+   record's cloudId, syncing it first (recursively) if it hasn't
+   synced yet -- this makes relation order self-healing instead of
+   depending on every call site syncing parents before children.
+   localIdForCloudId is the reverse, used when reading cloud rows back
+   into local state. */
+async function resolveCloudId(table, localId, upsertFn){
+  if(!localId) return null;
+  const row = (db[table]||[]).find(x=>x.id===localId);
+  if(!row) return null;
+  if(!row.cloudId && typeof upsertFn==='function'){
+    try{ await upsertFn(row); }catch(e){ console.warn('resolveCloudId', table, e); }
+  }
+  return row.cloudId!=null ? row.cloudId : null;
+}
+function localIdForCloudId(table, cloudId){
+  if(cloudId===null || cloudId===undefined || cloudId==='') return '';
+  const n = Number(cloudId);
+  const row = (db[table]||[]).find(x=>x.cloudId===n || x.cloudId===cloudId);
+  return row ? row.id : '';
+}
+function markSyncOk(x){ if(x){ x.syncError=''; x.syncPending=false; } }
+function markSyncError(x, message){
+  if(x){ x.syncError=message||'sync failed'; x.syncPending=false; save(); }
+  if(db && db.settings){ db.settings.lastSyncError={message, at:new Date().toISOString()}; }
+}
+
 async function loadPurchasesFromCloud(){
   try{
     const sb = window.supabaseClient;
@@ -54,7 +84,6 @@ async function upsertPurchaseCloud(p){
       notes: p.notes || '',
       receipt_url: p.receipt_url || ''
     };
-    // إذا id رقمي من السحابة نحدّث، وإلا ندرج صف جديد
     let error;
     if(p.cloudId){
       ({ error } = await sb.from('purchases').update(row).eq('id', p.cloudId));
@@ -63,14 +92,14 @@ async function upsertPurchaseCloud(p){
       error = res.error;
       if(res.data?.id){
         p.cloudId = res.data.id;
-        // حدّث النسخة المحلية بالـ cloudId
         const local = db.purchases.find(x => x.id === p.id);
         if(local) local.cloudId = res.data.id;
         save();
       }
     }
-    if(error) console.warn('upsertPurchase', error.message);
-  }catch(e){ console.warn(e); }
+    if(error){ console.warn('upsertPurchase', error.message); markSyncError(p, error.message); }
+    else markSyncOk(p);
+  }catch(e){ console.warn(e); markSyncError(p, e.message); }
 }
 
 async function deletePurchaseCloud(pid){
@@ -102,12 +131,15 @@ async function upsertCustomerCloud(c){
   try{
     const sb=window.supabaseClient; if(!sb) return;
     const row={name:c.name||'',phone:c.phone||'',email:c.email||'',address:c.address||'',company_id:c.companyId||session?.company?.id||'de'};
-    if(c.cloudId){ await sb.from('customers').update(row).eq('id',c.cloudId); }
-    else {
+    if(c.cloudId){
+      const {error}=await sb.from('customers').update(row).eq('id',c.cloudId);
+      if(error){ console.warn('upsertCustomer',error.message); markSyncError(c,error.message); } else markSyncOk(c);
+    } else {
       const {data,error}=await sb.from('customers').insert(row).select('id').single();
-      if(!error && data?.id){ c.cloudId=data.id; save(); }
+      if(!error && data?.id){ c.cloudId=data.id; markSyncOk(c); save(); }
+      else if(error){ console.warn('upsertCustomer',error.message); markSyncError(c,error.message); }
     }
-  }catch(e){console.warn(e)}
+  }catch(e){console.warn(e); markSyncError(c,e.message)}
 }
 async function loadInventoryFromCloud(){
   try{
@@ -126,12 +158,15 @@ async function upsertInventoryCloud(item){
   try{
     const sb=window.supabaseClient; if(!sb) return;
     const row={sku:item.sku||'',name:item.name||'',qty:Number(item.qty||0),buy:Number(item.buy||0),sell:Number(item.sell||0),company_id:item.companyId||session?.company?.id||'de'};
-    if(item.cloudId){ await sb.from('inventory').update(row).eq('id',item.cloudId); }
-    else {
+    if(item.cloudId){
+      const {error}=await sb.from('inventory').update(row).eq('id',item.cloudId);
+      if(error){ console.warn('upsertInventory',error.message); markSyncError(item,error.message); } else markSyncOk(item);
+    } else {
       const {data,error}=await sb.from('inventory').insert(row).select('id').single();
-      if(!error && data?.id){ item.cloudId=data.id; save(); }
+      if(!error && data?.id){ item.cloudId=data.id; markSyncOk(item); save(); }
+      else if(error){ console.warn('upsertInventory',error.message); markSyncError(item,error.message); }
     }
-  }catch(e){console.warn(e)}
+  }catch(e){console.warn(e); markSyncError(item,e.message)}
 }
 
 async function loadVehiclesFromCloud(){
@@ -141,7 +176,7 @@ async function loadVehiclesFromCloud(){
     if(error||!Array.isArray(data)||!data.length) return false;
     mergeByCompany('vehicles', data.map(r=>({
       id:'v_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
-      customerId:r.customer_id||'', plate:r.plate||'', vin:r.vin||'',
+      customerId:localIdForCloudId('customers', r.customer_id), plate:r.plate||'', vin:r.vin||'',
       make:r.make||'', model:r.model||'', year:r.year||'', engine:r.engine||'',
       paint:r.paint||'', km:r.km||0, nextServiceKm:r.next_service_km||0, photo:r.photo||''
     })));
@@ -151,10 +186,18 @@ async function loadVehiclesFromCloud(){
 async function upsertVehicleCloud(v){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={company_id:v.companyId||'de',customer_id:v.customerId||'',plate:v.plate||'',vin:v.vin||'',make:v.make||'',model:v.model||'',year:String(v.year||''),engine:v.engine||'',paint:v.paint||'',km:Number(v.km||0),next_service_km:Number(v.nextServiceKm||0),photo:(v.photo&&v.photo.length<180000)?v.photo:''};
-    if(v.cloudId){ await sb.from('vehicles').update(row).eq('id',v.cloudId); }
-    else { const {data,error}=await sb.from('vehicles').insert(row).select('id').single(); if(!error&&data?.id){v.cloudId=data.id;save();} }
-  }catch(e){console.warn(e)}
+    const customerCloudId = await resolveCloudId('customers', v.customerId, upsertCustomerCloud);
+    const yearNum = v.year!=null && String(v.year).trim()!=='' ? (parseInt(v.year,10)||null) : null;
+    const row={company_id:v.companyId||'de',customer_id:customerCloudId,plate:v.plate||'',vin:v.vin||'',make:v.make||'',model:v.model||'',year:yearNum,engine:v.engine||'',paint:v.paint||'',km:Number(v.km||0),next_service_km:Number(v.nextServiceKm||0),photo:(v.photo&&v.photo.length<180000)?v.photo:''};
+    if(v.cloudId){
+      const {error}=await sb.from('vehicles').update(row).eq('id',v.cloudId);
+      if(error){ console.warn('upsertVehicle',error.message); markSyncError(v,error.message); } else markSyncOk(v);
+    } else {
+      const {data,error}=await sb.from('vehicles').insert(row).select('id').single();
+      if(!error&&data?.id){ v.cloudId=data.id; markSyncOk(v); save(); }
+      else if(error){ console.warn('upsertVehicle',error.message); markSyncError(v,error.message); }
+    }
+  }catch(e){console.warn(e); markSyncError(v,e.message)}
 }
 async function loadRepairsFromCloud(){
   try{
@@ -162,7 +205,8 @@ async function loadRepairsFromCloud(){
     const {data,error}=await cloudCompanyFilter(sb.from('repairs').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
     mergeByCompany('repairs', data.map(r=>({
-      id:'r_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de', vehicleId:r.vehicle_id||'',
+      id:'r_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+      vehicleId: localIdForCloudId('vehicles', r.vehicle_id) || r.vehicle_id || '',
       description:r.description||'', complaint:r.complaint||'', tech:r.tech||'', hours:r.hours||0,
       status:r.status||'intake', km:r.km||'', fuel:r.fuel||'', date:r.repair_date||'',
       jobs: r.jobs? (typeof r.jobs==='string'? JSON.parse(r.jobs||'[]'):r.jobs):[],
@@ -175,63 +219,142 @@ async function loadRepairsFromCloud(){
 async function upsertRepairCloud(r){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={company_id:r.companyId||'de',vehicle_id:r.vehicleId||'',description:r.description||'',complaint:r.complaint||'',tech:r.tech||'',hours:Number(r.hours||0),status:r.status||'',km:Number(r.km||0)||null,fuel:r.fuel||'',jobs:JSON.stringify(r.jobs||[]),parts:JSON.stringify(r.parts||[]),photos:JSON.stringify((r.photos||[]).map(x=>({kind:x.kind,url:x.url}))),repair_date:r.date||new Date().toISOString().slice(0,10)};
-    if(r.cloudId){ await sb.from('repairs').update(row).eq('id',r.cloudId); }
-    else { const {data,error}=await sb.from('repairs').insert(row).select('id').single(); if(!error&&data?.id){r.cloudId=data.id;save();} }
-  }catch(e){console.warn(e)}
+    const vehicleCloudId = await resolveCloudId('vehicles', r.vehicleId, upsertVehicleCloud);
+    const row={company_id:r.companyId||'de',vehicle_id:vehicleCloudId!=null?String(vehicleCloudId):'',description:r.description||'',complaint:r.complaint||'',tech:r.tech||'',hours:Number(r.hours||0),status:r.status||'',km:Number(r.km||0)||null,fuel:r.fuel||'',jobs:JSON.stringify(r.jobs||[]),parts:JSON.stringify(r.parts||[]),photos:JSON.stringify((r.photos||[]).map(x=>({kind:x.kind,url:x.url}))),repair_date:r.date||new Date().toISOString().slice(0,10)};
+    if(r.cloudId){
+      const {error}=await sb.from('repairs').update(row).eq('id',r.cloudId);
+      if(error){ console.warn('upsertRepair',error.message); markSyncError(r,error.message); } else markSyncOk(r);
+    } else {
+      const {data,error}=await sb.from('repairs').insert(row).select('id').single();
+      if(!error&&data?.id){ r.cloudId=data.id; markSyncOk(r); save(); }
+      else if(error){ console.warn('upsertRepair',error.message); markSyncError(r,error.message); }
+    }
+  }catch(e){console.warn(e); markSyncError(r,e.message)}
 }
 async function loadAppointmentsFromCloud(){
   try{
     const sb=window.supabaseClient; if(!sb) return false;
-    const {data,error}=await sb.from('appointments').select('*');
+    const {data,error}=await cloudCompanyFilter(sb.from('appointments').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    mergeByCompany('appointments', data.map(r=>({
-      id:'ap_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
-      vehicleId:r.vehicle_id||'', customerId:r.customer_id||'',
-      date:r.appt_date||'', time:r.appt_time||'', tech:r.tech||'', note:r.note||'', status:r.status||'',
-      updatedAt:r.updated_at||r.appt_date||''
-    })));
+    mergeByCompany('appointments', data.map(r=>{
+      const meta=r.metadata||{};
+      const dt=r.start_at?new Date(r.start_at):null;
+      return {
+        id:'ap_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+        vehicleId:localIdForCloudId('vehicles', r.vehicle_id), customerId:localIdForCloudId('customers', r.customer_id),
+        date: dt?dt.toISOString().slice(0,10):'', time: meta.time || (dt?dt.toISOString().slice(11,16):''),
+        tech: meta.tech||'', note:r.notes||'', status:r.status||'',
+        updatedAt:r.updated_at||''
+      };
+    }));
     return true;
   }catch(e){console.warn(e);return false}
 }
 async function upsertAppointmentCloud(a){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={company_id:a.companyId||'de',vehicle_id:a.vehicleId||'',customer_id:a.customerId||'',appt_date:a.date||null,appt_time:a.time||'',tech:a.tech||'',note:a.note||'',status:a.status||'confirmed'};
-    if(a.cloudId){ await sb.from('appointments').update(row).eq('id',a.cloudId); }
-    else { const {data,error}=await sb.from('appointments').insert(row).select('id').single(); if(!error&&data?.id){a.cloudId=data.id;save();} }
-  }catch(e){console.warn(e)}
+    const customerCloudId = await resolveCloudId('customers', a.customerId, upsertCustomerCloud);
+    const vehicleCloudId = await resolveCloudId('vehicles', a.vehicleId, upsertVehicleCloud);
+    const startAt = a.date ? new Date(a.date+'T'+(a.time||'00:00')+':00').toISOString() : null;
+    const row={company_id:a.companyId||'de',customer_id:customerCloudId,vehicle_id:vehicleCloudId,status:a.status||'confirmed',start_at:startAt,notes:a.note||'',metadata:{tech:a.tech||'',time:a.time||''}};
+    if(a.cloudId){
+      const {error}=await sb.from('appointments').update(row).eq('id',a.cloudId);
+      if(error){ console.warn('upsertAppointment',error.message); markSyncError(a,error.message); } else markSyncOk(a);
+    } else {
+      const {data,error}=await sb.from('appointments').insert(row).select('id').single();
+      if(!error&&data?.id){ a.cloudId=data.id; markSyncOk(a); save(); }
+      else if(error){ console.warn('upsertAppointment',error.message); markSyncError(a,error.message); }
+    }
+  }catch(e){console.warn(e); markSyncError(a,e.message)}
 }
 async function loadInvoicesFromCloud(){
   try{
     const sb=window.supabaseClient; if(!sb) return false;
     const {data,error}=await cloudCompanyFilter(sb.from('invoices').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    mergeByCompany('invoices', data.map(r=>({
-      id:'i_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de', vehicleId:r.vehicle_id||'',
-      repairId:r.repair_id||'', number:r.number||'', type:r.type||'Rechnung',
-      parts:r.parts||0, labor:r.labor||0, discount:r.discount||0, tax:r.tax||19,
-      net:r.net||0, total:r.total||0, payment:r.payment||'', paid:!!r.paid,
-      date:r.issued_at||'', updatedAt:r.updated_at||r.issued_at||'', lines: r.lines? (typeof r.lines==='string'?JSON.parse(r.lines||'[]'):r.lines):[]
-    })));
+    mergeByCompany('invoices', data.map(r=>{
+      const meta=r.metadata||{};
+      const paid = r.status==='paid' || (Number(r.total_amount||0)>0 && Number(r.paid_amount||0)>=Number(r.total_amount||0));
+      return {
+        id:'i_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+        vehicleId:localIdForCloudId('vehicles', r.vehicle_id),
+        customerId:localIdForCloudId('customers', r.customer_id),
+        repairId:meta.repairLocalId||'', number:r.invoice_number||'', type:meta.type||'Rechnung',
+        parts:meta.parts||0, labor:meta.labor||0, discount:meta.discount||0, tax:meta.taxPercent||19,
+        net:r.subtotal||0, total:r.total_amount||0, payment:meta.payment||'', paid,
+        date:r.issue_date||'', updatedAt:r.updated_at||r.issue_date||'', lines: meta.lines||[]
+      };
+    }));
     return true;
   }catch(e){console.warn(e);return false}
 }
 async function upsertInvoiceCloud(inv){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={company_id:inv.companyId||'de',vehicle_id:inv.vehicleId||'',repair_id:inv.repairId||'',number:inv.number||'',type:inv.type||'',parts:Number(inv.parts||0),labor:Number(inv.labor||0),discount:Number(inv.discount||0),tax:Number(inv.tax||19),net:Number(inv.net||0),total:Number(inv.total||0),payment:inv.payment||'',paid:!!inv.paid,lines:JSON.stringify(inv.lines||[])};
-    if(inv.cloudId){ await sb.from('invoices').update(row).eq('id',inv.cloudId); }
-    else { const {data,error}=await sb.from('invoices').insert(row).select('id').single(); if(!error&&data?.id){inv.cloudId=data.id;save();} }
-  }catch(e){console.warn(e)}
+    const vehicleCloudId = await resolveCloudId('vehicles', inv.vehicleId, upsertVehicleCloud);
+    const vehicle = (db.vehicles||[]).find(x=>x.id===inv.vehicleId);
+    const customerLocalId = inv.customerId || vehicle?.customerId;
+    const customerCloudId = await resolveCloudId('customers', customerLocalId, upsertCustomerCloud);
+    const net = Number(inv.net||0), total = Number(inv.total||0);
+    const row={
+      company_id:inv.companyId||'de', customer_id:customerCloudId, vehicle_id:vehicleCloudId,
+      invoice_number:inv.number||'', status:inv.paid?'paid':'open',
+      issue_date:inv.date||new Date().toISOString().slice(0,10),
+      subtotal:net, tax_amount:Math.max(total-net,0), total_amount:total,
+      paid_amount: inv.paid?total:0,
+      metadata:{type:inv.type||'Rechnung', parts:Number(inv.parts||0), labor:Number(inv.labor||0), discount:Number(inv.discount||0), taxPercent:Number(inv.tax||19), payment:inv.payment||'', repairLocalId:inv.repairId||'', lines:inv.lines||[]}
+    };
+    if(inv.cloudId){
+      const {error}=await sb.from('invoices').update(row).eq('id',inv.cloudId);
+      if(error){ console.warn('upsertInvoice',error.message); markSyncError(inv,error.message); } else markSyncOk(inv);
+    } else {
+      const {data,error}=await sb.from('invoices').insert(row).select('id').single();
+      if(!error&&data?.id){ inv.cloudId=data.id; markSyncOk(inv); save(); }
+      else if(error){ console.warn('upsertInvoice',error.message); markSyncError(inv,error.message); }
+    }
+  }catch(e){console.warn(e); markSyncError(inv,e.message)}
+}
+async function upsertExpenseCloud(x){
+  try{
+    const sb=window.supabaseClient; if(!sb) return;
+    const row={company_id:x.companyId||'de',category:x.category||'',description:x.note||x.description||'',expense_date:x.date||new Date().toISOString().slice(0,10),net_amount:Number(x.amount||0),tax_amount:0,total_amount:Number(x.amount||0),notes:x.note||''};
+    if(x.cloudId){
+      const {error}=await sb.from('expenses').update(row).eq('id',x.cloudId);
+      if(error){ console.warn('upsertExpense',error.message); markSyncError(x,error.message); } else markSyncOk(x);
+    } else {
+      const {data,error}=await sb.from('expenses').insert(row).select('id').single();
+      if(!error&&data?.id){ x.cloudId=data.id; markSyncOk(x); save(); }
+      else if(error){ console.warn('upsertExpense',error.message); markSyncError(x,error.message); }
+    }
+  }catch(e){console.warn(e); markSyncError(x,e.message)}
+}
+async function loadExpensesFromCloud(){
+  try{
+    const sb=window.supabaseClient; if(!sb) return false;
+    const {data,error}=await cloudCompanyFilter(sb.from('expenses').select('*'));
+    if(error||!Array.isArray(data)||!data.length) return false;
+    mergeByCompany('expenses', data.map(r=>({
+      id:'ex_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
+      category:r.category||'', note:r.notes||r.description||'', date:r.expense_date||'',
+      amount:Number(r.total_amount||0), updatedAt:r.updated_at||''
+    })));
+    return true;
+  }catch(e){console.warn(e);return false}
 }
 function syncAllCloud(){
-  return Promise.all([
-    loadPurchasesFromCloud(), loadCustomersFromCloud(), loadInventoryFromCloud(),
-    loadVehiclesFromCloud(), loadRepairsFromCloud(), loadAppointmentsFromCloud(), loadInvoicesFromCloud()
-  ]).then(function(ok){
-    if(db && db.settings) db.settings.lastCloudSync=new Date().toISOString();
-    save();
-    return ok;
-  });
+  /* Customers and vehicles must land first -- repairs, appointments
+     and invoices resolve their relations against db.customers /
+     db.vehicles while loading, so those two load sequentially before
+     everything else (which has no inter-dependencies among itself). */
+  return loadCustomersFromCloud()
+    .then(()=>loadVehiclesFromCloud())
+    .then(()=>Promise.all([
+      loadPurchasesFromCloud(), loadInventoryFromCloud(), loadExpensesFromCloud(),
+      loadRepairsFromCloud(), loadAppointmentsFromCloud(), loadInvoicesFromCloud()
+    ]))
+    .then(function(ok){
+      if(db && db.settings) db.settings.lastCloudSync=new Date().toISOString();
+      save();
+      return ok;
+    });
 }

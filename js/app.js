@@ -1260,7 +1260,7 @@ function expenses(){
  const rows=companyRows('expenses');
 $('#content').innerHTML=head(t('expensesTitle'),`<button class="btn primary" id="scanExpense">📷 ${t('scanBill')}</button> <button class="btn primary" id="add">${t('newExpense')}</button>`)+
  table([t('date'),t('statement'),t('amount'),t('category')],rows.map(x=>[esc(x.date),esc(x.note),money(x.amount),esc(x.category)]));
- $('#add').onclick=()=>simpleModal(t('newExpense'),[['date',t('date'),'date'],['note',t('statement')],['amount',t('amount'),'number'],['category',t('category')]],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);db.journal.push({id:id('j'),companyId:session.company.id,date:o.date||todayISO(),account:t('expenses'),debit:Number(o.amount||0),credit:0,note:o.note});save();audit('expense.create',o.note);render()});
+ $('#add').onclick=()=>simpleModal(t('newExpense'),[['date',t('date'),'date'],['note',t('statement')],['amount',t('amount'),'number'],['category',t('category')]],o=>{o.companyId=session.company.id;o.id=id('x');db.expenses.push(o);db.journal.push({id:id('j'),companyId:session.company.id,date:o.date||todayISO(),account:t('expenses'),debit:Number(o.amount||0),credit:0,note:o.note});save();if(typeof upsertExpenseCloud==='function')upsertExpenseCloud(o);audit('expense.create',o.note);render()});
 $('#scanExpense').onclick=scanExpenseDocument;
 }
    async function scanExpenseDocument(){
@@ -1339,6 +1339,7 @@ notes:ai.notes||''
 
 db.expenses.push(expense);
 save();
+if(typeof upsertExpenseCloud==='function')upsertExpenseCloud(expense);
 audit('expense.create',expense.note);
 closeModal();
 render();
