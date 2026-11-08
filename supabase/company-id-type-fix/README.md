@@ -5,6 +5,51 @@ to the production Supabase project (`jljzobaggesefsdeslrf`). This
 documents a confirmed bug and a migration tested only against a
 disposable local Supabase CLI stack, for the owner to review and apply.
 
+## Third pass (same day): foreign keys
+
+A second owner-run attempt (pass 2's migration, with the RLS-policy
+handling) failed differently:
+
+```
+ERROR: foreign key constraint "customers_company_id_fkey" cannot be implemented
+DETAIL: Key columns "company_id" and "id" are of incompatible types: text and bigint.
+```
+
+Investigated directly against production (read-only), not assumed:
+`companies` has exactly 3 columns (`id bigint identity`, `name text`,
+`created_at`) — no country/currency/code column, nothing holding
+`'de'`/`'es'` anywhere. `companies` and `company_memberships` both have
+**0 rows**. All 24 `company_id` columns across this Supabase project
+(a much larger, otherwise-undocumented schema — `activity_logs`,
+`employees`, `estimates`, `bank_transactions`, etc., none of which
+WerkPilot's code touches) carry an identical FK:
+`<table>_company_id_fkey -> companies(id)`.
+
+Conclusion: this `companies`/`company_memberships` scaffold belongs to
+a separate, unrelated, never-populated system WerkPilot's own company
+model (`'de'`/`'es'` string codes, defined in `js/core.js`, never read
+from this table) was never actually integrated with. Changing
+`companies.id` itself to text — the only way to keep the FK
+meaningful — would touch a column shared by all 24 tables, 16 of which
+are outside WerkPilot and unexamined here; that risks an unrelated
+system this project has no visibility into, which is why the migration
+instead drops only WerkPilot's own 8 FK constraints (not `companies`
+itself, not the other 16 tables). With `companies` empty, these FKs
+could never be satisfied by any non-null value regardless of type, so
+they're already non-functional for real use today — removing them
+doesn't weaken anything that currently works.
+
+Also found while investigating: the first, partial migration attempt
+left production in a mixed state — `repairs.company_id` was already
+`text` (that table has no FK and no RLS policy on `company_id`, so its
+`ALTER` simply succeeded alone), and the open policy `wp_expenses_all`
+was missing (every other policy, including the restrictive one on
+`expenses`, was untouched). `migration-fix-company-id-type.sql` is
+written defensively (`drop ... if exists`, re-creates every open
+policy) so it's correct regardless of that partial state — tested
+against a local reproduction seeded with exactly that same partial
+state, not just a clean one.
+
 ## Confirmed root cause
 
 Found 2026-11-08 while verifying the published app with clearly-labeled
