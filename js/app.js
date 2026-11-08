@@ -933,9 +933,9 @@ function deletePurchase(pid){
   return askConfirm(t('delPurchase'), '', ()=>{ deletePurchaseDo(pid); });
 }
 function deletePurchaseDo(pid){
+  deletePurchaseCloud(pid);
   db.purchases = db.purchases.filter(x => x.id !== pid);
   save();
-  deletePurchaseCloud(pid);
   audit('purchase.delete', pid);
   render();
   toast(t('deleted'));
