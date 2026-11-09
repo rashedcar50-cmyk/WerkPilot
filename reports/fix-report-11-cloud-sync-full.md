@@ -529,3 +529,82 @@ owner's (`Rashid`); the 4 unused accounts are disabled rather than
 provisioned, by the owner's explicit choice, and can be re-enabled
 and linked the same way later if a real staff member starts using
 them.
+
+## Phase 4: real network-interruption test + isolated limited-role test (2026-11-09)
+
+**Network interruption, simulated honestly:** overrode `window.fetch`
+in the live browser tab to reject only requests to the Supabase host
+(every other request -- page assets, GitHub, anything else -- passed
+through untouched; the device's actual network was never disabled).
+With that in place: created a TEST customer through the app's own
+"Neuer Kunde" form -- saved locally with no error shown to the user,
+`syncError` recorded internally. Edited it (phone field) -- same
+result. Reloaded the whole app (closed/reopened) *while still
+blocked*, re-installing the block immediately on load, before logging
+back in: the edited record was still there, read straight from
+`localStorage`, confirming real persistence and not just in-memory
+state. Logged in locally while still fully blocked -- succeeded
+immediately (no network needed for the local password check),
+confirming the app's offline-first login design actually holds, not
+just in theory.
+
+**Bug found here too, by testing -- not by reading the code:**
+restoring the connection and calling `syncAllCloud()` did **not**
+sync the pending record. Tracing why: `syncAllCloud()` only ever
+*pulls* from the cloud (`loadXFromCloud()` calls); nothing ever
+re-pushed a record whose earlier `upsert*Cloud()` call had failed.
+Fixed by adding `retryPendingCloud()` -- retries every local record in
+the current company with no `cloudId` yet or a recorded `syncError`,
+via the exact same upsert function a normal save already uses;
+`syncAllCloud()` now runs it first. Re-tested live after the fix: the
+same record synced with a real `cloudId`, and a second sync pass
+confirmed via a direct Supabase read that exactly **one** row exists
+-- no duplicate. Deployed (PR #12) and verified on the published site.
+Test record cleaned up (cloud + local) once confirmed.
+
+**Limited-permission ("mechanic") employee test, in an isolated
+environment:** the user explicitly declined creating a second real
+Supabase Auth identity and explicitly forbade changing the owner's
+own `company_memberships.role` (even temporarily) -- correctly, since
+that's live data on the real owner account. Built a fully disposable
+local Supabase stack instead (Docker, `supabase start`, a from-scratch
+project under a throwaway directory -- zero connection to production,
+zero shared credentials), reproducing only what this test needed:
+`company_memberships` and a `customers` table with the real
+production policy pattern (company-scoped `members can ...`, no role
+check, same as every table). Created one test identity there
+(`mechanic-test@isolated.local`), granted it `company_id='de'`,
+`role='mechanic'`, seeded one real `'es'` row directly (bypassing
+RLS). Signed in as that identity and tested against the real REST API
+of that isolated instance:
+
+| Check | Result |
+|---|---|
+| Read `'de'` (own company) | 200, allowed |
+| Read `'es'` (other company), real row exists | 200, **0 rows** (hidden) |
+| Insert into `'de'` | 201, succeeded |
+| Insert into `'es'` | **403**, explicit RLS violation |
+| Delete the `'es'` seed row | 200, **0 rows affected** (silently denied) |
+
+Confirms, with a genuinely independent identity and a genuinely
+limited role, the same result already proven with the owner's own
+account: protection is company-scoped, not role-scoped -- a
+"mechanic" gets exactly the same company isolation as a "developer"
+because the policies never look at role at all (consistent with the
+earlier finding that 0 of 37 member policies reference `role`). The
+isolated stack was torn down completely afterward (`supabase stop`,
+containers removed, confirmed via `docker ps`); nothing in it ever
+touched production or BusinessPilot (also reconfirmed untouched).
+
+Owner's own account and its real `company_memberships` row were
+**not** touched during this phase -- confirmed by direct query before
+and after (`company_id='de', role='developer', active=true`,
+unchanged) after the user caught and stopped an in-progress attempt
+to modify it, correctly, before it ran.
+
+**Not done, flagged honestly:** no second *real* cloud-linked
+employee account was tested against production itself, since the
+user explicitly declined creating one and declined using the owner's
+account for it. The isolated-environment test above is methodologically
+equivalent (same policy code, same mechanism) but is not literally "a
+second production account" -- stated plainly, not glossed over.
