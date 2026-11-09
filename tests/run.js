@@ -179,6 +179,7 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
 // anyone changes that logic in a way that reopens the hole or locks out a
 // legitimate user.
 async function decideLogin(cand, pass){
+  if(cand && cand.disabled) return {ok:false, freshAccount:false, legacyDefault:false, forcesSetup:false, disabled:true};
   const freshAccount=!!cand && cand.p==null;
   const legacyDefault=!!cand && !freshAccount && E.isLegacyDefaultPassword(cand.u, pass);
   const ok=freshAccount || !!(cand && await E.passOk(cand.p, pass));
@@ -212,6 +213,13 @@ async function decideLogin(cand, pass){
   assert(E.isLegacyDefaultPassword('Rashid','1976R')===true,'legacy default is recognized for its own account');
   assert(E.isLegacyDefaultPassword('Rashid','MyR3al-Pass!')===false,'a real custom password is never flagged as the legacy default');
   assert(E.isLegacyDefaultPassword('someone-not-in-the-table','1976R')===false,'an unrelated username is never matched against another account\'s old default');
+
+  // 6) Disabled account (2026-11-09 fix): rejected outright, even with the
+  // exact correct password -- no freshAccount/legacyDefault path can ever
+  // grant it a session.
+  const disabledAcct={u:'admin',p:'1980D',role:'manager',disabled:true};
+  d=await decideLogin(disabledAcct,'1980D');
+  assert(!d.ok && d.disabled,'a disabled account is rejected even with its correct password');
 
   // --- Fix: invoice preview must not mutate the database -------------------
   // Bug that shipped before this fix: js/invoice-print.js's ensureKd(), called
