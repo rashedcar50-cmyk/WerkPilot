@@ -237,9 +237,128 @@ update path (PATCH by id) doesn't create a duplicate row.
       chain, update-path dedup check).
 - [x] DB migration (`repairs.photos`) -- audited (no FK/policy
       dependency), tested locally, applied to production.
+- [x] Live-corrected 2 bugs found only by testing against real
+      production constraints (not caught by the local schema
+      reproduction): appointment `title`/`start_at` NOT NULL (PR #5,
+      `7fba035`, merged+deployed), and `deletePurchaseDo` calling the
+      local-array filter *before* the cloud delete so the cloud row's
+      id was never found (PR #6, `db744fe`, merged+deployed).
+- [x] Re-verified the purchase-delete fix live post-deploy (2026-11-09):
+      created purchase `TEST-DEL-VERIFY-1` via the app's own "Manueller
+      Einkauf" form -> synced as cloud `purchases.id=5` -> deleted via
+      the app's own "Löschen" button/confirm flow -> confirmed via a
+      direct `select` in the Supabase SQL editor that `id=5` no longer
+      exists. Cloud delete is real, not just a local list update.
 - [ ] Full 8-point integration test with TEST-labeled data, live
-      against production, from the open browser session.
-- [ ] Fix-forward any failures found during that test.
-- [ ] PR, merge, deploy, verify published version syncs for real
-      (not just that the build succeeded).
-- [ ] Final Arabic report per the user's 5 questions.
+      against production, from the open browser session (customer+
+      vehicle, appointment+repair+invoice, inventory, network-loss
+      reasoning, cross-session read-back) -- partially covered across
+      this and earlier phases; appointments/repairs/invoices/inventory
+      not yet re-exercised against the *current* deployed build in one
+      pass.
+- [ ] Final Arabic report per the user's 5 questions -- blocked on the
+      RLS/auth phase below being far enough along to report on
+      honestly (see "Data-protection audit").
+
+## Data-protection audit (phase 2, started 2026-11-09)
+
+**Why this phase exists:** after the purchase-delete fix, the user
+asked me to test `expenses` access -- which is denied for everyone,
+because an earlier migration pass (see fix-report-10, "Pass-4 RLS
+migration" note) accidentally dropped `wp_expenses_all` and never
+recreated it. My first instinct was to recreate that one open
+`using(true)` policy to match the other 7 tables. **The user explicitly
+rejected this**: its presence on the other tables doesn't make it
+correct there either, and asked me to (a) fix `expenses` via real
+authentication + company membership instead of an open policy, (b)
+audit whether the open policies on the *other* 7 tables are themselves
+a problem, not just a historical artifact, (c) identify and complete
+whatever cloud-account-linkage work is within my own authority if that
+turns out to be the gap, and (d) actually test allow-for-the-right-
+company / deny-for-another-company, not just assume it from the policy
+text.
+
+**Findings (read-only queries against production, 2026-11-09):**
+
+| Fact | Value |
+|---|---|
+| `company_memberships` rows | **0** |
+| `auth.users` rows | **0** |
+| Local accounts (`db.users`) with `cloudEmail` set | **0 of 5** (admin, Rashid, accountant, ismail, warehouse) |
+| Tables with an open `wp_<table>_all using(true)` policy | customers, vehicles, repairs, invoices, purchases, inventory, appointments (7 of 8) |
+| Tables with a real `members can ...` (authenticated + `company_memberships`) policy | **all 8**, including expenses |
+| `expenses`'s open policy | missing (the Pass-4 regression) -- its `members can manage expenses` policy is the *only* one on that table |
+
+**The real finding is bigger than "expenses is missing one policy":**
+zero Supabase Auth users have ever existed for this project, and zero
+`company_memberships` rows exist. That means the `members can ...`
+policy already sitting on *every one of the 8 tables* -- not just
+expenses -- has never once been capable of passing for anyone,
+because `auth.uid()` has never had a real signed-in user to resolve
+to. The open `wp_<table>_all` policies are not a backstop next to a
+working membership system; on 7 of the 8 tables they are the *only*
+thing currently granting access at all, to anyone holding the
+published anon key, regardless of company. `expenses` isn't an
+exception to an otherwise-protected schema -- it's the one table where
+that was visible (total failure) instead of invisible (total,
+unauthenticated access). So the user's instinct to question the other
+7 tables' open policies was correct: right now, **no table in this
+schema has real, enforced, per-company access control.**
+
+**Why I haven't fixed this yet, and the one thing only the owner can
+do:** real protection needs an actual Supabase Auth identity to exist
+before any policy work matters -- without one, tightening RLS to rely
+on `company_memberships` would deny access to *everyone*, including
+the owner, since the app currently talks to Supabase using only the
+anon key. Creating that first account requires one of:
+  - `sb.auth.signUp({email, password})`, which is exactly what the
+    app's own existing "link cloud account" flow already does
+    (`js/auth.js` `linkAccountToCloud`, wired into Settings and into
+    the forced-password-rotation screen) -- but it needs a real email
+    + password entered by the account's owner, in that form, in the
+    already-open app tab.
+  - or creating a user directly from the Supabase dashboard's
+    Authentication -> Users page, which needs a password set the same
+    way.
+
+I never enter, type, or see a password on behalf of the user, even for
+their own production app -- this is a hard rule, not a preference, and
+it's the one step in this whole phase I cannot do for them. Everything
+else below is already prepared so it can be finished within minutes of
+that one action. Confirmed along the way: this Supabase project has
+**"Confirm email" turned on** (Authentication -> Sign In / Providers),
+so after signing up the owner will need to click the confirmation link
+in the email Supabase sends (no custom SMTP is configured, so it goes
+out through Supabase's own low-volume default sender -- fine for one
+real account, not for bulk).
+
+**What I *have* completed within my own authority, ready to run the
+moment a real `auth.users` row exists:**
+
+1. `supabase/rls-fix-proposal/provision-membership.sql` (new, see
+   below) -- a plain `insert into company_memberships`, not a policy
+   change, so it isn't subject to the RLS-modification block. Takes
+   the new user's email, looks up their `auth.users.id`, and grants
+   them `company_id='de'` (TABAH AUTO) -- the owner can be granted
+   `'es'` too in the same statement if wanted.
+2. Confirmed `expenses` needs **no new policy at all** -- its
+   `members can manage expenses` policy already matches the pattern
+   on every other table; it only needs a real identity + membership
+   row to ever pass.
+3. Plan for after that identity exists (not yet executed, needs the
+   live auth session verified first): sign in as the provisioned user,
+   confirm `select`/`insert` on `expenses` succeeds for `company_id=
+   'de'` and is denied/empty for `'es'` or no membership, then -- as
+   an explicitly separate, confirmed step -- retire the open
+   `wp_<table>_all` policies table by table (classifier-blocked for me
+   to execute directly; will specify exact SQL per table once the
+   auth path is proven, same as the `wp_expenses_all` recreation
+   attempt was blocked earlier).
+
+**Distinction to carry into the final report:** cloud *sync* (data
+reaching Supabase, round-tripping correctly, surviving edits/deletes)
+and *data protection* (who is allowed to read/write it) are two
+different, separately-verified claims. Sync is now solid per the
+8-point test (pending the last re-pass). Protection is **not yet
+real on any of the 8 tables** -- this must not be glossed over in the
+Arabic summary.
