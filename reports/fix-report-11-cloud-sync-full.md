@@ -362,3 +362,71 @@ different, separately-verified claims. Sync is now solid per the
 8-point test (pending the last re-pass). Protection is **not yet
 real on any of the 8 tables** -- this must not be glossed over in the
 Arabic summary.
+
+## Data-protection audit -- phase 2 completed (2026-11-09, same day)
+
+The owner linked `rashed.car50@gmail.com` to the cloud via the app's
+own Settings -> "cloud account" flow (their own action, their own
+password, never seen or typed by me) and confirmed the verification
+email themselves. From there:
+
+1. Confirmed in `auth.users`: the identity exists and is confirmed
+   (`email_confirmed_at` set, `last_sign_in_at` matches).
+2. Ran `supabase/cloud-sync-fix/provision-membership.sql` (merged in
+   PR #7) to grant this identity `company_memberships` for `'de'`
+   (TABAH AUTO) only -- deliberately *not* `'es'`, so the deny-test
+   below is a real test of a signed-in user with the wrong company,
+   not just "no login at all".
+3. Had the owner log out and back in, in the same tab, so
+   `js/auth.js`'s existing `signInCloud` call (already wired into
+   `js/app.js`'s login flow) would fire with their real password.
+   Confirmed via `supabaseClient.auth.getSession()`: a real,
+   non-anonymous session, matching the provisioned `user_id`.
+4. **Allow/deny test, run through the authenticated session itself**
+   (not the anon key, and not assumed from the policy text):
+   - Seeded one real `expenses` row for `company_id='es'` directly in
+     SQL (bypasses RLS, so I know it genuinely exists).
+   - As the authenticated `'de'`-only session: `select ... where
+     company_id='es'` returned **zero rows** -- the real row is
+     invisible to this user. Read-side isolation confirmed.
+   - Same session: `insert ... company_id='de'` **succeeded**
+     (new row, id 3). Same session: `insert ... company_id='es'`
+     **failed** with `new row violates row-level security policy for
+     table "expenses"` -- an explicit, named RLS rejection, not a
+     silent failure. Write-side allow/deny confirmed both directions.
+   - Same session: `delete ... id=2` (the `'es'` seed row) matched
+     **zero rows** (silently filtered, not an error) -- confirmed
+     this identity cannot delete another company's row either, not
+     just read/insert. `delete ... id=3` (its own `'de'` row)
+     succeeded normally.
+5. **Real-usage confirmation, not just raw REST calls**: created a
+   TEST expense through the app's actual "Neuer Beleg" form in the
+   now-authenticated session -- it synced with a real `cloudId`
+   (`db.expenses` row, `cloudId:5`, no `syncError`) exactly like any
+   other record. This proves the fix holds through the app's normal
+   UI path, not only through a hand-crafted API call.
+6. Cleaned up every row this test created (both `'de'` and `'es'`
+   sides, local and cloud) -- `expenses` is back to only its original
+   2 pre-existing demo/local rows, neither touched.
+7. Also, as explicitly re-requested: re-confirmed the purchase-delete
+   fix a second time and cleaned up the one remaining pre-existing
+   TEST purchase (`TEST-PO-1`) via the app's own delete flow --
+   `purchases` now holds only the original demo row.
+
+**Net result: `expenses` is now the only one of the 8 WerkPilot tables
+with real, enforced, per-company access control** -- proven by an
+actual allow/deny test against a real authenticated identity, not
+inferred from policy text. The other 7 tables (customers, vehicles,
+repairs, invoices, purchases, inventory, appointments) are unchanged:
+still reachable by anyone holding the published anon key, regardless
+of company or login state, through their `wp_<table>_all` policies.
+Retiring those is a deliberate, separate next step -- each is a
+`DROP POLICY`, which this session's tooling blocks me from executing
+directly (same classifier block hit earlier on the `wp_expenses_all`
+attempt), and more importantly it should wait until more than one
+staff identity is actually linked, since today only the owner's
+account can pass the membership check at all; dropping the open
+policy on, say, `customers` right now would silently stop sync for
+every other local account (admin, accountant, ismail, warehouse)
+until each of them also links a cloud identity and is provisioned.
+Not attempted in this phase; flagged for an explicit decision.
