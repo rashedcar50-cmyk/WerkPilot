@@ -430,3 +430,102 @@ policy on, say, `customers` right now would silently stop sync for
 every other local account (admin, accountant, ismail, warehouse)
 until each of them also links a cloud identity and is provisioned.
 Not attempted in this phase; flagged for an explicit decision.
+
+## Data-protection audit -- phase 3: full rollout (2026-11-09, same day)
+
+Owner confirmed only the `Rashid` account is in real use; the other 4
+seeded local accounts (`admin`, `accountant`, `ismail`, `warehouse`)
+have never logged in on this device (0 audit-log entries, still held
+their original published default passwords) and were disabled rather
+than cloud-linked (PR #10): `login()` now rejects a `disabled:true`
+account outright, before any password check; `core.js`'s seed marks
+them disabled for any future fresh install too. This device's live
+`db.users` was also patched directly (each disabled account's `p`
+field replaced with the hash of a random, never-recorded value, on
+top of the `disabled` flag -- defense in depth). Verified live: a
+login attempt for `admin` with its old default password is rejected
+with the same generic error as a wrong password.
+
+With only one real identity to cover, retired all 7 remaining open
+`wp_<table>_all` policies in one migration (`retire-open-policies.sql`,
+applied directly -- not blocked this time, unlike the earlier
+`CREATE POLICY` attempt):
+
+```sql
+drop policy if exists "wp_appointments_all" on appointments;
+drop policy if exists "wp_customers_all" on customers;
+drop policy if exists "wp_inventory_all" on inventory;
+drop policy if exists "wp_invoices_all" on invoices;
+drop policy if exists "wp_purchases_all" on purchases;
+drop policy if exists "wp_repairs_all" on repairs;
+drop policy if exists "wp_vehicles_all" on vehicles;
+```
+
+**Bug found and fixed during verification:** `repairs` turned out to
+have **zero** RLS policies of any kind once its open policy was
+dropped -- the "members can manage repairs" policy I had assumed
+existed (based on an earlier, not-directly-verified row-count
+extrapolation) was never actually created in any prior migration
+pass. This made `repairs` completely inaccessible to everyone,
+including the owner's own authenticated session -- confirmed live (an
+insert with the owner's own `company_id='de'` failed with an RLS
+violation). Fixed immediately by creating the missing policy, matching
+the exact pattern already used on every other table:
+
+```sql
+create policy "members can manage repairs" on repairs for all
+  using (exists (select 1 from company_memberships cm
+    where cm.company_id = repairs.company_id
+      and cm.user_id = auth.uid() and cm.active = true))
+  with check (exists (select 1 from company_memberships cm
+    where cm.company_id = repairs.company_id
+      and cm.user_id = auth.uid() and cm.active = true));
+```
+
+Re-verified immediately after: insert into `repairs` with `company_id
+='de'` now succeeds for the owner's session, confirming the fix and
+proving no other table had the same gap (every other table's insert
+had already succeeded on the first attempt, which is itself proof
+each of their member policies was real and working).
+
+**Full allow/deny test, all 8 WerkPilot tables, through the real
+authenticated session (not the anon key, not assumed from policy
+text):** for `appointments`, `customers`, `inventory`, `invoices`,
+`purchases`, `repairs`, `vehicles` (plus `expenses`, proven in phase
+2) --
+- Seeded one real row per table for `company_id='es'` directly via
+  the privileged SQL connection (bypasses RLS, so each row's
+  existence is certain).
+- As the owner's `'de'`-only authenticated session: reading that
+  `'es'` row returned nothing (hidden), inserting a `'de'` row
+  succeeded, inserting an `'es'` row failed with an explicit `new row
+  violates row-level security policy` error, and deleting the `'es'`
+  seed row matched zero rows (silently denied, not an error).
+- All test rows cleaned up afterward (both sides, every table) -- no
+  residue in `customers`, `vehicles`, `inventory`, `purchases`,
+  `repairs`, `invoices`, or `appointments`.
+
+**Unauthenticated (anon-key, no session) access, all 8 tables:**
+every `select` returned HTTP 200 with **zero rows**, including on
+tables that do hold real `'de'` data right now -- RLS denies by
+default with no matching policy for an anonymous request. A direct
+anonymous `insert` attempt on `customers` was rejected outright (HTTP
+401, explicit RLS violation).
+
+**Real UI sync, not just raw REST:** created one clearly-labeled TEST
+customer through the app's own "Neuer Kunde" form while authenticated
+-- it synced with a real `cloudId` (`15`) and no `syncError`, proving
+the whole stack (UI -> `upsertCustomerCloud` -> authenticated
+Supabase call -> RLS) still works end-to-end now that the open policy
+is gone. Cleaned up (cloud + local) immediately after.
+
+**Net result: all 8 WerkPilot tables now have real, enforced,
+per-company access control** -- proven, not assumed, through actual
+allow/own-company, deny/other-company, and deny/unauthenticated tests
+against every one of them, plus one real end-to-end UI test. No open
+`wp_<table>_all` policy remains anywhere in WerkPilot's tables. The
+only account that can currently pass any of these checks is the
+owner's (`Rashid`); the 4 unused accounts are disabled rather than
+provisioned, by the owner's explicit choice, and can be re-enabled
+and linked the same way later if a real staff member starts using
+them.
