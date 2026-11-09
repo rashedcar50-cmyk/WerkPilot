@@ -603,6 +603,20 @@ async function decideLogin(cand, pass){
   const syncAllCloudIdx=appSrc3.indexOf('syncAllCloud().finally');
   assert(cloudSignInIdx>0 && syncAllCloudIdx>cloudSignInIdx, 'PROOF OF FIX: cloud sign-in happens BEFORE cloud sync starts, so sync calls carry a real authenticated session, not just the anon key');
 
+  // --- Fix: reconnecting must retry locally-pending/failed cloud writes ----
+  // Bug found by actually simulating a blocked cloud connection, saving a
+  // record, restoring the connection, and watching it stay unsynced:
+  // syncAllCloud() only ever *pulled* from the cloud -- nothing re-pushed a
+  // record whose earlier upsert had failed (cloudId still unset, syncError
+  // still set). Proof: syncAllCloud's own source now calls
+  // retryPendingCloud() as its very first step, before any load*FromCloud().
+  const cloudSrc=fs.readFileSync(path.join(root,'js/cloud.js'),'utf8');
+  assert(/function retryPendingCloud\(\)/.test(cloudSrc), 'retryPendingCloud() exists');
+  const retryIdx=cloudSrc.indexOf('return retryPendingCloud()');
+  const firstLoadIdx=cloudSrc.indexOf('loadCustomersFromCloud()', cloudSrc.indexOf('function syncAllCloud'));
+  assert(retryIdx>0 && firstLoadIdx>retryIdx, 'PROOF OF FIX: syncAllCloud retries pending local writes before pulling from the cloud');
+  assert(/!x\.cloudId \|\| x\.syncError/.test(cloudSrc), 'retryPendingCloud selects records with no cloudId yet OR a recorded sync error');
+
   // --- Settings page: password change must be hashed + validated ----------
   // Bug found while wiring cloud auth into password changes: the Settings
   // page's own "new password" field stored the password in PLAIN TEXT

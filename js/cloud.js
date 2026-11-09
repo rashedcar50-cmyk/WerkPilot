@@ -343,12 +343,38 @@ async function loadExpensesFromCloud(){
     return true;
   }catch(e){console.warn(e);return false}
 }
+/* Network-recovery fix (2026-11-09): a record saved while the cloud
+   was unreachable gets its upsert call's rejection recorded via
+   markSyncError (syncError set, cloudId stays unset) -- but nothing
+   ever retried it afterward. syncAllCloud() only ever *pulled* from
+   the cloud; reconnecting (even logging back in) did not re-push a
+   single locally-pending change. Found by actually simulating a
+   blocked connection, creating/editing a record, restoring the
+   connection, and watching it stay unsynced -- not by code reading.
+   Fixed by retrying every record (in the current company) that has
+   no cloudId yet or still carries a syncError, using the exact same
+   upsert function a normal save would call, before the usual pull. */
+async function retryPendingCloud(){
+  const companyId = session && session.company && session.company.id;
+  if(!companyId) return;
+  const configs = [
+    ['customers', upsertCustomerCloud], ['vehicles', upsertVehicleCloud],
+    ['purchases', upsertPurchaseCloud], ['inventory', upsertInventoryCloud],
+    ['expenses', upsertExpenseCloud], ['repairs', upsertRepairCloud],
+    ['appointments', upsertAppointmentCloud], ['invoices', upsertInvoiceCloud]
+  ];
+  for(const [table, fn] of configs){
+    const pending = (db[table]||[]).filter(x => x.companyId===companyId && (!x.cloudId || x.syncError));
+    await Promise.all(pending.map(rec => fn(rec).catch(e => console.warn('retryPendingCloud', table, e))));
+  }
+}
 function syncAllCloud(){
   /* Customers and vehicles must land first -- repairs, appointments
      and invoices resolve their relations against db.customers /
      db.vehicles while loading, so those two load sequentially before
      everything else (which has no inter-dependencies among itself). */
-  return loadCustomersFromCloud()
+  return retryPendingCloud()
+    .then(()=>loadCustomersFromCloud())
     .then(()=>loadVehiclesFromCloud())
     .then(()=>Promise.all([
       loadPurchasesFromCloud(), loadInventoryFromCloud(), loadExpensesFromCloud(),
