@@ -1,3 +1,9 @@
+-- APPLIED to production 2026-11-09 (see fix-report-11, "phase 3: full
+-- rollout"). Kept here as a record of exactly what ran, not as a
+-- pending action. One gap found and fixed immediately after applying
+-- this: repairs had no "members can ..." policy at all once its open
+-- one was gone -- see add-repairs-member-policy.sql.
+--
 -- WerkPilot: retire the open wp_<table>_all policies on the 7 tables
 -- that still have one (expenses already lost/never-recreated its own,
 -- see fix-report-11 -- it has been running on real auth+membership
