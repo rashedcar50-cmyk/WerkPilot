@@ -21,12 +21,19 @@ const storeKey='baymeister_v1';
 // install with no stored data yet. See tests/run.js's "account migration"
 // section for a test that pins this down directly.
 const seed={
+ // Confirmed with the business owner (2026-11-09): only one of these
+ // five seeded accounts (Rashid) is actually used. The other four ship
+ // disabled by default -- app.js's login() rejects them outright,
+ // before even checking a password -- rather than relying on nobody
+ // ever guessing a password for an account nobody uses. An owner who
+ // does want one of them active again removes `disabled` on that
+ // account (e.g. via Settings, or directly in stored data).
  users:[
-  {u:'admin',p:null,name:'Admin',role:'manager'},
+  {u:'admin',p:null,name:'Admin',role:'manager',disabled:true},
   {u:'Rashid',p:null,name:'Rashid Tabah',role:'developer'},
-  {u:'accountant',p:null,name:'Buchhaltung',role:'accountant'},
-  {u:'ismail',p:null,name:'Ismail',role:'mechanic'},
-  {u:'warehouse',p:null,name:'Lager',role:'warehouse'}
+  {u:'accountant',p:null,name:'Buchhaltung',role:'accountant',disabled:true},
+  {u:'ismail',p:null,name:'Ismail',role:'mechanic',disabled:true},
+  {u:'warehouse',p:null,name:'Lager',role:'warehouse',disabled:true}
  ],
  companies:[
   {id:'de',name:'TABAH AUTO — Autoservice und Autoteile UG',country:'DE',currency:'EUR',docLang:'de'},

@@ -46,6 +46,11 @@ function login(){
   if(window._loginFails>=5) return $('#loginErr').textContent=t('loginBlocked');
   const name=$('#lu').value.trim(), pass=$('#lp').value;
   const cand=(db.users||[]).find(x=>x.u===name);
+  // Security fix (2026-11-09): a disabled account is rejected outright,
+  // before any password check -- same error message as "wrong
+  // password" so a disabled username can't be distinguished from one
+  // that just doesn't exist or was typed wrong.
+  if(cand && cand.disabled){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
   // Security fix (audit 2026-11-08): an account with no password yet
   // (cand.p==null, a fresh seed -- see core.js) can never pass the normal
   // passOk check by design, so it is routed straight to first-time setup
