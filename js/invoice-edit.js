@@ -250,7 +250,8 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     const f=this.files&&this.files[0]; if(!f) return;
     const hint=$('#scanInvHint'); if(hint) hint.textContent=t('readingSchein');
     try{
-      const {c,v}=await scheinFileToCustomerVehicle(f);
+      const {c,v,cancelled}=await scheinFileToCustomerVehicle(f);
+      if(cancelled){ if(hint) hint.textContent=t('scanAborted')||''; this.value=''; return; }
       fillInvoicePartySelects(c,v);
       if(hint) hint.textContent=(v.plate||v.vin||'')+' · '+(c.name||'');
       toast((v.plate||v.vin||'')+' OK');

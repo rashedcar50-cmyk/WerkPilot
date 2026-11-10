@@ -44,6 +44,29 @@
       }).catch(()=>{});
     }
   }
-  W.Scan={apply};
+  function renderReview(ai, containerSel){
+    containerSel=containerSel||'#ocrReview';
+    const el=typeof $==='function' ? $(containerSel) : (typeof document!=='undefined' ? document.querySelector(containerSel) : null);
+    if(!el) return;
+    if(!ai){ el.innerHTML=''; return; }
+    const esc_=typeof esc==='function' ? esc : (s)=>String(s==null?'':s);
+    const warnings=ai.validationWarnings||[];
+    const cutouts=ai.cutouts||null;
+    let html='';
+    if(ai.ocrSource) html+=`<div class="hint">OCR: ${esc_(ai.ocrSource)}</div>`;
+    if(typeof window!=='undefined' && window.WP && window.WP._autosiastikError){
+      html+=`<div class="ocr-warnings"><div class="ocr-warn">⚠️ ${esc_(window.WP._autosiastikError)}</div></div>`;
+    }
+    if(warnings.length){
+      html+=`<ul class="ocr-warnings">${warnings.map(w=>`<li class="ocr-warn">⚠️ ${esc_(w)}</li>`).join('')}</ul>`;
+    }
+    if(cutouts){
+      const imgs=Object.keys(cutouts).filter(k=>cutouts[k]).map(k=>`<img class="ocr-cutout" title="${esc_(k)}" src="${cutouts[k]}">`).join('');
+      if(imgs) html+=`<div class="ocr-cutouts">${imgs}</div>`;
+    }
+    el.innerHTML=html;
+  }
+  W.Scan={apply,renderReview};
   window.applyScheinToCustomerForm=apply;
+  window.renderScheinReview=renderReview;
 })(window.WP=window.WP||{});

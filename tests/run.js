@@ -629,6 +629,200 @@ async function decideLogin(cand, pass){
   assert(/if\(np\.length<6\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now enforces the same minimum password length');
   assert(/WP\.Engine\.isLegacyDefaultPassword\(u\.u,\s*np\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now rejects reusing an old published default password');
 
+  // --- Autosiastik Fahrzeugschein-Scanner integration -----------------------
+  // Field mapping must preserve raw values exactly as the API returns them
+  // (leading zeros on HSN/plate digits included) and must never invent a
+  // value for a field the API left null/empty.
+  const autoSandbox={window:{WP:{}}, console};
+  vm.createContext(autoSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/autosiastik.js'),'utf8'), autoSandbox);
+  const Auto=autoSandbox.window.WP.Autosiastik;
+  assert(!!Auto && typeof Auto.read==='function','Autosiastik module loads and exposes read()');
+
+  const mappedFull=Auto.mapScan({
+    registrationNumber:'HH-TT 0012', vin:'wvwzzz1jzxw000001',
+    name:'Mustermann\nGmbH', firstname:'', address1:'Hauptstr. 1', address2:'12345 Musterstadt',
+    ez_string:'03.07.2019', ez:'2019-07-03',
+    hsn:'0035', tsn:'0AB', d1:'OPEL', d3:'Astra', p1:'1395', p2_p4:'92', p3:'Benzin', r:'Schwarz',
+    f1:'1800', s1:'5', j:'M1'
+  });
+  assert(mappedFull.hsn==='0035','autosiastik keeps leading zero on HSN (0035, not 35)');
+  assert(mappedFull.tsn==='0AB','autosiastik keeps leading zero on TSN (0AB, not AB)');
+  assert(mappedFull.license_plate==='HH-TT 0012' && mappedFull.plate==='HH-TT 0012','autosiastik keeps the raw registrationNumber, leading zero included');
+  assert(mappedFull.vin==='WVWZZZ1JZXW000001','autosiastik VIN is upper-cased but otherwise unchanged');
+  assert(mappedFull.year==='2019','autosiastik derives year from ez_string');
+  assert(mappedFull.first_registration==='03.07.2019','autosiastik prefers the raw ez_string over the ISO ez field');
+  assert(mappedFull.address==='Hauptstr. 1, 12345 Musterstadt','autosiastik joins address1+address2');
+  assert(mappedFull.brand==='OPEL' && mappedFull.model==='Astra','autosiastik maps d1/d3 to brand/model');
+  assert(mappedFull.engine_displacement_cm3==='1395' && mappedFull.engine_power_kw==='92','autosiastik maps p1/p2_p4 raw');
+
+  const mappedEmpty=Auto.mapScan({registrationNumber:null, vin:null, hsn:null, d1:null});
+  assert(mappedEmpty.license_plate==='' && mappedEmpty.vin==='' && mappedEmpty.hsn==='' && mappedEmpty.brand==='','PROOF: missing/null API fields stay empty -- autosiastik never invents a value');
+
+  const warn1=Auto.buildWarnings({vin:'X',vin_valid:false,vin_validation_msg:'Prüfziffer falsch',hsn:'0035',hsn_valid:true,plate:{valid:false}});
+  assert(warn1.some(w=>/VIN/.test(w) && /Prüfziffer falsch/.test(w)),'autosiastik surfaces the VIN validation message as a warning');
+  assert(warn1.some(w=>/Kennzeichen/.test(w)),'autosiastik warns when plate.valid is false');
+  assert(!warn1.some(w=>/HSN/.test(w)),'autosiastik does NOT warn about a field whose *_valid flag is true');
+  assert(Auto.buildWarnings({}).length===0,'autosiastik returns no warnings when nothing is flagged invalid');
+
+  const cuts1=Auto.buildCutouts({document_img:'AAAA', vin_img:'BBBB'});
+  assert(cuts1 && cuts1.document==='data:image/jpeg;base64,AAAA' && cuts1.vin==='data:image/jpeg;base64,BBBB','autosiastik turns show_cuts base64 fields into data URLs');
+  assert(Auto.buildCutouts({})===null,'autosiastik returns null cutouts when the API sent none (show_cuts off or unsupported doc)');
+
+  // --- Autosiastik: the access key must never be client-side ---------------
+  const autoClientSrc=fs.readFileSync(path.join(root,'js/autosiastik.js'),'utf8');
+  assert(!/AUTOSIASTIK_ACCESS_KEY\s*=\s*['"]/.test(autoClientSrc) && !/access_key['"]?\s*:\s*['"][A-Za-z0-9]/.test(autoClientSrc), 'PROOF: no literal access key is hardcoded in the browser-side module');
+  assert(!/fetch\([^)]*fahrzeugschein-scanner\.de/.test(autoClientSrc), 'PROOF: the browser never calls the Autosiastik API directly -- only the Supabase edge function does');
+  assert(/functions\/v1\/autosiastik-scan/.test(autoClientSrc), 'the client calls the server-side proxy function, not the provider API');
+
+  const autoFnSrc=fs.readFileSync(path.join(root,'supabase/functions/autosiastik-scan/index.ts'),'utf8');
+  assert(/Deno\.env\.get\('AUTOSIASTIK_ACCESS_KEY'\)/.test(autoFnSrc), 'the edge function reads the access key from a server-side secret, never a literal');
+  assert(!/AUTOSIASTIK_ACCESS_KEY\s*=\s*['"][A-Za-z0-9]/.test(autoFnSrc), 'PROOF: no literal access key value is hardcoded in the edge function source');
+  assert(/https:\/\/api\.fahrzeugschein-scanner\.de\//.test(autoFnSrc), 'edge function posts to the documented Autosiastik endpoint');
+  assert(/access_key/.test(autoFnSrc) && /\bfile\b/.test(autoFnSrc), 'edge function sends the documented multipart fields (file, access_key)');
+
+  // get_kba_data must default OFF and require BOTH a deploy-time secret and
+  // an explicit per-request flag -- never a single always-on switch.
+  const kbaBlock=(autoFnSrc.match(/get_kba_data stays OFF[\s\S]{0,400}/)||[''])[0];
+  assert(/AUTOSIASTIK_ALLOW_KBA/.test(kbaBlock) && /getKbaData\s*===\s*true/.test(kbaBlock), 'get_kba_data requires both the AUTOSIASTIK_ALLOW_KBA secret and an explicit request flag');
+  assert(!/form\.append\('get_kba_data',\s*'true'\);\s*$/m.test(autoFnSrc.replace(kbaBlock,'')), 'get_kba_data is only ever appended inside the gated branch, never unconditionally');
+
+  // No automatic retry against the provider for a single scan (credits).
+  const fetchCallsInFn=(autoFnSrc.match(/fetch\(/g)||[]).length;
+  assert(fetchCallsInFn===1, 'the edge function calls the upstream Autosiastik API at most once per request -- no built-in retry loop');
+
+  // --- Autosiastik wired into the existing OCR pipeline as first tier,
+  // current provider (OpenAI/local tiers) kept as fallback -------------------
+  const ocrSrcFull=fs.readFileSync(path.join(root,'js/ocr.js'),'utf8');
+  assert(/W\.Autosiastik\s*&&\s*typeof\s*W\.Autosiastik\.read/.test(ocrSrcFull), 'ocr.js read() tries the Autosiastik provider first when the module is loaded');
+  const autosiastikBlockIdx=ocrSrcFull.indexOf('W.Autosiastik && typeof W.Autosiastik.read');
+  const openaiReadIdx=ocrSrcFull.indexOf('await openaiRead(imgColor)');
+  assert(autosiastikBlockIdx>0 && openaiReadIdx>autosiastikBlockIdx, 'PROOF: Autosiastik is attempted before the existing OpenAI-based pipeline, which remains as a fallback, not removed');
+
+  // --- Dedup: do not merge customers by name alone --------------------------
+  // Reproduces the exact scenario the integration must handle: a brand-new
+  // vehicle scan whose owner name matches an EXISTING customer by text alone.
+  // The fix must never silently attach the new vehicle to that customer
+  // without the user explicitly confirming -- and must do nothing at all if
+  // the user cancels.
+  function makeCustSandbox(){
+    const db={customers:[{id:'cust-1',companyId:'co1',name:'Rashid Tabah',phone:'030-1',address:'Alt 1'}], vehicles:[]};
+    const session={company:{id:'co1'}};
+    const calls={modalShown:0, closeCalls:0, audits:[]};
+    let idn=0;
+    const sb={
+      window:{WP:{}}, console,
+      db, session,
+      id:(p)=>p+'-test-'+(++idn),
+      t:(k)=>({possibleDuplicateCustomer:'dup?',possibleDuplicateHint:'A customer named "{name}" already exists.',createNewCustAnyway:'new',cancelBtn:'cancel',holderOf:'Halter von',newCustDefault:'Neukunde'}[k]||k),
+      esc:(s)=>String(s==null?'':s),
+      companyRows:(name)=> db[name].filter(x=>x.companyId===session.company.id),
+      audit:(a,d)=>calls.audits.push(a+':'+d),
+      save:()=>{},
+      upsertCustomerCloud:()=>{}, upsertVehicleCloud:()=>{},
+      modal:(title,body,onSave,saveText)=>{ calls.modalShown++; },
+      closeModal:()=>{ calls.closeCalls++; },
+      document:null // set per-test below
+    };
+    vm.createContext(sb);
+    return {sb, db, calls};
+  }
+  function fakeDocFor(candidateIds){
+    const handlers={cand:{}, dupNew:null, xmod:null, mcancel:null};
+    const btns=candidateIds.map(cid=>({
+      getAttribute:(k)=> k==='data-cid' ? cid : null,
+      addEventListener:(ev,cb)=>{ handlers.cand[cid]=cb; }
+    }));
+    return {
+      handlers,
+      doc:{
+        querySelectorAll:(sel)=> sel==='#dupChoices .dupcand' ? btns : [],
+        getElementById:(id)=>{
+          if(id==='dupNew') return {addEventListener:(ev,cb)=>{ handlers.dupNew=cb; }};
+          if(id==='xmod') return {addEventListener:(ev,cb)=>{ handlers.xmod=cb; }};
+          if(id==='mcancel') return {addEventListener:(ev,cb)=>{ handlers.mcancel=cb; }};
+          return null;
+        }
+      }
+    };
+  }
+
+  // 1) Vehicle already identified by VIN/plate -> links straight to its
+  //    existing customer, no name-matching/confirmation involved at all.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    db.vehicles.push({id:'veh-1',companyId:'co1',customerId:'cust-1',vin:'WVWZZZ1JZXW000001',plate:'HH-AB 1'});
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const res=await sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000001', owner_name:'Rashid Tabah'});
+    assert(res.existing===true && res.v.id==='veh-1' && res.c.id==='cust-1','a VIN match links to the existing vehicle/customer directly');
+    assert(calls.modalShown===0,'no duplicate-customer prompt is shown when the match is a strong vehicle identifier, not a name guess');
+  }
+
+  // 2) New vehicle, no existing customer shares the owner name -> creates
+  //    straight away (no ambiguity to confirm).
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const res=await sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000002', owner_name:'Completely Unique Name'});
+    assert(res.existing===false && db.customers.length===2 && db.vehicles.length===1,'a genuinely new owner name creates a new customer+vehicle without prompting');
+    assert(calls.modalShown===0,'no prompt is needed when there is no name collision to resolve');
+  }
+
+  // 3) New vehicle, owner name text-matches an EXISTING customer -> must NOT
+  //    silently merge. A confirmation is shown; only an explicit "link to
+  //    this candidate" click actually attaches the vehicle to that customer.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const fd=fakeDocFor(['cust-1']);
+    sb.document=fd.doc;
+    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000003', owner_name:'Rashid Tabah'});
+    assert(calls.modalShown===1,'PROOF OF FIX: a same-name match triggers a confirmation prompt instead of merging silently');
+    assert(typeof fd.handlers.cand['cust-1']==='function','the prompt offers the matching existing customer as a linkable choice');
+    fd.handlers.cand['cust-1'](); // user explicitly picks "link to this customer"
+    const res=await p;
+    assert(res.c.id==='cust-1' && db.customers.length===1,'after explicit confirmation, the vehicle links to the chosen existing customer -- no duplicate customer created');
+    assert(db.vehicles.length===1 && db.vehicles[0].customerId==='cust-1','the new vehicle is attached to the confirmed customer');
+  }
+
+  // 4) Same collision, but the user explicitly chooses "create new customer
+  //    anyway" -- a deliberate duplicate-by-name is allowed, since it is now
+  //    an explicit user decision, not an automatic merge.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const fd=fakeDocFor(['cust-1']);
+    sb.document=fd.doc;
+    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000004', owner_name:'Rashid Tabah'});
+    fd.handlers.dupNew();
+    const res=await p;
+    assert(res.c.id!=='cust-1' && db.customers.length===2,'explicitly choosing "create new anyway" makes a separate customer record, not a merge');
+  }
+
+  // 5) Same collision, user cancels the prompt -> nothing is created or
+  //    linked at all.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const fd=fakeDocFor(['cust-1']);
+    sb.document=fd.doc;
+    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000005', owner_name:'Rashid Tabah'});
+    fd.handlers.mcancel();
+    const res=await p;
+    assert(res.cancelled===true,'cancelling the confirmation reports cancelled:true');
+    assert(db.customers.length===1 && db.vehicles.length===0,'PROOF: cancelling the duplicate-customer prompt writes nothing -- no customer, no vehicle');
+  }
+
+  // Tenant isolation: a same-name customer belonging to a DIFFERENT company
+  // must never be offered as a match candidate.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    db.customers.push({id:'cust-other-tenant',companyId:'co2',name:'Rashid Tabah'});
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const matches=sb.findCustomerNameMatches('Rashid Tabah');
+    assert(matches.length===1 && matches[0].id==='cust-1','findCustomerNameMatches only returns candidates from the current tenant/company');
+  }
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

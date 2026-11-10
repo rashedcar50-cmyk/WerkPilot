@@ -1407,6 +1407,10 @@ function integrations(){
   <p class="hint" id="oaState">${(function(){ const k=typeof readOpenAI==='function'?readOpenAI():(db.settings.openaiKey||''); return k?('Gerät · …'+k.slice(-4)):'Server zuerst — Gerät leer'; })()}</p>
   <button type="button" class="btn primary full" id="oaSave">Notfall-Schlüssel speichern</button>
  </div>
+ <div class="card"><b>Autosiastik Fahrzeugschein-Scanner</b>
+  <p class="muted">Primäre Dokumenten-Erkennung für Fahrzeugschein-Scans (<a href="https://api.fahrzeugschein-scanner.de/redoc" target="_blank" rel="noopener">api.fahrzeugschein-scanner.de</a>). Der Zugangsschlüssel liegt ausschließlich als Supabase-Secret <code>AUTOSIASTIK_ACCESS_KEY</code> auf dem Server (Funktion <code>autosiastik-scan</code>) — er wird nie im Browser, im Code oder in Git gespeichert. Kein Schlüsselfeld hier, bewusst.</p>
+  <p class="hint">Ohne konfigurierten Server-Schlüssel wird automatisch mit der bisherigen OpenAI-Erkennung weitergearbeitet (Fallback). KBA-Anreicherung (<code>get_kba_data</code>) bleibt deaktiviert, solange sie nicht ausdrücklich über das Secret <code>AUTOSIASTIK_ALLOW_KBA=true</code> freigegeben ist.</p>
+ </div>
  <div class="card"><b>Matthies Katy</b>
   <p class="muted">${t('katyHintInt')}</p>
   <div class="field"><label>Vincario API Key</label><input id="vinKey" value="${esc(db.settings.vincarioKey||'')}"></div>

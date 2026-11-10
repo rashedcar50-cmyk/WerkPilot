@@ -120,6 +120,7 @@ async function ingestScheinFile(file){
   try{
     let ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(file): readScheinAI(file));
     if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
+    if(typeof renderScheinReview==='function') renderScheinReview(ai);
     if($('#n')||$('#vplate')) applyScheinToCustomerForm(ai);
     if($('#pl')&&$('#vin')){
       if(ai.license_plate||ai.plate) $('#pl').value=ai.license_plate||ai.plate;
