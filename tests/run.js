@@ -823,6 +823,26 @@ async function decideLogin(cand, pass){
     assert(matches.length===1 && matches[0].id==='cust-1','findCustomerNameMatches only returns candidates from the current tenant/company');
   }
 
+  // --- Regression: every call site of the now-async findOrCreateFromSchein
+  // must await it ---------------------------------------------------------
+  // Bug found during real-device testing (2026-11-11): js/camera.js's
+  // ingestScheinFile() called `findOrCreateFromSchein(ai)` without `await`.
+  // Since the function is async, `found` was a pending Promise, so
+  // `found.v`/`found.c` were undefined and vehicleModal() opened with an
+  // almost-empty prefill -- including no customer selected -- even though
+  // the customer/vehicle were (eventually) created correctly in the
+  // background. Every call site must await it.
+  const camSrc=fs.readFileSync(path.join(root,'js/camera.js'),'utf8');
+  const repSrc=fs.readFileSync(path.join(root,'js/repairs.js'),'utf8');
+  const custSrc2=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
+  [['js/camera.js',camSrc],['js/repairs.js',repSrc],['js/customers.js',custSrc2]].forEach(([name,src])=>{
+    const calls=src.match(/[^\n]*findOrCreateFromSchein\([^)]*\)[^\n]*/g)||[];
+    const defsExcluded=calls.filter(l=>!/^\s*async function findOrCreateFromSchein/.test(l));
+    defsExcluded.forEach(line=>{
+      assert(/await\s+findOrCreateFromSchein\(/.test(line), `PROOF OF FIX: every call to findOrCreateFromSchein() in ${name} is awaited -- "${line.trim()}"`);
+    });
+  });
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

@@ -149,7 +149,8 @@ async function ingestScheinFile(file){
         setTimeout(()=>vehicleModal(dup), 80);
       }
     } else if(!$('#n') && !($('#pl')&&$('#vin'))){
-      const found=findOrCreateFromSchein(ai);
+      const found=await findOrCreateFromSchein(ai);
+      if(found.cancelled){ toast(t('scanAborted')||'Cancelled'); return; }
       save();
       vehicleModal(Object.assign({},found.v,{customerId:found.c&&found.c.id}));
       toast((t('scheinFilled')||t('saved'))+' · '+src);

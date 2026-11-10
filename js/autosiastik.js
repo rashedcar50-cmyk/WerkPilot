@@ -51,6 +51,23 @@
     return w;
   }
 
+  // Strips the (large, base64) *_img fields so the remaining object is safe
+  // to keep around and show in a review/trace panel -- this is what lets a
+  // mismatch between the provider's own field and our mapping be inspected
+  // without needing the browser's Network tab.
+  function rawTextFields(d){
+    d=d||{};
+    const out={};
+    Object.keys(d).forEach(k=>{
+      if(/_img$/.test(k)) return;
+      if(k==='extra_pages') return;
+      const v=d[k];
+      if(v==null || v==='') return;
+      out[k]=v;
+    });
+    return out;
+  }
+
   function buildCutouts(d){
     d=d||{};
     const pick=b64=> b64 ? ('data:image/jpeg;base64,'+b64) : '';
@@ -122,8 +139,9 @@
     mapped.cutouts=buildCutouts(d);
     mapped.kbaFound=(d.kba_found===true);
     mapped.documentId=str(d.document_id);
+    mapped.raw=rawTextFields(d); // full provider fields (no images) -- for the review/trace panel
     return mapped;
   }
 
-  W.Autosiastik={read, mapScan, buildWarnings, buildCutouts};
+  W.Autosiastik={read, mapScan, buildWarnings, buildCutouts, rawTextFields};
 })(window.WP=window.WP||{});

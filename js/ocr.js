@@ -693,6 +693,7 @@
           W._autosiastikError=auto.message||('http-'+(auto.status||0));
           console.warn('autosiastik', W._autosiastikError);
         } else if(auto){
+          W._autosiastikRaw=auto.raw||null; // console-inspectable trace, no Network tab needed
           const a=stripDemo(auto);
           const enoughAuto=(a.vin||a.license_plate) && (a.hsn||a.model||a.brand||a.make);
           if(enoughAuto){
