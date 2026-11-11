@@ -886,6 +886,21 @@ async function decideLogin(cand, pass){
     });
   });
 
+  // --- Regression: the header's displayed version must never drift from --
+  // the real cache-busting version again (found stuck at "v1.13.2" in the
+  // UI while index.html/sw.js were already several versions ahead).
+  const appSrcVer=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(!/class="ver">v1\.13\.2</.test(appSrcVer), 'PROOF OF FIX: the header version label is no longer a hardcoded, driftable string');
+  assert(/class="ver">v\$\{esc\(\(location\.search\.match/.test(appSrcVer), 'the header version label is now read from the actual URL version param at render time');
+
+  // --- Regression: the review panel must list every mapped field, so an
+  // empty Zulässige Gesamtmasse/Sitze/Nenndrehzahl is visible for review
+  // instead of silently missing from the panel entirely. ------------------
+  const scanSrc2=fs.readFileSync(path.join(root,'js/scan.js'),'utf8');
+  ['engine_rated_rpm','maxWeight','seats'].forEach(k=>{
+    assert(new RegExp(k+":'").test(scanSrc2), `review panel's MAPPED_FIELD_LABELS includes ${k} -- an empty value here must be visible, not just absent`);
+  });
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

@@ -47,8 +47,10 @@
   const MAPPED_FIELD_LABELS={
     license_plate:'Kennzeichen', vin:'VIN', hsn:'HSN', tsn:'TSN',
     brand:'Marke', model:'Modell', year:'Baujahr', first_registration:'Erstzulassung',
-    engine_power_kw:'Leistung (kW)', engine_displacement_cm3:'Hubraum (cm³)',
+    engine_power_kw:'Leistung (kW)', engine_rated_rpm:'Nenndrehzahl (U/min)',
+    engine_displacement_cm3:'Hubraum (cm³)',
     fuel_type:'Kraftstoff', color:'Farbe', vehicleClass:'Fahrzeugklasse',
+    maxWeight:'Zul. Gesamtmasse (kg)', seats:'Sitze',
     owner_name:'Halter', address:'Anschrift'
   };
   function kv(label, val){
