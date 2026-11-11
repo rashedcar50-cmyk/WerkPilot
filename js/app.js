@@ -319,7 +319,7 @@ function render(force){
  WP._uiLang=lang; WP._uid=uid; WP._cid=cid;
  const allowed=nav().filter(([k])=>roleCan(k));
  $('#app').innerHTML=`<div class="shell henry-skin">
- <div class="henry-top"><span class="ver">v1.13.2</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
+ <div class="henry-top"><span class="ver">v${esc((location.search.match(/[?&]v=([^&]*)/)||[])[1]||'')}</span> ${t('loggedInAs')}: ${esc(session.user.name||'')} · TABAH AUTO
   <span class="henry-top-right"><button class="btn ghost small" id="logout">${t('logout')}</button></span>
  </div>
  <aside class="sidebar" id="side"><div class="sidebrand"><div class="brand-mark"><img class="app-logo" src="logo-app.jpg" alt="TABAH AUTO"></div></div><div class="nav">
@@ -1406,6 +1406,10 @@ function integrations(){
   <div class="field"><label>Notfall-Schlüssel (Gerät)</label><input id="oaKey" type="password" autocomplete="off" value="${esc((typeof readOpenAI==='function'?readOpenAI():'')||db.settings.openaiKey||'')}" placeholder="sk-… nur falls Server fehlt"></div>
   <p class="hint" id="oaState">${(function(){ const k=typeof readOpenAI==='function'?readOpenAI():(db.settings.openaiKey||''); return k?('Gerät · …'+k.slice(-4)):'Server zuerst — Gerät leer'; })()}</p>
   <button type="button" class="btn primary full" id="oaSave">Notfall-Schlüssel speichern</button>
+ </div>
+ <div class="card"><b>Autosiastik Fahrzeugschein-Scanner</b>
+  <p class="muted">Primäre Dokumenten-Erkennung für Fahrzeugschein-Scans (<a href="https://api.fahrzeugschein-scanner.de/redoc" target="_blank" rel="noopener">api.fahrzeugschein-scanner.de</a>). Der Zugangsschlüssel liegt ausschließlich als Supabase-Secret <code>AUTOSIASTIK_ACCESS_KEY</code> auf dem Server (Funktion <code>autosiastik-scan</code>) — er wird nie im Browser, im Code oder in Git gespeichert. Kein Schlüsselfeld hier, bewusst.</p>
+  <p class="hint">Ohne konfigurierten Server-Schlüssel wird automatisch mit der bisherigen OpenAI-Erkennung weitergearbeitet (Fallback). KBA-Anreicherung (<code>get_kba_data</code>) bleibt deaktiviert, solange sie nicht ausdrücklich über das Secret <code>AUTOSIASTIK_ALLOW_KBA=true</code> freigegeben ist.</p>
  </div>
  <div class="card"><b>Matthies Katy</b>
   <p class="muted">${t('katyHintInt')}</p>

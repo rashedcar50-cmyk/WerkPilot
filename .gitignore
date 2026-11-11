@@ -1,0 +1,7 @@
+# Local secrets -- never commit API keys / access tokens.
+# (AUTOSIASTIK_ACCESS_KEY, OPENAI_API_KEY etc. live as Supabase secrets,
+# never in this repo. See KEYS.md.)
+.env
+.env.*
+*.local.env
+supabase/.temp/

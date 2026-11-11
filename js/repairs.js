@@ -15,6 +15,7 @@ function scanScheinStartRepair(mode){
     <img id="ocrImg" class="ocr-preview hidden">
     <div id="ocrStatus" class="hint"></div>
     <div id="scheinPreview" class="hidden"></div>
+    <div id="ocrReview"></div>
   </div>`, async()=>{
     const f=$('#doc').files[0];
     if(!f) return toast(t('pickScheinFirst'));
@@ -22,7 +23,8 @@ function scanScheinStartRepair(mode){
       const km=Number($('#scheinKm')?.value||0);
       if(!km) return toast(t('kmNowEx'));
       const ai=window._scheinAI;
-      const {c,v}=findOrCreateFromSchein(ai);
+      const {c,v,cancelled}=await findOrCreateFromSchein(ai);
+      if(cancelled){ toast(t('scanAborted')||'Cancelled'); return; }
       v.km=km; upsertVehicleCloud(v); save();
       const complaint=($('#scheinWork')&&$('#scheinWork').value||'').trim() || t('scheinIntake');
       window._scheinReady=false; window._scheinAI=null;
@@ -68,6 +70,7 @@ function scanScheinStartRepair(mode){
         if(!ai.license_plate && !ai.vin) throw err;
       }
       window._scheinAI=ai; window._scheinReady=true;
+      if(typeof renderScheinReview==='function') renderScheinReview(ai);
       const plate=ai.license_plate||ai.plate||'-';
       const vin=ai.vin||'-';
       const owner=ai.owner_name||ai.holder||ai.customer_name||'-';

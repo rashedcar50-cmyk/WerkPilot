@@ -45,6 +45,7 @@ function customerModal(existing){
   <div class="hint">${t('ocrHint')}</div>
   <img id="ocrImg" class="ocr-preview hidden">
   <div id="ocrStatus" class="hint"></div>
+  <div id="ocrReview"></div>
  </div>`}
  <div class="field"><label>${t('customerType')}</label><select id="ctype"><option value="person" ${c0.type!=='company'?'selected':''}>${t('person')}</option><option value="company" ${c0.type==='company'?'selected':''}>${t('company')}</option></select></div>
  <div class="field"><label>${t('contact')}</label><input id="n" value="${esc(c0.name||c0.contact||'')}"></div>
@@ -206,16 +207,17 @@ function vehicleModal(prefill={}){
  <div class="field"><label>${t('displacement')}</label><input id="cc" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
  <div class="field"><label>${t('fuel')}</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
  <div class="field"><label>${t('powerKw')}</label><input id="kw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_power_kw||'')}"></div>
+ <div class="field"><label>${t('ratedRpm')}</label><input id="vrpm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_rated_rpm||prefill.ratedRpm||'')}" placeholder="U/min"></div>
  <div class="field"><label>${t('maxWeight')}</label><input id="vmaxw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.maxWeight||'')}"></div>
  <div class="field"><label>${t('seats')}</label><input id="vseats" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.seats||'')}"></div>
  <div class="field"><label>${t('vClass')}</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
  <div class="field"><label>${t('engineCode')}</label><input id="en" value="${esc(prefill.engine||'')}"></div>
- <div class="field"><label>${t('paintCode')}</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="Fahrzeugschein"></div>
+ <div class="field"><label>${t('paintCode')}</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="z. B. Schwarz Metallic"></div>
  <div class="field"><label>${t('km')}</label><input id="vkm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.km||'')}"></div>
  <div class="field"><label>${t('nextService')}</label><input id="vnext" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
   if(!$('#cu').value)return toast(t('pickCustomerFirst'));
-  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
+  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ratedRpm:$('#vrpm')?.value||'',maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
   else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
  });
@@ -225,6 +227,13 @@ function vehicleModal(prefill={}){
   bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',year:'#yr',kw:'#kw',cc:'#cc',fuel:'#fuel',seats:'#vseats',weight:'#vmaxw',klass:'#vklass'});
 }
 function scanVehicleDocument(){
+ // Two-step, like repairs.js's scan-to-job flow: the first click only reads
+ // and shows the review panel (source, mapped fields, warnings, raw data).
+ // The actual customer/vehicle creation only happens on an EXPLICIT second
+ // click -- this is the fix for a real bug where the review used to render
+ // and then be destroyed by closeModal() within the same continuation,
+ // before anyone could actually read it.
+ let ready=false, lastAi=null;
  modal(t('scanScheinTitle'),`<div class="field">
  <label>${t('pickSchein')}</label>
  <input id="doc" type="file" accept="image/*" class="hidden">
@@ -237,20 +246,31 @@ function scanVehicleDocument(){
  <div class="hint">${t('ocrHint')}</div>
  <img id="ocrImg" class="ocr-preview hidden">
  <div id="ocrBox" class="hidden"><div class="progress"><div id="ocrProg"></div></div><div id="ocrStatus" class="muted"></div></div>
+ <div id="ocrReview"></div>
  </div>`,async()=>{
-  const f=$('#doc').files[0];if(!f)return toast(t('pickScheinFirst'));
-  $('#ocrBox').classList.remove('hidden');
-  $('#msave').disabled=true;
+  if(!ready){
+   const f=$('#doc').files[0];if(!f)return toast(t('pickScheinFirst'));
+   $('#ocrBox').classList.remove('hidden');
+   $('#msave').disabled=true;
+   try{
+    const url=URL.createObjectURL(f);$('#ocrImg').src=url;$('#ocrImg').classList.remove('hidden');
+    $('#ocrStatus').textContent = t('readingAI');
+    let ai = await (WP.OCR && WP.OCR.read ? WP.OCR.read(f) : readScheinAI(f));
+    if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
+    if(typeof renderScheinReview==='function') renderScheinReview(ai);
+    lastAi=ai; ready=true;
+    $('#ocrStatus').textContent = t('scheinFilled')||'';
+    if($('#msave')){ $('#msave').disabled=false; $('#msave').textContent=t('useThisData')||t('readData'); }
+   }catch(e){console.error(e);$('#ocrStatus').textContent=t('ocrManual');$('#msave').disabled=false}
+   return;
+  }
   try{
-   const url=URL.createObjectURL(f);$('#ocrImg').src=url;$('#ocrImg').classList.remove('hidden');
-   $('#ocrStatus').textContent = t('readingAI');
-   let ai = await (WP.OCR && WP.OCR.read ? WP.OCR.read(f) : readScheinAI(f));
-   if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
-   const {c,v}=findOrCreateFromSchein(ai);
+   const {c,v,cancelled}=await findOrCreateFromSchein(lastAi);
+   if(cancelled){ toast(t('scanAborted')||'Cancelled'); return; }
    closeModal();
    vehicleModal(v);
    toast((c&&c.name?c.name+' · ':'')+(v.plate||v.vin||''));
-  }catch(e){console.error(e);$('#ocrStatus').textContent=t('ocrManual');$('#msave').disabled=false}
+  }catch(e){ console.error(e); toast(t('ocrFailSchein')); }
  },t('readData'));
  $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden'); if($('#docName')) $('#docName').textContent=f.name;}};
  if($('#pickDoc')) $('#pickDoc').onclick=()=>$('#doc').click();
@@ -271,31 +291,91 @@ function findExistingVehicle(ai){
     return false;
   })||null;
 }
-function findOrCreateFromSchein(ai){
-  const plate = (ai.license_plate || ai.plate || '').trim();
-  const vin = (ai.vin || '').trim().toUpperCase();
-  let v = findExistingVehicle(ai);
-  if(v){
-    const c = db.customers.find(x=>x.id===v.customerId) || db.customers.find(x=>x.companyId===session.company.id && x.id===v.customerId);
-    return {c,v,existing:true};
-  }
-  const ownerName = (ai.owner_name || ai.holder || ai.customer_name || '').trim() || (plate ? (t('holderOf')+' '+plate) : t('newCustDefault'));
-  const ownerPhone = (ai.phone || ai.owner_phone || '').trim();
-  const ownerAddr = (ai.address || ai.owner_address || '').trim();
-  let c = db.customers.find(x=>x.companyId===session.company.id && x.name===ownerName);
-  if(!c){
-    c={id:id('c'),companyId:session.company.id,name:ownerName,phone:ownerPhone,email:'',address:ownerAddr};
-    db.customers.push(c); upsertCustomerCloud(c);
-  }
-  v={id:id('v'),companyId:session.company.id,customerId:c.id,cloudId:undefined,
+function normNameKey(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+
+// Finds existing customers whose name matches by text alone. Returning
+// candidates here is *not* a merge decision -- the caller must ask the user
+// before linking to any of them. See askScheinCustomerChoice().
+function findCustomerNameMatches(ownerName){
+  const key=normNameKey(ownerName);
+  if(!key) return [];
+  return companyRows('customers').filter(x=>normNameKey(x.companyName||x.name)===key);
+}
+
+// Shows existing same-name customers and lets the user pick one to link to,
+// or explicitly create a new, separate customer record instead. Resolves to
+// a candidate id, '__new__', or null (user cancelled -- caller must not
+// create anything). This is the confirmation step required before a scanned
+// vehicle is ever attached to a customer found by name alone.
+function askScheinCustomerChoice(ownerName, candidates){
+  return new Promise(resolve=>{
+    let settled=false;
+    const finish=(val)=>{ if(settled) return; settled=true; closeModal(); resolve(val); };
+    const rows=candidates.slice(0,6).map(c=>
+      `<button type="button" class="btn full dupcand" data-cid="${esc(c.id)}" style="margin-bottom:6px;text-align:start">${esc(c.companyName||c.name||c.id)}${c.phone?(' · '+esc(c.phone)):''}${c.address?(' · '+esc(c.address)):''}</button>`
+    ).join('');
+    modal(t('possibleDuplicateCustomer')||'Kunde eventuell schon vorhanden',
+      `<p class="hint">${esc((t('possibleDuplicateHint')||'A customer named "{name}" already exists.').replace('{name}',ownerName))}</p>
+       <div id="dupChoices">${rows}</div>
+       <button type="button" class="btn primary full" id="dupNew" style="margin-top:6px">${t('createNewCustAnyway')||'Create new customer anyway'}</button>`,
+      null, t('cancelBtn'));
+    document.querySelectorAll('#dupChoices .dupcand').forEach(btn=>{
+      btn.addEventListener('click', ()=>finish(btn.getAttribute('data-cid')));
+    });
+    const newBtn=document.getElementById('dupNew');
+    if(newBtn) newBtn.addEventListener('click', ()=>finish('__new__'));
+    const xm=document.getElementById('xmod'), mc=document.getElementById('mcancel');
+    if(xm) xm.addEventListener('click', ()=>finish(null));
+    if(mc) mc.addEventListener('click', ()=>finish(null));
+  });
+}
+
+function buildVehicleFromAi(ai, customerId){
+  const plate=(ai.license_plate||ai.plate||'').trim();
+  const vin=(ai.vin||'').trim().toUpperCase();
+  return {id:id('v'),companyId:session.company.id,customerId,cloudId:undefined,
     plate, vin, make:ai.brand||ai.make||'', model:ai.model||'', year:ai.year||'',
     engine:ai.engine_code||ai.engine||'', paint:ai.color||ai.paint||'',
     engine_displacement_cm3:ai.engine_displacement_cm3||'', fuel_type:ai.fuel_type||'',
-    engine_power_kw:ai.engine_power_kw||'', hsn:ai.hsn||'', tsn:ai.tsn||'', kba:ai.kba||((ai.hsn||'')+' '+(ai.tsn||'')).trim(),
+    engine_power_kw:ai.engine_power_kw||'', ratedRpm:ai.engine_rated_rpm||ai.ratedRpm||'', hsn:ai.hsn||'', tsn:ai.tsn||'', kba:ai.kba||((ai.hsn||'')+' '+(ai.tsn||'')).trim(),
     maxWeight:ai.maxWeight||'', seats:ai.seats||'', vehicleClass:ai.vehicleClass||'',
     km:0, nextServiceKm:0, photo:'',
-    ocrSource:'fahrzeugschein'};
-  db.vehicles.push(v); upsertVehicleCloud(v);
+    ocrSource:ai.ocrSource||'fahrzeugschein'};
+}
+
+// Links the scanned vehicle to an existing customer/vehicle when a strong
+// identifier (VIN or plate) already matches -- that is a safe, unambiguous
+// identity match, not a name-based guess. Otherwise creates (or, after
+// explicit user confirmation, links to) a customer, tenant-scoped via
+// session.company.id throughout, and never writes anything if the user
+// cancels the confirmation prompt.
+async function findOrCreateFromSchein(ai){
+  let v = findExistingVehicle(ai);
+  if(v){
+    const c = db.customers.find(x=>x.id===v.customerId) || null;
+    return {c,v,existing:true};
+  }
+  const plate = (ai.license_plate || ai.plate || '').trim();
+  const explicitName = (ai.owner_name || ai.holder || ai.customer_name || '').trim();
+  const ownerName = explicitName || (plate ? (t('holderOf')+' '+plate) : t('newCustDefault'));
+  const ownerPhone = (ai.phone || ai.owner_phone || '').trim();
+  const ownerAddr = (ai.address || ai.owner_address || '').trim();
+
+  let c=null;
+  if(explicitName){
+    const candidates=findCustomerNameMatches(explicitName);
+    if(candidates.length){
+      const choice=await askScheinCustomerChoice(explicitName, candidates);
+      if(choice===null) return {c:null, v:null, cancelled:true};
+      if(choice!=='__new__') c=candidates.find(x=>x.id===choice)||null;
+    }
+  }
+  if(!c){
+    c={id:id('c'),companyId:session.company.id,name:ownerName,phone:ownerPhone,email:'',address:ownerAddr};
+    db.customers.push(c); upsertCustomerCloud(c); audit('customer.create', c.name);
+  }
+  v=buildVehicleFromAi(ai, c.id);
+  db.vehicles.push(v); upsertVehicleCloud(v); audit('vehicle.create', v.plate||v.vin);
   return {c,v,existing:false};
 }
 async function scheinFileToCustomerVehicle(file){
@@ -316,7 +396,8 @@ async function scheinFileToCustomerVehicle(file){
     if(WP.OCR&&WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai);
     if(!ai.license_plate && !ai.vin) throw err;
   }
-  const {c,v}=findOrCreateFromSchein(ai);
+  const {c,v,cancelled}=await findOrCreateFromSchein(ai);
+  if(cancelled) return {c:null,v:null,ai,cancelled:true};
   save();
   return {c,v,ai};
 }

@@ -629,6 +629,278 @@ async function decideLogin(cand, pass){
   assert(/if\(np\.length<6\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now enforces the same minimum password length');
   assert(/WP\.Engine\.isLegacyDefaultPassword\(u\.u,\s*np\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now rejects reusing an old published default password');
 
+  // --- Autosiastik Fahrzeugschein-Scanner integration -----------------------
+  // Field mapping must preserve raw values exactly as the API returns them
+  // (leading zeros on HSN/plate digits included) and must never invent a
+  // value for a field the API left null/empty.
+  const autoSandbox={window:{WP:{}}, console};
+  vm.createContext(autoSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/autosiastik.js'),'utf8'), autoSandbox);
+  const Auto=autoSandbox.window.WP.Autosiastik;
+  assert(!!Auto && typeof Auto.read==='function','Autosiastik module loads and exposes read()');
+
+  const mappedFull=Auto.mapScan({
+    registrationNumber:'HH-TT 0012', vin:'wvwzzz1jzxw000001',
+    name:'Mustermann\nGmbH', firstname:'', address1:'Hauptstr. 1', address2:'12345 Musterstadt',
+    ez_string:'03.07.2019', ez:'2019-07-03',
+    hsn:'0035', tsn:'0AB', d1:'OPEL', d3:'Astra', p1:'1395', p2_p4:'92', p3:'Benzin', r:'Schwarz',
+    f1:'1800', s1:'5', j:'M1'
+  });
+  assert(mappedFull.hsn==='0035','autosiastik keeps leading zero on HSN (0035, not 35)');
+  assert(mappedFull.tsn==='0AB','autosiastik keeps leading zero on TSN (0AB, not AB)');
+  assert(mappedFull.license_plate==='HH-TT 0012' && mappedFull.plate==='HH-TT 0012','autosiastik keeps the raw registrationNumber, leading zero included');
+  assert(mappedFull.vin==='WVWZZZ1JZXW000001','autosiastik VIN is upper-cased but otherwise unchanged');
+  assert(mappedFull.year==='2019','autosiastik derives year from ez_string');
+  assert(mappedFull.first_registration==='03.07.2019','autosiastik prefers the raw ez_string over the ISO ez field');
+  assert(mappedFull.address==='Hauptstr. 1, 12345 Musterstadt','autosiastik joins address1+address2');
+  assert(mappedFull.brand==='OPEL' && mappedFull.model==='Astra','autosiastik maps d1/d3 to brand/model');
+  assert(mappedFull.engine_displacement_cm3==='1395' && mappedFull.engine_power_kw==='92','autosiastik maps p1/p2_p4 raw');
+
+  const mappedEmpty=Auto.mapScan({registrationNumber:null, vin:null, hsn:null, d1:null});
+  assert(mappedEmpty.license_plate==='' && mappedEmpty.vin==='' && mappedEmpty.hsn==='' && mappedEmpty.brand==='','PROOF: missing/null API fields stay empty -- autosiastik never invents a value');
+
+  const warn1=Auto.buildWarnings({vin:'X',vin_valid:false,vin_validation_msg:'Prüfziffer falsch',hsn:'0035',hsn_valid:true,plate:{valid:false}});
+  assert(warn1.some(w=>/VIN/.test(w) && /Prüfziffer falsch/.test(w)),'autosiastik surfaces the VIN validation message as a warning');
+  assert(warn1.some(w=>/Kennzeichen/.test(w)),'autosiastik warns when plate.valid is false');
+  assert(!warn1.some(w=>/HSN/.test(w)),'autosiastik does NOT warn about a field whose *_valid flag is true');
+  assert(Auto.buildWarnings({}).length===0,'autosiastik returns no warnings when nothing is flagged invalid');
+
+  const cuts1=Auto.buildCutouts({document_img:'AAAA', vin_img:'BBBB'});
+  assert(cuts1 && cuts1.document==='data:image/jpeg;base64,AAAA' && cuts1.vin==='data:image/jpeg;base64,BBBB','autosiastik turns show_cuts base64 fields into data URLs');
+  assert(Auto.buildCutouts({})===null,'autosiastik returns null cutouts when the API sent none (show_cuts off or unsupported doc)');
+
+  // --- Autosiastik: the access key must never be client-side ---------------
+  const autoClientSrc=fs.readFileSync(path.join(root,'js/autosiastik.js'),'utf8');
+  assert(!/AUTOSIASTIK_ACCESS_KEY\s*=\s*['"]/.test(autoClientSrc) && !/access_key['"]?\s*:\s*['"][A-Za-z0-9]/.test(autoClientSrc), 'PROOF: no literal access key is hardcoded in the browser-side module');
+  assert(!/fetch\([^)]*fahrzeugschein-scanner\.de/.test(autoClientSrc), 'PROOF: the browser never calls the Autosiastik API directly -- only the Supabase edge function does');
+  assert(/functions\/v1\/autosiastik-scan/.test(autoClientSrc), 'the client calls the server-side proxy function, not the provider API');
+
+  const autoFnSrc=fs.readFileSync(path.join(root,'supabase/functions/autosiastik-scan/index.ts'),'utf8');
+  assert(/Deno\.env\.get\('AUTOSIASTIK_ACCESS_KEY'\)/.test(autoFnSrc), 'the edge function reads the access key from a server-side secret, never a literal');
+  assert(!/AUTOSIASTIK_ACCESS_KEY\s*=\s*['"][A-Za-z0-9]/.test(autoFnSrc), 'PROOF: no literal access key value is hardcoded in the edge function source');
+  assert(/https:\/\/api\.fahrzeugschein-scanner\.de\//.test(autoFnSrc), 'edge function posts to the documented Autosiastik endpoint');
+  assert(/access_key/.test(autoFnSrc) && /\bfile\b/.test(autoFnSrc), 'edge function sends the documented multipart fields (file, access_key)');
+
+  // get_kba_data must default OFF and require BOTH a deploy-time secret and
+  // an explicit per-request flag -- never a single always-on switch.
+  const kbaBlock=(autoFnSrc.match(/get_kba_data stays OFF[\s\S]{0,400}/)||[''])[0];
+  assert(/AUTOSIASTIK_ALLOW_KBA/.test(kbaBlock) && /getKbaData\s*===\s*true/.test(kbaBlock), 'get_kba_data requires both the AUTOSIASTIK_ALLOW_KBA secret and an explicit request flag');
+  assert(!/form\.append\('get_kba_data',\s*'true'\);\s*$/m.test(autoFnSrc.replace(kbaBlock,'')), 'get_kba_data is only ever appended inside the gated branch, never unconditionally');
+
+  // No automatic retry against the provider for a single scan (credits).
+  const fetchCallsInFn=(autoFnSrc.match(/fetch\(/g)||[]).length;
+  assert(fetchCallsInFn===1, 'the edge function calls the upstream Autosiastik API at most once per request -- no built-in retry loop');
+
+  // --- Autosiastik wired into the existing OCR pipeline as first tier,
+  // current provider (OpenAI/local tiers) kept as fallback -------------------
+  const ocrSrcFull=fs.readFileSync(path.join(root,'js/ocr.js'),'utf8');
+  assert(/W\.Autosiastik\s*&&\s*typeof\s*W\.Autosiastik\.read/.test(ocrSrcFull), 'ocr.js read() tries the Autosiastik provider first when the module is loaded');
+  const autosiastikBlockIdx=ocrSrcFull.indexOf('W.Autosiastik && typeof W.Autosiastik.read');
+  const openaiReadIdx=ocrSrcFull.indexOf('await openaiRead(imgColor)');
+  assert(autosiastikBlockIdx>0 && openaiReadIdx>autosiastikBlockIdx, 'PROOF: Autosiastik is attempted before the existing OpenAI-based pipeline, which remains as a fallback, not removed');
+
+  // --- Real-device findings (2026-11-11, Nissan Almera Zulassungsbescheinigung
+  // + a prior VW test): the provider prints some fields in combined/blank
+  // forms that need a GENERAL, document-format-agnostic fix -- not a value
+  // hardcoded for any one vehicle. ----------------------------------------
+  assert(Auto.splitPowerRpm('85/5600').kw==='85' && Auto.splitPowerRpm('85/5600').rpm==='5600' && Auto.splitPowerRpm('85/5600').derived===true, 'splitPowerRpm splits an old-style combined "kW/Drehzahl" cell');
+  assert(Auto.splitPowerRpm('75/3000').kw==='75' && Auto.splitPowerRpm('75/3000').rpm==='3000', 'splitPowerRpm is format-general, not specific to one vehicle (VW test case)');
+  const plainKw=Auto.splitPowerRpm('85');
+  assert(plainKw.kw==='85' && plainKw.rpm==='' && plainKw.derived===false, 'splitPowerRpm leaves a plain single kW value (new-style template) untouched -- no invented RPM');
+  assert(Auto.splitPowerRpm('').kw==='' && Auto.splitPowerRpm('').rpm==='', 'splitPowerRpm never invents values for an empty field');
+
+  assert(Auto.isBlankish('') && Auto.isBlankish('-') && Auto.isBlankish('—') && !Auto.isBlankish('OPEL'), 'isBlankish recognizes empty/dash placeholders printed on some documents');
+  const bm1=Auto.splitBrandModel('-', 'NISSAN ALMERA');
+  assert(bm1.brand==='NISSAN' && bm1.model==='ALMERA' && bm1.derived===true, 'splitBrandModel derives the brand from the model text ONLY when D.1 itself is blank/dash, using a known-manufacturer list (general, not a NISSAN-specific hardcode)');
+  const bmAnyMake=Auto.splitBrandModel('', 'SKODA OCTAVIA');
+  assert(bmAnyMake.brand==='SKODA' && bmAnyMake.model==='OCTAVIA', 'splitBrandModel works for any manufacturer in the known list, not just the one seen during testing');
+  const bm2=Auto.splitBrandModel('OPEL', 'Astra Sports Tourer');
+  assert(bm2.brand==='OPEL' && bm2.model==='Astra Sports Tourer' && bm2.derived===false, 'splitBrandModel leaves brand/model alone when D.1 already has a real value');
+  const bm3=Auto.splitBrandModel('', 'Totally Unrecognized Model Name');
+  assert(bm3.brand==='' && bm3.derived===false, 'splitBrandModel never invents a brand when no known manufacturer name matches -- stays empty for review, not guessed');
+
+  const nissanScan=Auto.mapScan({d1:'-', d3:'NISSAN ALMERA', p1:'1769', p2_p4:'85/5600', ez_string:'19.05.2004', f1:'1735', s1:'5', j:'01'});
+  assert(nissanScan.brand==='NISSAN' && nissanScan.model==='ALMERA', 'mapScan applies the brand/model split end-to-end');
+  assert(nissanScan.engine_power_kw==='85' && nissanScan.engine_rated_rpm==='5600', 'mapScan applies the power/RPM split end-to-end, keeping both values (neither is silently dropped)');
+  assert(nissanScan.engine_displacement_cm3==='1769', 'mapScan still preserves Hubraum exactly as the provider returned it (1769) -- any 769-vs-1769 mismatch is upstream recognition, not our mapping, and must never be "corrected" by guessing');
+  assert(nissanScan.maxWeight==='1735' && nissanScan.seats==='5', 'mapScan still passes through f1/s1 when the provider actually returns them -- confirms the pipeline has no bug dropping these fields');
+  assert(nissanScan._derivationWarnings.some(w=>/Marke/.test(w)) && nissanScan._derivationWarnings.some(w=>/Leistung/.test(w)) && nissanScan._derivationWarnings.some(w=>/Baujahr/.test(w)), 'every derived (non-literal) value is flagged in _derivationWarnings for review, not presented as a plain confirmed fact');
+
+  const plainFormatScan=Auto.mapScan({d1:'VOLKSWAGEN', d3:'Golf', p2_p4:'66', ez_string:'01.01.2020'});
+  assert(plainFormatScan.brand==='VOLKSWAGEN' && plainFormatScan.engine_power_kw==='66' && !plainFormatScan.engine_rated_rpm, 'a newer-style document (plain D.1 + single kW value) is handled correctly too -- same code path supports both old and new certificate formats');
+  assert(!plainFormatScan._derivationWarnings.some(w=>/Marke/.test(w)) && !plainFormatScan._derivationWarnings.some(w=>/Leistung/.test(w)), 'no derivation warning is raised for fields that were NOT derived (D.1 already present, power already a single value)');
+
+  // --- Regression: the review panel must survive long enough to be read --
+  // Bug found during real-device testing: scanVehicleDocument() rendered
+  // the review panel and then called closeModal() in the very same click
+  // handler, destroying it before a human could read it. Fixed with an
+  // explicit two-step gate (read -> show review -> second click confirms).
+  const custSrc3=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
+  const scanFnBody=(custSrc3.match(/function scanVehicleDocument\(\)\{[\s\S]*?\r?\n\}/)||[''])[0];
+  assert(/let ready=false/.test(scanFnBody), 'PROOF OF FIX: scanVehicleDocument has an explicit ready/confirmed state, not a single auto-continuing step');
+  const firstReadIdx=scanFnBody.indexOf('renderScheinReview(ai)');
+  const closeModalIdx=scanFnBody.indexOf('closeModal();', firstReadIdx); // the real call, not the explanatory comment above it
+  assert(firstReadIdx>0 && closeModalIdx>firstReadIdx && scanFnBody.slice(firstReadIdx,closeModalIdx).includes('return;'), 'PROOF OF FIX: rendering the review and closing the modal are in different passes (an explicit `return` separates them) -- the review is no longer destroyed in the same continuation that renders it');
+
+  // --- Dedup: do not merge customers by name alone --------------------------
+  // Reproduces the exact scenario the integration must handle: a brand-new
+  // vehicle scan whose owner name matches an EXISTING customer by text alone.
+  // The fix must never silently attach the new vehicle to that customer
+  // without the user explicitly confirming -- and must do nothing at all if
+  // the user cancels.
+  function makeCustSandbox(){
+    const db={customers:[{id:'cust-1',companyId:'co1',name:'Rashid Tabah',phone:'030-1',address:'Alt 1'}], vehicles:[]};
+    const session={company:{id:'co1'}};
+    const calls={modalShown:0, closeCalls:0, audits:[]};
+    let idn=0;
+    const sb={
+      window:{WP:{}}, console,
+      db, session,
+      id:(p)=>p+'-test-'+(++idn),
+      t:(k)=>({possibleDuplicateCustomer:'dup?',possibleDuplicateHint:'A customer named "{name}" already exists.',createNewCustAnyway:'new',cancelBtn:'cancel',holderOf:'Halter von',newCustDefault:'Neukunde'}[k]||k),
+      esc:(s)=>String(s==null?'':s),
+      companyRows:(name)=> db[name].filter(x=>x.companyId===session.company.id),
+      audit:(a,d)=>calls.audits.push(a+':'+d),
+      save:()=>{},
+      upsertCustomerCloud:()=>{}, upsertVehicleCloud:()=>{},
+      modal:(title,body,onSave,saveText)=>{ calls.modalShown++; },
+      closeModal:()=>{ calls.closeCalls++; },
+      document:null // set per-test below
+    };
+    vm.createContext(sb);
+    return {sb, db, calls};
+  }
+  function fakeDocFor(candidateIds){
+    const handlers={cand:{}, dupNew:null, xmod:null, mcancel:null};
+    const btns=candidateIds.map(cid=>({
+      getAttribute:(k)=> k==='data-cid' ? cid : null,
+      addEventListener:(ev,cb)=>{ handlers.cand[cid]=cb; }
+    }));
+    return {
+      handlers,
+      doc:{
+        querySelectorAll:(sel)=> sel==='#dupChoices .dupcand' ? btns : [],
+        getElementById:(id)=>{
+          if(id==='dupNew') return {addEventListener:(ev,cb)=>{ handlers.dupNew=cb; }};
+          if(id==='xmod') return {addEventListener:(ev,cb)=>{ handlers.xmod=cb; }};
+          if(id==='mcancel') return {addEventListener:(ev,cb)=>{ handlers.mcancel=cb; }};
+          return null;
+        }
+      }
+    };
+  }
+
+  // 1) Vehicle already identified by VIN/plate -> links straight to its
+  //    existing customer, no name-matching/confirmation involved at all.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    db.vehicles.push({id:'veh-1',companyId:'co1',customerId:'cust-1',vin:'WVWZZZ1JZXW000001',plate:'HH-AB 1'});
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const res=await sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000001', owner_name:'Rashid Tabah'});
+    assert(res.existing===true && res.v.id==='veh-1' && res.c.id==='cust-1','a VIN match links to the existing vehicle/customer directly');
+    assert(calls.modalShown===0,'no duplicate-customer prompt is shown when the match is a strong vehicle identifier, not a name guess');
+  }
+
+  // 2) New vehicle, no existing customer shares the owner name -> creates
+  //    straight away (no ambiguity to confirm).
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const res=await sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000002', owner_name:'Completely Unique Name'});
+    assert(res.existing===false && db.customers.length===2 && db.vehicles.length===1,'a genuinely new owner name creates a new customer+vehicle without prompting');
+    assert(calls.modalShown===0,'no prompt is needed when there is no name collision to resolve');
+  }
+
+  // 3) New vehicle, owner name text-matches an EXISTING customer -> must NOT
+  //    silently merge. A confirmation is shown; only an explicit "link to
+  //    this candidate" click actually attaches the vehicle to that customer.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const fd=fakeDocFor(['cust-1']);
+    sb.document=fd.doc;
+    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000003', owner_name:'Rashid Tabah'});
+    assert(calls.modalShown===1,'PROOF OF FIX: a same-name match triggers a confirmation prompt instead of merging silently');
+    assert(typeof fd.handlers.cand['cust-1']==='function','the prompt offers the matching existing customer as a linkable choice');
+    fd.handlers.cand['cust-1'](); // user explicitly picks "link to this customer"
+    const res=await p;
+    assert(res.c.id==='cust-1' && db.customers.length===1,'after explicit confirmation, the vehicle links to the chosen existing customer -- no duplicate customer created');
+    assert(db.vehicles.length===1 && db.vehicles[0].customerId==='cust-1','the new vehicle is attached to the confirmed customer');
+  }
+
+  // 4) Same collision, but the user explicitly chooses "create new customer
+  //    anyway" -- a deliberate duplicate-by-name is allowed, since it is now
+  //    an explicit user decision, not an automatic merge.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const fd=fakeDocFor(['cust-1']);
+    sb.document=fd.doc;
+    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000004', owner_name:'Rashid Tabah'});
+    fd.handlers.dupNew();
+    const res=await p;
+    assert(res.c.id!=='cust-1' && db.customers.length===2,'explicitly choosing "create new anyway" makes a separate customer record, not a merge');
+  }
+
+  // 5) Same collision, user cancels the prompt -> nothing is created or
+  //    linked at all.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const fd=fakeDocFor(['cust-1']);
+    sb.document=fd.doc;
+    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000005', owner_name:'Rashid Tabah'});
+    fd.handlers.mcancel();
+    const res=await p;
+    assert(res.cancelled===true,'cancelling the confirmation reports cancelled:true');
+    assert(db.customers.length===1 && db.vehicles.length===0,'PROOF: cancelling the duplicate-customer prompt writes nothing -- no customer, no vehicle');
+  }
+
+  // Tenant isolation: a same-name customer belonging to a DIFFERENT company
+  // must never be offered as a match candidate.
+  {
+    const {sb,db,calls}=makeCustSandbox();
+    db.customers.push({id:'cust-other-tenant',companyId:'co2',name:'Rashid Tabah'});
+    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
+    const matches=sb.findCustomerNameMatches('Rashid Tabah');
+    assert(matches.length===1 && matches[0].id==='cust-1','findCustomerNameMatches only returns candidates from the current tenant/company');
+  }
+
+  // --- Regression: every call site of the now-async findOrCreateFromSchein
+  // must await it ---------------------------------------------------------
+  // Bug found during real-device testing (2026-11-11): js/camera.js's
+  // ingestScheinFile() called `findOrCreateFromSchein(ai)` without `await`.
+  // Since the function is async, `found` was a pending Promise, so
+  // `found.v`/`found.c` were undefined and vehicleModal() opened with an
+  // almost-empty prefill -- including no customer selected -- even though
+  // the customer/vehicle were (eventually) created correctly in the
+  // background. Every call site must await it.
+  const camSrc=fs.readFileSync(path.join(root,'js/camera.js'),'utf8');
+  const repSrc=fs.readFileSync(path.join(root,'js/repairs.js'),'utf8');
+  const custSrc2=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
+  [['js/camera.js',camSrc],['js/repairs.js',repSrc],['js/customers.js',custSrc2]].forEach(([name,src])=>{
+    const calls=src.match(/[^\n]*findOrCreateFromSchein\([^)]*\)[^\n]*/g)||[];
+    const defsExcluded=calls.filter(l=>!/^\s*async function findOrCreateFromSchein/.test(l));
+    defsExcluded.forEach(line=>{
+      assert(/await\s+findOrCreateFromSchein\(/.test(line), `PROOF OF FIX: every call to findOrCreateFromSchein() in ${name} is awaited -- "${line.trim()}"`);
+    });
+  });
+
+  // --- Regression: the header's displayed version must never drift from --
+  // the real cache-busting version again (found stuck at "v1.13.2" in the
+  // UI while index.html/sw.js were already several versions ahead).
+  const appSrcVer=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(!/class="ver">v1\.13\.2</.test(appSrcVer), 'PROOF OF FIX: the header version label is no longer a hardcoded, driftable string');
+  assert(/class="ver">v\$\{esc\(\(location\.search\.match/.test(appSrcVer), 'the header version label is now read from the actual URL version param at render time');
+
+  // --- Regression: the review panel must list every mapped field, so an
+  // empty Zulässige Gesamtmasse/Sitze/Nenndrehzahl is visible for review
+  // instead of silently missing from the panel entirely. ------------------
+  const scanSrc2=fs.readFileSync(path.join(root,'js/scan.js'),'utf8');
+  ['engine_rated_rpm','maxWeight','seats'].forEach(k=>{
+    assert(new RegExp(k+":'").test(scanSrc2), `review panel's MAPPED_FIELD_LABELS includes ${k} -- an empty value here must be visible, not just absent`);
+  });
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

@@ -120,6 +120,7 @@ async function ingestScheinFile(file){
   try{
     let ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(file): readScheinAI(file));
     if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
+    if(typeof renderScheinReview==='function') renderScheinReview(ai);
     if($('#n')||$('#vplate')) applyScheinToCustomerForm(ai);
     if($('#pl')&&$('#vin')){
       if(ai.license_plate||ai.plate) $('#pl').value=ai.license_plate||ai.plate;
@@ -148,7 +149,8 @@ async function ingestScheinFile(file){
         setTimeout(()=>vehicleModal(dup), 80);
       }
     } else if(!$('#n') && !($('#pl')&&$('#vin'))){
-      const found=findOrCreateFromSchein(ai);
+      const found=await findOrCreateFromSchein(ai);
+      if(found.cancelled){ toast(t('scanAborted')||'Cancelled'); return; }
       save();
       vehicleModal(Object.assign({},found.v,{customerId:found.c&&found.c.id}));
       toast((t('scheinFilled')||t('saved'))+' · '+src);

@@ -682,6 +682,30 @@
   async function read(file){
     const q=await quality(file);
     if(!q.ok) console.warn('ocr-quality', q.issues);
+    if(W.Autosiastik && typeof W.Autosiastik.read==='function'){
+      try{
+        const auto=await W.Autosiastik.read(file);
+        if(auto && auto.error){
+          // Provider reached but refused/failed -- surface it, but never
+          // retry this same provider for the same image (scan credits),
+          // just fall through to the existing OCR pipeline below.
+          W._ocrLast='autosiastik-error';
+          W._autosiastikError=auto.message||('http-'+(auto.status||0));
+          console.warn('autosiastik', W._autosiastikError);
+        } else if(auto){
+          W._autosiastikRaw=auto.raw||null; // console-inspectable trace, no Network tab needed
+          const a=stripDemo(auto);
+          const enoughAuto=(a.vin||a.license_plate) && (a.hsn||a.model||a.brand||a.make);
+          if(enoughAuto){
+            if(!a.year && a.first_registration) a.year=String(a.first_registration).slice(-4);
+            a.ocrScore=score(a);
+            a.ocrSource='autosiastik';
+            a.ocrQuality=q;
+            return a;
+          }
+        }
+      }catch(e){ console.warn('autosiastik', e); }
+    }
     const imgColor=await colorJpeg(file);
     let out=await openaiRead(imgColor);
     out=stripDemo(out);
@@ -729,7 +753,7 @@
     out.ocrQuality=q;
     return out;
   }
-  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields,vinCheckOk,grounded,stripDemo,dropUngrounded,spaceRead};
+  W.OCR={parse,preprocess,merge,read,score,quality,cleanFields,vinCheckOk,grounded,stripDemo,dropUngrounded,spaceRead,MAKES};
 })(window.WP=window.WP||{});
 window.parseVehicleOCR=function(text){ return WP.OCR.parse(text); };
 window.preprocessSchein=function(file){ return WP.OCR.preprocess(file,'contrast'); };
