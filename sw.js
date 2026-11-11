@@ -1,9 +1,9 @@
-const CACHE='baymeister-v1.14.3';
+const CACHE='baymeister-v1.14.4';
 const PRECACHE=[
   './','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png',
-  './css/app.css?v=1.14.3','./i18n.js?v=1.14.3','./supabase-config.js',
-  './js/config.js?v=1.14.3','./js/engine.js?v=1.14.3','./js/core.js?v=1.14.3','./js/autosiastik.js?v=1.14.3','./js/ocr.js?v=1.14.3','./js/cloud.js?v=1.14.3',
-  './js/lookup.js?v=1.14.3','./js/quality.js?v=1.14.3','./js/schein-engine.js?v=1.14.3','./js/schein-wizard.js?v=1.14.3','./js/logo-invoice-data.js?v=1.14.3','./js/invoice-print.js?v=1.14.3','./js/print.js?v=1.14.3','./js/camera.js?v=1.14.3','./js/customers.js?v=1.14.3','./js/repairs.js?v=1.14.3','./js/invoice-edit.js?v=1.14.3','./js/app.js?v=1.14.3','./logo-app.jpg','./logo-invoice.jpg'
+  './css/app.css?v=1.14.4','./i18n.js?v=1.14.4','./supabase-config.js',
+  './js/config.js?v=1.14.4','./js/engine.js?v=1.14.4','./js/core.js?v=1.14.4','./js/autosiastik.js?v=1.14.4','./js/ocr.js?v=1.14.4','./js/cloud.js?v=1.14.4',
+  './js/lookup.js?v=1.14.4','./js/quality.js?v=1.14.4','./js/schein-engine.js?v=1.14.4','./js/schein-wizard.js?v=1.14.4','./js/logo-invoice-data.js?v=1.14.4','./js/invoice-print.js?v=1.14.4','./js/print.js?v=1.14.4','./js/camera.js?v=1.14.4','./js/customers.js?v=1.14.4','./js/repairs.js?v=1.14.4','./js/invoice-edit.js?v=1.14.4','./js/app.js?v=1.14.4','./logo-app.jpg','./logo-invoice.jpg'
 ];
 self.addEventListener('install', e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRECACHE).catch(()=>{})));
