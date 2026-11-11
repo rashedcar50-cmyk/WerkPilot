@@ -1,105 +1,42 @@
 /* Repairs + Schein-to-job */
+// Uses the SAME unified scan/match/save engine as the Customers and
+// Vehicles pages (openScheinWizard) -- this is deliberately not a separate
+// matching implementation, so a scanned document is never resolved
+// differently depending on which page started the scan. Once the wizard
+// has resolved (and saved) the customer+vehicle, this adds the
+// job/estimate/invoice-specific follow-up step (mileage + complaint).
 function scanScheinStartRepair(mode){
   if(mode && typeof mode==='object') mode='repair';
   mode=mode||'repair';
-  const title=mode==='estimate'?t('scanSchein'):mode==='invoice'?t('scanSchein'):t('scanOpenJob');
-  modal(title,`<div class="field">
-    <label>${t('pickSchein')}</label>
-    <input id="doc" type="file" accept="image/*" class="hidden">
-    <div class="toolbar">
-      <button type="button" class="btn primary" id="pickGallery">${t('pickFile')||t('pickSchein')}</button>
-      ${waBtn("#doc")}
-      <button type="button" class="btn" onclick="openCamera()">📷 ${t('openCam')}</button>
-    </div>
-    <div class="hint">${t('ocrHint')}</div>
-    <img id="ocrImg" class="ocr-preview hidden">
-    <div id="ocrStatus" class="hint"></div>
-    <div id="scheinPreview" class="hidden"></div>
-    <div id="ocrReview"></div>
-  </div>`, async()=>{
-    const f=$('#doc').files[0];
-    if(!f) return toast(t('pickScheinFirst'));
-    if(window._scheinReady){
-      const km=Number($('#scheinKm')?.value||0);
-      if(!km) return toast(t('kmNowEx'));
-      const ai=window._scheinAI;
-      const {c,v,cancelled}=await findOrCreateFromSchein(ai);
-      if(cancelled){ toast(t('scanAborted')||'Cancelled'); return; }
-      v.km=km; upsertVehicleCloud(v); save();
-      const complaint=($('#scheinWork')&&$('#scheinWork').value||'').trim() || t('scheinIntake');
-      window._scheinReady=false; window._scheinAI=null;
-      if(mode==='estimate'){
-        closeModal();
-        session.page='estimates';
-        financeModal('estimate', v.id, c.id);
-        toast((v.plate||v.vin)+' / '+km+' km');
-        return;
-      }
-      if(mode==='invoice'){
-        closeModal();
-        session.page='invoices';
-        invoiceDesigner('invoice', c.id, null, v.id);
-        toast((v.plate||v.vin)+' / '+km+' km');
-        return;
-      }
-      const r={id:id('r'),companyId:session.company.id,vehicleId:v.id,complaint,description:complaint,jobs:[],parts:[],photos:[],tech:session.user.name||'',hours:1,status:'intake',km:km,fuel:'half',date:todayISO()};
-      db.repairs.push(r); upsertRepairCloud(r); save();
-      audit('repair.from_schein', (v.plate||v.vin)+' '+km);
-      closeModal(); session.repairId=r.id; session.page='repairs'; render();
-      toast(t('jobOpened')+' — '+esc(v.plate||v.vin)+' / '+km+' km');
-      return;
-    }
-    $('#ocrStatus').textContent=t('readingSchein');
-    $('#msave').disabled=true;
-    try{
-      let ai;
-      try{
-        ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(f): readScheinAI(f));
-        if(WP.OCR&&WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
-      }catch(err){
-        const compressed=await compressVehiclePhoto(f);
-        let text='';
-        try{ await WP.loadOcr(); }catch(e){}
-        if(window.Tesseract){
-          const res=await Tesseract.recognize(compressed,'deu+eng');
-          text=res?.data?.text||'';
-        }
-        const parsed=parseVehicleOCR(text||'');
-        ai={license_plate:parsed.plate,vin:parsed.vin,brand:parsed.make,model:parsed.model,year:parsed.year,owner_name:parsed.owner_name||parsed.owner||''};
-        if(WP.OCR&&WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai);
-        if(!ai.license_plate && !ai.vin) throw err;
-      }
-      window._scheinAI=ai; window._scheinReady=true;
-      if(typeof renderScheinReview==='function') renderScheinReview(ai);
-      const plate=ai.license_plate||ai.plate||'-';
-      const vin=ai.vin||'-';
-      const owner=ai.owner_name||ai.holder||ai.customer_name||'-';
-      $('#scheinPreview').classList.remove('hidden');
-      $('#scheinPreview').innerHTML=`<div class="okbox">
-        <b>${t('ocrHint')}</b><br>
-        ${t('customer')}: ${esc(dePrintName(owner))}<br>
-        ${t('plate')}: ${esc(plate)}<br>
-        VIN: ${esc(vin)}<br>
-        ${esc(ai.brand||ai.make||'')} ${esc(ai.model||'')} ${esc(ai.year||'')}
-        <div class="field" style="margin-top:10px"><label>${t('kmNowEx')}</label><input id="scheinKm" class="latnum" inputmode="decimal" lang="de" placeholder="86500"></div>
-        <div class="field"><label>${t('repairNeeded')}</label><textarea id="scheinWork" placeholder="${t('repairNeeded')}"></textarea></div>
-      </div>`;
-      $('#ocrStatus').textContent=t('enterKmSave');
-      $('#msave').disabled=false;
-      $('#msave').textContent=t('saveOpenJob');
-      setTimeout(()=>$('#scheinKm')?.focus(), 150);
-    }catch(e){
-      console.error(e);
-      $('#ocrStatus').textContent=t('readFailClear');
-      $('#msave').disabled=false;
-    }
-  }, t('readPaper'));
-  $('#doc').onchange=()=>{const f=$('#doc').files[0]; if(f){ $('#ocrImg').src=URL.createObjectURL(f); $('#ocrImg').classList.remove('hidden'); window._scheinReady=false; }};
-  if($('#pickGallery')) $('#pickGallery').onclick=()=>$('#doc').click();
-  if($('#pickWa')) $('#pickWa').onclick=()=>pickWhatsApp('#doc');
-  setTimeout(()=>applySharedFileTo('#doc'), 50);
+  openScheinWizard({ onDone:(c,v)=>askKmAndStartJob(mode, c, v) });
 }
 window.scanScheinStartRepair=scanScheinStartRepair;
+function askKmAndStartJob(mode, c, v){
+  modal(mode==='estimate'||mode==='invoice'?t('scanSchein'):t('scanOpenJob'), `
+    <div class="okbox">${esc(c.name||c.companyName||'')} · ${esc(v.plate||v.vin||'')}</div>
+    <div class="field"><label>${t('kmNowEx')}</label><input id="scheinKm" class="latnum" inputmode="decimal" lang="de" placeholder="86500"></div>
+    <div class="field"><label>${t('repairNeeded')}</label><textarea id="scheinWork" placeholder="${t('repairNeeded')}"></textarea></div>
+  `, ()=>{
+    const km=Number($('#scheinKm')?.value||0);
+    if(!km) return toast(t('kmNowEx'));
+    v.km=km; upsertVehicleCloud(v); save();
+    const complaint=($('#scheinWork')&&$('#scheinWork').value||'').trim() || t('scheinIntake');
+    if(mode==='estimate'){
+      closeModal(); session.page='estimates'; financeModal('estimate', v.id, c.id);
+      toast((v.plate||v.vin)+' / '+km+' km'); return;
+    }
+    if(mode==='invoice'){
+      closeModal(); session.page='invoices'; invoiceDesigner('invoice', c.id, null, v.id);
+      toast((v.plate||v.vin)+' / '+km+' km'); return;
+    }
+    const r={id:id('r'),companyId:session.company.id,vehicleId:v.id,complaint,description:complaint,jobs:[],parts:[],photos:[],tech:session.user.name||'',hours:1,status:'intake',km:km,fuel:'half',date:todayISO()};
+    db.repairs.push(r); upsertRepairCloud(r); save();
+    audit('repair.from_schein', (v.plate||v.vin)+' '+km);
+    closeModal(); session.repairId=r.id; session.page='repairs'; render();
+    toast(t('jobOpened')+' — '+esc(v.plate||v.vin)+' / '+km+' km');
+  }, t('saveOpenJob')||t('readPaper'));
+  setTimeout(()=>$('#scheinKm')?.focus(), 150);
+}
 function repairStatusClass(st){
   const c=normStatus(st);
   if(['done','closed','delivered','ready'].includes(c)) return 'ok';
