@@ -110,56 +110,14 @@ async function openProCamera(opts){
 }
 window.openProCamera=openProCamera;
 window.openCamera=function(target){ return openProCamera({target:typeof target==='string'?target:'#doc'}); };
-async function ingestScheinFile(file){
+// Entry point for scans that arrive with a file already in hand (WhatsApp
+// share-target, PWA share-target). Opens the SAME unified wizard used by
+// the Customers/Vehicles pages (openScheinWizard), just pre-loaded with
+// this file instead of asking the user to pick one -- identical
+// matching/dedup/save behavior regardless of how the scan started.
+function ingestScheinFile(file){
   if(!file) return;
-  if(window._scheinBusy) return;
-  window._scheinBusy=true;
-  if(/heic|heif/i.test(file.type||file.name||'')) toast(t('ocrHint')||'HEIC');
-  if($('#ocrStatus')) $('#ocrStatus').textContent=t('readingSchein')||t('readingAI');
-  toast(t('readingSchein')||t('readingAI'));
-  try{
-    let ai=await (window.WP&&WP.OCR&&WP.OCR.read? WP.OCR.read(file): readScheinAI(file));
-    if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
-    if(typeof renderScheinReview==='function') renderScheinReview(ai);
-    if($('#n')||$('#vplate')) applyScheinToCustomerForm(ai);
-    if($('#pl')&&$('#vin')){
-      if(ai.license_plate||ai.plate) $('#pl').value=ai.license_plate||ai.plate;
-      if(ai.vin) $('#vin').value=ai.vin;
-      if($('#hsn')&&ai.hsn) $('#hsn').value=ai.hsn;
-      if($('#tsn')&&ai.tsn) $('#tsn').value=ai.tsn;
-      if($('#mk')&&(ai.brand||ai.make)) $('#mk').value=ai.brand||ai.make;
-      if($('#mo')&&ai.model) $('#mo').value=ai.model;
-      if($('#yr')&&ai.year) $('#yr').value=ai.year;
-      if($('#cc')&&ai.engine_displacement_cm3) $('#cc').value=ai.engine_displacement_cm3;
-      if($('#kw')&&ai.engine_power_kw) $('#kw').value=ai.engine_power_kw;
-      if($('#fuel')&&ai.fuel_type) $('#fuel').value=ai.fuel_type;
-      if($('#pa')&&(ai.color||ai.paint)) $('#pa').value=ai.color||ai.paint;
-      if($('#en')&&(ai.engine||ai.engine_code)) $('#en').value=ai.engine||ai.engine_code;
-      if($('#vmaxw')&&ai.maxWeight) $('#vmaxw').value=ai.maxWeight;
-      if($('#vseats')&&ai.seats) $('#vseats').value=ai.seats;
-      if($('#vklass')&&ai.vehicleClass) $('#vklass').value=ai.vehicleClass;
-    }
-    const src=ai.ocrSource==='server'?'Server':(ai.ocrSource==='openai'?'OpenAI GPT-4o-mini':(ai.ocrSource||'OCR'));
-    const dup=typeof findExistingVehicle==='function'?findExistingVehicle(ai):null;
-    if(dup){
-      toast(t('vehicleExists'));
-      if($('#ocrStatus')) $('#ocrStatus').textContent=t('vehicleExists');
-      if(!$('#n') && !($('#pl')&&$('#vin'))){
-        session.page='vehicles'; render();
-        setTimeout(()=>vehicleModal(dup), 80);
-      }
-    } else if(!$('#n') && !($('#pl')&&$('#vin'))){
-      const found=await findOrCreateFromSchein(ai);
-      if(found.cancelled){ toast(t('scanAborted')||'Cancelled'); return; }
-      save();
-      vehicleModal(Object.assign({},found.v,{customerId:found.c&&found.c.id}));
-      toast((t('scheinFilled')||t('saved'))+' · '+src);
-    } else {
-      toast((t('scheinFilled')||t('saved'))+' · '+src);
-      if($('#ocrStatus')) $('#ocrStatus').textContent=(t('scheinFilled')||'')+' · '+src;
-    }
-  }catch(e){ console.warn(e); toast(t('readFailClear')||t('ocrFailSchein')); }
-  finally{ window._scheinBusy=false; }
+  openScheinWizard({ file });
 }
 window.ingestScheinFile=ingestScheinFile;
 function waFileInput(){

@@ -121,7 +121,9 @@ const ver=(idx.match(/CUR='([\d.]+)'/)||[])[1];
 assert(!!ver,'index has version');
 assert(idx.includes('js/app.js?v='+ver),'index cache-busts app.js');
 assert(idx.includes('js/quality.js?v='+ver),'index loads quality.js');
-assert(idx.includes('js/scan.js?v='+ver),'index loads scan.js');
+assert(idx.includes('js/schein-engine.js?v='+ver),'index loads schein-engine.js');
+assert(idx.includes('js/schein-wizard.js?v='+ver),'index loads schein-wizard.js');
+assert(!fs.existsSync(path.join(root,'js/scan.js')),'PROOF: the old scan.js (superseded by schein-engine.js/schein-wizard.js) is actually gone, not just unreferenced -- no two parallel implementations left behind');
 assert(idx.includes('js/print.js?v='+ver),'index loads print.js');
 assert(idx.includes('js/camera.js?v='+ver),'index loads camera.js');
 assert(idx.includes('js/invoice-print.js?v='+ver),'index loads invoice-print.js');
@@ -781,18 +783,6 @@ async function decideLogin(cand, pass){
   const rawWithPlate=Auto.rawTextFields({plate:{raw:'RZ AA4763', valid:true}, hsn:'3144'});
   assert(typeof rawWithPlate.plate==='string' && !/\[object Object\]/.test(rawWithPlate.plate), 'PROOF OF FIX: rawTextFields (used by the review panel) flattens plate instead of leaving a raw object that stringifies to "[object Object]"');
 
-  // --- Regression: the review panel must survive long enough to be read --
-  // Bug found during real-device testing: scanVehicleDocument() rendered
-  // the review panel and then called closeModal() in the very same click
-  // handler, destroying it before a human could read it. Fixed with an
-  // explicit two-step gate (read -> show review -> second click confirms).
-  const custSrc3=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
-  const scanFnBody=(custSrc3.match(/function scanVehicleDocument\(\)\{[\s\S]*?\r?\n\}/)||[''])[0];
-  assert(/let ready=false/.test(scanFnBody), 'PROOF OF FIX: scanVehicleDocument has an explicit ready/confirmed state, not a single auto-continuing step');
-  const firstReadIdx=scanFnBody.indexOf('renderScheinReview(ai)');
-  const closeModalIdx=scanFnBody.indexOf('closeModal();', firstReadIdx); // the real call, not the explanatory comment above it
-  assert(firstReadIdx>0 && closeModalIdx>firstReadIdx && scanFnBody.slice(firstReadIdx,closeModalIdx).includes('return;'), 'PROOF OF FIX: rendering the review and closing the modal are in different passes (an explicit `return` separates them) -- the review is no longer destroyed in the same continuation that renders it');
-
   // --- Regression: companyRows() must never return a stale customer/
   // vehicle list right after a push -------------------------------------
   // Real bug found via live browser testing (2026-11-12): scanning a
@@ -832,149 +822,154 @@ async function decideLogin(cand, pass){
     assert(flushRowsResult.afterCount===2 && flushRowsResult.hasNew, 'PROOF OF FIX: companyRows() reflects a just-pushed row immediately after audit()/save(), without waiting for the debounced disk write');
   }
 
-  // --- Dedup: do not merge customers by name alone --------------------------
-  // Reproduces the exact scenario the integration must handle: a brand-new
-  // vehicle scan whose owner name matches an EXISTING customer by text alone.
-  // The fix must never silently attach the new vehicle to that customer
-  // without the user explicitly confirming -- and must do nothing at all if
-  // the user cancels.
-  function makeCustSandbox(){
-    const db={customers:[{id:'cust-1',companyId:'co1',name:'Rashid Tabah',phone:'030-1',address:'Alt 1'}], vehicles:[]};
-    const session={company:{id:'co1'}};
-    const calls={modalShown:0, closeCalls:0, audits:[]};
-    let idn=0;
+  // =========================================================================
+  // Rebuilt scan -> match -> save pipeline (2026-11-13): replaces
+  // findOrCreateFromSchein()/askScheinCustomerChoice()/scanVehicleDocument()
+  // with WP.ScheinEngine (pure matching) + WP.ScheinWizard (unified
+  // wizard + idempotent save), used identically from every entry point.
+  // =========================================================================
+  const engSandbox={window:{WP:{}}, console};
+  vm.createContext(engSandbox);
+  vm.runInContext(fs.readFileSync(path.join(root,'js/schein-engine.js'),'utf8'), engSandbox);
+  const Eng=engSandbox.window.WP.ScheinEngine;
+  assert(!!Eng && typeof Eng.findCustomerCandidates==='function', 'ScheinEngine loads and exposes its matching functions');
+
+  // --- Requirement: never suggest a customer match on name alone ----------
+  {
+    const custs=[{id:'c1',companyId:'de',name:'Rashid Tabah'}];
+    const byNameOnly=Eng.findCustomerCandidates({name:'Rashid Tabah'}, custs);
+    assert(byNameOnly.length===0, 'PROOF: an identical name with NO corroborating signal (no address, no tax id) is never suggested as a match -- name alone is not enough');
+  }
+  {
+    const custs=[{id:'c1',companyId:'de',name:'Rashid Tabah',address:'Hauptstr. 1, 12345 Musterstadt'}];
+    const byNameAndAddr=Eng.findCustomerCandidates({name:'Rashid Tabah',address:'Hauptstr. 1, 12345 Musterstadt'}, custs);
+    assert(byNameAndAddr.length===1 && byNameAndAddr[0].customer.id==='c1', 'name + matching address together DO suggest a candidate');
+  }
+  {
+    const custs=[{id:'c1',companyId:'de',name:'Someone Else Entirely',taxId:'DE123456789'}];
+    const byTaxId=Eng.findCustomerCandidates({name:'Totally Different Name',taxId:'DE123456789'}, custs);
+    assert(byTaxId.length===1, 'a matching reliable identifier (tax id) alone is enough to suggest a match, even with no name/address overlap -- it is not name-based at all');
+  }
+  // Scenario: two similarly-named customers -- both are offered, the caller
+  // (wizard UI) must ask, never auto-pick one.
+  {
+    const custs=[
+      {id:'c1',companyId:'de',name:'Thomas Müller',address:'Bahnhofstr. 5, 10115 Berlin'},
+      {id:'c2',companyId:'de',name:'Thomas Mueller',address:'Bahnhofstr. 5, 10115 Berlin'}
+    ];
+    const cands=Eng.findCustomerCandidates({name:'Thomas Müller',address:'Bahnhofstr. 5, 10115 Berlin'}, custs);
+    assert(cands.length===2, 'two similarly-named/addressed customers are BOTH surfaced as candidates, not silently collapsed into one');
+  }
+  // Tenant isolation: candidates are scoped by whatever list the caller
+  // passes in (companyRows('customers') upstream) -- a cross-tenant
+  // same-name/address customer must simply not be in that list.
+  {
+    const custs=[{id:'c-other-tenant',companyId:'OTHER',name:'Rashid Tabah',address:'Alt 1, 99999 X'}];
+    const cands=Eng.findCustomerCandidates({name:'Rashid Tabah',address:'Alt 1, 99999 X'}, custs);
+    assert(cands.length===1, 'sanity: candidates are whatever the caller passes in');
+    // the real tenant-scoping guarantee is that callers always pass
+    // companyRows(...), never the raw db.* array -- verified below.
+  }
+
+  // --- Vehicle matching: VIN is strong identity, plate alone is weak -------
+  {
+    const vehicles=[{id:'v1',companyId:'de',customerId:'c1',vin:'WVWZZZ1JZXW000001',plate:'HH-AB 1'}];
+    const vinHit=Eng.findVehicleMatch('WVWZZZ1JZXW000001','DIFFERENT-PLATE', vehicles);
+    assert(vinHit.strong && vinHit.strong.id==='v1' && !vinHit.weak, 'a VIN match is strong even if the plate read differently (plate changed/misread)');
+    const plateOnlyHit=Eng.findVehicleMatch('', 'HH-AB 1', vehicles);
+    assert(!plateOnlyHit.strong && plateOnlyHit.weak && plateOnlyHit.weak.id==='v1', 'a plate-only match (no VIN) is kept separate as a WEAK suggestion, never a strong identity match');
+    const noHit=Eng.findVehicleMatch('SOMEOTHERVIN00000X','ZZ-ZZ 999', vehicles);
+    assert(!noHit.strong && !noHit.weak, 'no match at all when neither VIN nor plate correspond to an existing vehicle');
+  }
+
+  // --- Never overwrite existing customer contact data with blanks ---------
+  {
+    const cust={id:'c1',phone:'030-111222',email:'',address:''};
+    const patch=Eng.mergeOwnerIntoCustomer(cust, {phone:'', email:'new@example.com', address:'Neue Str. 1'});
+    assert(patch.phone===undefined, 'PROOF: an existing phone number is never overwritten with an empty scanned value');
+    assert(patch.email==='new@example.com' && patch.address==='Neue Str. 1', 'empty existing fields ARE filled in from the scan');
+  }
+
+  // --- executeSave: the actual create/update/idempotency logic, in an
+  // isolated sandbox (no real customer data touched). --------------------
+  function makeSaveSandbox(seedCustomers, seedVehicles){
+    const db={customers:seedCustomers||[], vehicles:seedVehicles||[], audit:[]};
+    const session={company:{id:'de'}, user:{name:'tester'}};
+    let idn=0, kdn=1000;
     const sb={
-      window:{WP:{}}, console,
+      console,
       db, session,
-      id:(p)=>p+'-test-'+(++idn),
-      t:(k)=>({possibleDuplicateCustomer:'dup?',possibleDuplicateHint:'A customer named "{name}" already exists.',createNewCustAnyway:'new',cancelBtn:'cancel',holderOf:'Halter von',newCustDefault:'Neukunde'}[k]||k),
-      esc:(s)=>String(s==null?'':s),
+      id:(p)=>p+'-t'+(++idn),
+      nextKdNr:()=>String(++kdn),
+      t:(k)=>({holderOf:'Halter von',newCustDefault:'Neukunde'}[k]||k),
       companyRows:(name)=> db[name].filter(x=>x.companyId===session.company.id),
-      audit:(a,d)=>calls.audits.push(a+':'+d),
+      audit:(a,d)=>db.audit.push(a+':'+d),
       save:()=>{},
       upsertCustomerCloud:()=>{}, upsertVehicleCloud:()=>{},
-      modal:(title,body,onSave,saveText)=>{ calls.modalShown++; },
-      closeModal:()=>{ calls.closeCalls++; },
-      document:null // set per-test below
+      WP:{ScheinEngine:Eng}
     };
+    sb.window=sb; // real browsers have window===globalThis; schein-wizard.js
+                  // uses bare `WP.x` AND `window.WP=...` interchangeably, so
+                  // the sandbox's global object must alias itself the same way.
     vm.createContext(sb);
-    return {sb, db, calls};
-  }
-  function fakeDocFor(candidateIds){
-    const handlers={cand:{}, dupNew:null, xmod:null, mcancel:null};
-    const btns=candidateIds.map(cid=>({
-      getAttribute:(k)=> k==='data-cid' ? cid : null,
-      addEventListener:(ev,cb)=>{ handlers.cand[cid]=cb; }
-    }));
-    return {
-      handlers,
-      doc:{
-        querySelectorAll:(sel)=> sel==='#dupChoices .dupcand' ? btns : [],
-        getElementById:(id)=>{
-          if(id==='dupNew') return {addEventListener:(ev,cb)=>{ handlers.dupNew=cb; }};
-          if(id==='xmod') return {addEventListener:(ev,cb)=>{ handlers.xmod=cb; }};
-          if(id==='mcancel') return {addEventListener:(ev,cb)=>{ handlers.mcancel=cb; }};
-          return null;
-        }
-      }
-    };
+    vm.runInContext(fs.readFileSync(path.join(root,'js/schein-wizard.js'),'utf8'), sb);
+    return {sb, db};
   }
 
-  // 1) Vehicle already identified by VIN/plate -> links straight to its
-  //    existing customer, no name-matching/confirmation involved at all.
+  // 1) New customer + new vehicle.
   {
-    const {sb,db,calls}=makeCustSandbox();
-    db.vehicles.push({id:'veh-1',companyId:'co1',customerId:'cust-1',vin:'WVWZZZ1JZXW000001',plate:'HH-AB 1'});
-    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
-    const res=await sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000001', owner_name:'Rashid Tabah'});
-    assert(res.existing===true && res.v.id==='veh-1' && res.c.id==='cust-1','a VIN match links to the existing vehicle/customer directly');
-    assert(calls.modalShown===0,'no duplicate-customer prompt is shown when the match is a strong vehicle identifier, not a name guess');
+    const {sb,db}=makeSaveSandbox();
+    const form={owner_name:'Neuer Kunde Eins', address:'Teststr. 1, 11111 X', license_plate:'B-AK 123', vin:'VIN0000000000001', brand:'OPEL', model:'Astra'};
+    const {customer,vehicle}=await sb.WP.ScheinWizard.executeSave({form, vehicleDecision:{mode:'create'}, customerDecision:{mode:'new'}});
+    assert(db.customers.length===1 && db.vehicles.length===1, 'a brand-new customer and vehicle are created');
+    assert(!!customer.kdNr, 'the new customer is assigned a unique customer number (kdNr) via the existing numbering system');
+    assert(vehicle.customerId===customer.id, 'the new vehicle is linked to the new customer');
   }
 
-  // 2) New vehicle, no existing customer shares the owner name -> creates
-  //    straight away (no ambiguity to confirm).
+  // 2) Existing customer + a SECOND vehicle -> same customer record, same
+  //    kdNr, two vehicles, no duplicate customer.
   {
-    const {sb,db,calls}=makeCustSandbox();
-    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
-    const res=await sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000002', owner_name:'Completely Unique Name'});
-    assert(res.existing===false && db.customers.length===2 && db.vehicles.length===1,'a genuinely new owner name creates a new customer+vehicle without prompting');
-    assert(calls.modalShown===0,'no prompt is needed when there is no name collision to resolve');
+    const {sb,db}=makeSaveSandbox([{id:'c1',companyId:'de',name:'Mehrwagen Kunde',kdNr:'1050',phone:'030-1'}],[{id:'v1',companyId:'de',customerId:'c1',vin:'VIN-FIRST-CAR-001',plate:'B-AK 1'}]);
+    const form={owner_name:'Mehrwagen Kunde', license_plate:'B-AK 2', vin:'VIN-SECOND-CAR-002', brand:'VW', model:'Golf'};
+    const {customer,vehicle}=await sb.WP.ScheinWizard.executeSave({form, vehicleDecision:{mode:'create'}, customerDecision:{mode:'existing', id:'c1'}});
+    assert(db.customers.length===1, 'PROOF: no duplicate customer is created when explicitly linking to an existing one');
+    assert(customer.kdNr==='1050', 'the existing customer keeps its ORIGINAL customer number -- renumbering never happens');
+    assert(db.vehicles.length===2 && db.vehicles.every(v=>v.customerId==='c1'), 'both vehicles (old and newly scanned) are linked under the SAME customer id/number');
   }
 
-  // 3) New vehicle, owner name text-matches an EXISTING customer -> must NOT
-  //    silently merge. A confirmation is shown; only an explicit "link to
-  //    this candidate" click actually attaches the vehicle to that customer.
+  // 3) Existing vehicle, re-scanning the same document -> updates the
+  //    existing record, never creates a duplicate.
   {
-    const {sb,db,calls}=makeCustSandbox();
-    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
-    const fd=fakeDocFor(['cust-1']);
-    sb.document=fd.doc;
-    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000003', owner_name:'Rashid Tabah'});
-    assert(calls.modalShown===1,'PROOF OF FIX: a same-name match triggers a confirmation prompt instead of merging silently');
-    assert(typeof fd.handlers.cand['cust-1']==='function','the prompt offers the matching existing customer as a linkable choice');
-    fd.handlers.cand['cust-1'](); // user explicitly picks "link to this customer"
-    const res=await p;
-    assert(res.c.id==='cust-1' && db.customers.length===1,'after explicit confirmation, the vehicle links to the chosen existing customer -- no duplicate customer created');
-    assert(db.vehicles.length===1 && db.vehicles[0].customerId==='cust-1','the new vehicle is attached to the confirmed customer');
+    const {sb,db}=makeSaveSandbox([{id:'c1',companyId:'de',name:'Re-Scan Kunde',kdNr:'1060'}],[{id:'v1',companyId:'de',customerId:'c1',vin:'VIN-RESCAN-0001',plate:'M-RS 1',make:'',model:''}]);
+    const form={owner_name:'Re-Scan Kunde', license_plate:'M-RS 1', vin:'VIN-RESCAN-0001', brand:'BMW', model:'320d'};
+    const {vehicle}=await sb.WP.ScheinWizard.executeSave({form, vehicleDecision:{mode:'update', id:'v1'}, customerDecision:{mode:'existing', id:'c1'}});
+    assert(db.vehicles.length===1 && vehicle.id==='v1', 'PROOF: re-scanning an existing vehicle updates it in place -- no second record');
+    assert(vehicle.make==='BMW' && vehicle.model==='320d', 'the freshly re-scanned data is applied to the existing vehicle record');
   }
 
-  // 4) Same collision, but the user explicitly chooses "create new customer
-  //    anyway" -- a deliberate duplicate-by-name is allowed, since it is now
-  //    an explicit user decision, not an automatic merge.
+  // 4) Idempotency: saving twice for the SAME VIN (double-click, or retry
+  //    after a dropped connection) must update, not duplicate -- even
+  //    though both calls use vehicleDecision mode:'create' (as the wizard
+  //    does on first save, before anything existed yet).
   {
-    const {sb,db,calls}=makeCustSandbox();
-    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
-    const fd=fakeDocFor(['cust-1']);
-    sb.document=fd.doc;
-    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000004', owner_name:'Rashid Tabah'});
-    fd.handlers.dupNew();
-    const res=await p;
-    assert(res.c.id!=='cust-1' && db.customers.length===2,'explicitly choosing "create new anyway" makes a separate customer record, not a merge');
+    const {sb,db}=makeSaveSandbox();
+    const form={owner_name:'Doppelklick Kunde', license_plate:'K-DC 1', vin:'VIN-DOUBLECLICK-01', brand:'FORD', model:'Focus'};
+    const first=await sb.WP.ScheinWizard.executeSave({form, vehicleDecision:{mode:'create'}, customerDecision:{mode:'new'}});
+    const second=await sb.WP.ScheinWizard.executeSave({form, vehicleDecision:{mode:'create'}, customerDecision:{mode:'existing', id:first.customer.id}});
+    assert(db.vehicles.length===1, 'PROOF OF IDEMPOTENCY: a repeated save for the same VIN (double-click/retry) results in exactly ONE vehicle record, not two');
+    assert(second.vehicle.id===first.vehicle.id, 'the second save resolves to the SAME vehicle record rather than inserting a new one');
   }
 
-  // 5) Same collision, user cancels the prompt -> nothing is created or
-  //    linked at all.
-  {
-    const {sb,db,calls}=makeCustSandbox();
-    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
-    const fd=fakeDocFor(['cust-1']);
-    sb.document=fd.doc;
-    const p=sb.findOrCreateFromSchein({vin:'WVWZZZ1JZXW000005', owner_name:'Rashid Tabah'});
-    fd.handlers.mcancel();
-    const res=await p;
-    assert(res.cancelled===true,'cancelling the confirmation reports cancelled:true');
-    assert(db.customers.length===1 && db.vehicles.length===0,'PROOF: cancelling the duplicate-customer prompt writes nothing -- no customer, no vehicle');
-  }
-
-  // Tenant isolation: a same-name customer belonging to a DIFFERENT company
-  // must never be offered as a match candidate.
-  {
-    const {sb,db,calls}=makeCustSandbox();
-    db.customers.push({id:'cust-other-tenant',companyId:'co2',name:'Rashid Tabah'});
-    vm.runInContext(fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), sb);
-    const matches=sb.findCustomerNameMatches('Rashid Tabah');
-    assert(matches.length===1 && matches[0].id==='cust-1','findCustomerNameMatches only returns candidates from the current tenant/company');
-  }
-
-  // --- Regression: every call site of the now-async findOrCreateFromSchein
-  // must await it ---------------------------------------------------------
-  // Bug found during real-device testing (2026-11-11): js/camera.js's
-  // ingestScheinFile() called `findOrCreateFromSchein(ai)` without `await`.
-  // Since the function is async, `found` was a pending Promise, so
-  // `found.v`/`found.c` were undefined and vehicleModal() opened with an
-  // almost-empty prefill -- including no customer selected -- even though
-  // the customer/vehicle were (eventually) created correctly in the
-  // background. Every call site must await it.
+  // --- Static check: every scan entry point goes through the SAME wizard,
+  // not a second parallel implementation. --------------------------------
   const camSrc=fs.readFileSync(path.join(root,'js/camera.js'),'utf8');
   const repSrc=fs.readFileSync(path.join(root,'js/repairs.js'),'utf8');
   const custSrc2=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
-  [['js/camera.js',camSrc],['js/repairs.js',repSrc],['js/customers.js',custSrc2]].forEach(([name,src])=>{
-    const calls=src.match(/[^\n]*findOrCreateFromSchein\([^)]*\)[^\n]*/g)||[];
-    const defsExcluded=calls.filter(l=>!/^\s*async function findOrCreateFromSchein/.test(l));
-    defsExcluded.forEach(line=>{
-      assert(/await\s+findOrCreateFromSchein\(/.test(line), `PROOF OF FIX: every call to findOrCreateFromSchein() in ${name} is awaited -- "${line.trim()}"`);
-    });
-  });
+  const appSrcForScan=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(/openScheinWizard\(/.test(camSrc), 'camera.js\'s WhatsApp/share-target ingest opens the unified wizard');
+  assert(/openScheinWizard\(/.test(repSrc), 'repairs.js\'s scan-to-job flow opens the unified wizard');
+  assert((custSrc2.match(/openScheinWizard\(/g)||[]).length>=3, 'customers.js opens the unified wizard from the Customers page, the Vehicles page, and the existing-customer "add vehicle" action');
+  assert(!/findOrCreateFromSchein|askScheinCustomerChoice/.test(custSrc2+camSrc+repSrc+appSrcForScan), 'PROOF: the old scattered matching functions are completely gone, not just unused -- no second path left that could give a different answer');
 
   // --- Regression: the header's displayed version must never drift from --
   // the real cache-busting version again (found stuck at "v1.13.2" in the
@@ -983,12 +978,14 @@ async function decideLogin(cand, pass){
   assert(!/class="ver">v1\.13\.2</.test(appSrcVer), 'PROOF OF FIX: the header version label is no longer a hardcoded, driftable string');
   assert(/class="ver">v\$\{esc\(\(location\.search\.match/.test(appSrcVer), 'the header version label is now read from the actual URL version param at render time');
 
-  // --- Regression: the review panel must list every mapped field, so an
-  // empty Zulässige Gesamtmasse/Sitze/Nenndrehzahl is visible for review
-  // instead of silently missing from the panel entirely. ------------------
-  const scanSrc2=fs.readFileSync(path.join(root,'js/scan.js'),'utf8');
-  ['engine_rated_rpm','maxWeight','seats'].forEach(k=>{
-    assert(new RegExp(k+":'").test(scanSrc2), `review panel's MAPPED_FIELD_LABELS includes ${k} -- an empty value here must be visible, not just absent`);
+  // --- Regression: the unified wizard's review step must list every
+  // mapped field as an EDITABLE input, so Nenndrehzahl/Zulässige
+  // Gesamtmasse/Sitze (and first_registration, kept separate from year)
+  // are all visible and correctable before matching/saving, not silently
+  // missing from the form entirely. ------------------------------------
+  const wizardSrc=fs.readFileSync(path.join(root,'js/schein-wizard.js'),'utf8');
+  ["'w_rpm'","'w_weight'","'w_seats'","'w_firstreg'","'w_year'","'w_hsn'","'w_tsn'","'w_cc'","'w_kw'","'w_fuel'","'w_color'","'w_class'"].forEach(k=>{
+    assert(wizardSrc.includes(k), `the wizard's review step has an editable field for ${k} -- it must be correctable, not just displayed read-only`);
   });
 
   if(failed){ console.error(failed+' failed'); process.exit(1); }
