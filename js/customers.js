@@ -207,6 +207,7 @@ function vehicleModal(prefill={}){
  <div class="field"><label>${t('displacement')}</label><input id="cc" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
  <div class="field"><label>${t('fuel')}</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
  <div class="field"><label>${t('powerKw')}</label><input id="kw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_power_kw||'')}"></div>
+ <div class="field"><label>${t('ratedRpm')}</label><input id="vrpm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_rated_rpm||prefill.ratedRpm||'')}" placeholder="U/min"></div>
  <div class="field"><label>${t('maxWeight')}</label><input id="vmaxw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.maxWeight||'')}"></div>
  <div class="field"><label>${t('seats')}</label><input id="vseats" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.seats||'')}"></div>
  <div class="field"><label>${t('vClass')}</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
@@ -216,7 +217,7 @@ function vehicleModal(prefill={}){
  <div class="field"><label>${t('nextService')}</label><input id="vnext" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.nextServiceKm||'')}"></div>
  </div>`,()=>{
   if(!$('#cu').value)return toast(t('pickCustomerFirst'));
-  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
+  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ratedRpm:$('#vrpm')?.value||'',maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
   else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
  });
@@ -226,6 +227,13 @@ function vehicleModal(prefill={}){
   bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',year:'#yr',kw:'#kw',cc:'#cc',fuel:'#fuel',seats:'#vseats',weight:'#vmaxw',klass:'#vklass'});
 }
 function scanVehicleDocument(){
+ // Two-step, like repairs.js's scan-to-job flow: the first click only reads
+ // and shows the review panel (source, mapped fields, warnings, raw data).
+ // The actual customer/vehicle creation only happens on an EXPLICIT second
+ // click -- this is the fix for a real bug where the review used to render
+ // and then be destroyed by closeModal() within the same continuation,
+ // before anyone could actually read it.
+ let ready=false, lastAi=null;
  modal(t('scanScheinTitle'),`<div class="field">
  <label>${t('pickSchein')}</label>
  <input id="doc" type="file" accept="image/*" class="hidden">
@@ -240,21 +248,29 @@ function scanVehicleDocument(){
  <div id="ocrBox" class="hidden"><div class="progress"><div id="ocrProg"></div></div><div id="ocrStatus" class="muted"></div></div>
  <div id="ocrReview"></div>
  </div>`,async()=>{
-  const f=$('#doc').files[0];if(!f)return toast(t('pickScheinFirst'));
-  $('#ocrBox').classList.remove('hidden');
-  $('#msave').disabled=true;
+  if(!ready){
+   const f=$('#doc').files[0];if(!f)return toast(t('pickScheinFirst'));
+   $('#ocrBox').classList.remove('hidden');
+   $('#msave').disabled=true;
+   try{
+    const url=URL.createObjectURL(f);$('#ocrImg').src=url;$('#ocrImg').classList.remove('hidden');
+    $('#ocrStatus').textContent = t('readingAI');
+    let ai = await (WP.OCR && WP.OCR.read ? WP.OCR.read(f) : readScheinAI(f));
+    if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
+    if(typeof renderScheinReview==='function') renderScheinReview(ai);
+    lastAi=ai; ready=true;
+    $('#ocrStatus').textContent = t('scheinFilled')||'';
+    if($('#msave')){ $('#msave').disabled=false; $('#msave').textContent=t('useThisData')||t('readData'); }
+   }catch(e){console.error(e);$('#ocrStatus').textContent=t('ocrManual');$('#msave').disabled=false}
+   return;
+  }
   try{
-   const url=URL.createObjectURL(f);$('#ocrImg').src=url;$('#ocrImg').classList.remove('hidden');
-   $('#ocrStatus').textContent = t('readingAI');
-   let ai = await (WP.OCR && WP.OCR.read ? WP.OCR.read(f) : readScheinAI(f));
-   if(WP.OCR && WP.OCR.stripDemo) ai=WP.OCR.stripDemo(ai||{});
-   if(typeof renderScheinReview==='function') renderScheinReview(ai);
-   const {c,v,cancelled}=await findOrCreateFromSchein(ai);
-   if(cancelled){ toast(t('scanAborted')||'Cancelled'); if($('#msave')) $('#msave').disabled=false; return; }
+   const {c,v,cancelled}=await findOrCreateFromSchein(lastAi);
+   if(cancelled){ toast(t('scanAborted')||'Cancelled'); return; }
    closeModal();
    vehicleModal(v);
    toast((c&&c.name?c.name+' · ':'')+(v.plate||v.vin||''));
-  }catch(e){console.error(e);$('#ocrStatus').textContent=t('ocrManual');$('#msave').disabled=false}
+  }catch(e){ console.error(e); toast(t('ocrFailSchein')); }
  },t('readData'));
  $('#doc').onchange=()=>{const f=$('#doc').files[0];if(f){const u=URL.createObjectURL(f);$('#ocrImg').src=u;$('#ocrImg').classList.remove('hidden'); if($('#docName')) $('#docName').textContent=f.name;}};
  if($('#pickDoc')) $('#pickDoc').onclick=()=>$('#doc').click();
@@ -321,7 +337,7 @@ function buildVehicleFromAi(ai, customerId){
     plate, vin, make:ai.brand||ai.make||'', model:ai.model||'', year:ai.year||'',
     engine:ai.engine_code||ai.engine||'', paint:ai.color||ai.paint||'',
     engine_displacement_cm3:ai.engine_displacement_cm3||'', fuel_type:ai.fuel_type||'',
-    engine_power_kw:ai.engine_power_kw||'', hsn:ai.hsn||'', tsn:ai.tsn||'', kba:ai.kba||((ai.hsn||'')+' '+(ai.tsn||'')).trim(),
+    engine_power_kw:ai.engine_power_kw||'', ratedRpm:ai.engine_rated_rpm||ai.ratedRpm||'', hsn:ai.hsn||'', tsn:ai.tsn||'', kba:ai.kba||((ai.hsn||'')+' '+(ai.tsn||'')).trim(),
     maxWeight:ai.maxWeight||'', seats:ai.seats||'', vehicleClass:ai.vehicleClass||'',
     km:0, nextServiceKm:0, photo:'',
     ocrSource:ai.ocrSource||'fahrzeugschein'};

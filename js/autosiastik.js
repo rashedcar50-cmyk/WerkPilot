@@ -4,11 +4,60 @@
    See https://api.fahrzeugschein-scanner.de/redoc for the upstream schema. */
 (function(W){
   function str(v){ return v==null ? '' : String(v).trim(); }
+  function isBlankish(v){
+    const s=str(v);
+    return !s || /^[-–—]+$/.test(s);
+  }
+  // Fallback list used only if js/ocr.js (which owns the canonical list)
+  // hasn't loaded for some reason -- kept intentionally short since the
+  // real list lives in one place (WP.OCR.MAKES) to avoid drift.
+  const FALLBACK_MAKES=['VOLKSWAGEN','VW','BMW','MERCEDES-BENZ','MERCEDES','AUDI','OPEL','FORD','TOYOTA','RENAULT','PEUGEOT','CITROEN','SKODA','SEAT','FIAT','HYUNDAI','KIA','PORSCHE','MAZDA','NISSAN','HONDA','VOLVO','DACIA','TESLA','MINI','SMART','JEEP','SUZUKI','CUPRA'];
+  function knownMakes(){
+    try{ return (window.WP && WP.OCR && WP.OCR.MAKES && WP.OCR.MAKES.length) ? WP.OCR.MAKES : FALLBACK_MAKES; }
+    catch(e){ return FALLBACK_MAKES; }
+  }
+
+  // Some printed certificates leave D.1 (Marke) blank or a bare dash and
+  // fold the brand into D.3 (Handelsbezeichnung) instead, e.g. D.3="NISSAN
+  // ALMERA". This only ever extracts a name that is ALREADY printed on the
+  // document (matched against a known-manufacturer list), never invents
+  // one -- and only runs when D.1 itself gives us nothing to show.
+  function splitBrandModel(d1, d3){
+    const brand=str(d1), model=str(d3);
+    if(!isBlankish(brand)) return {brand, model, derived:false};
+    if(!model) return {brand:'', model:'', derived:false};
+    const list=knownMakes();
+    for(let i=0;i<list.length;i++){
+      const mk=list[i];
+      const re=new RegExp('^'+mk.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+      if(re.test(model)){
+        const rest=model.replace(re,'').trim();
+        return {brand:mk, model: rest||model, derived:true};
+      }
+    }
+    return {brand:'', model, derived:false};
+  }
+
+  // Some certificate templates (and some national variants) print P.2.4 as
+  // a single combined "kW/Drehzahl" cell (e.g. "85/5600" = 85 kW at 5600
+  // U/min) instead of kW alone. Detect that exact two-number pattern and
+  // split it; a plain single number (the other template style) is left
+  // untouched. Never invents an RPM value when only one number is present.
+  function splitPowerRpm(raw){
+    const s=str(raw);
+    const m=s.match(/^(\d{1,4}(?:[.,]\d+)?)\s*\/\s*(\d{2,6})$/);
+    if(!m) return {kw:s, rpm:'', derived:false};
+    return {kw:m[1], rpm:m[2], derived:true};
+  }
 
   // Maps the upstream ScanResponseDe fields onto WerkPilot's internal
   // vehicle/customer field names. Values are kept exactly as returned
   // (hsn/tsn/plate/vin are strings in the API, so leading zeros survive);
   // nothing here invents a value for a field the API returned null/empty.
+  // Collects `_derivationWarnings` for every place a value was derived
+  // (split/matched) rather than read directly from its own API field, so
+  // the caller can flag it for review instead of presenting it as a plain
+  // fact.
   function mapScan(d){
     d=d||{};
     const plate = str(d.registrationNumber) || (d.plate && str(d.plate.formatted)) || '';
@@ -20,29 +69,41 @@
     const firstReg = str(d.ez_string) || str(d.ez);
     const year = (firstReg.match(/(19|20)\d{2}/)||[])[0] || '';
     const hsn = str(d.hsn), tsn = str(d.tsn);
+    const derivationWarnings=[];
+
+    const bm=splitBrandModel(d.d1, d.d3);
+    if(bm.derived) derivationWarnings.push('Marke "'+bm.brand+'" wurde aus der Modellbezeichnung abgeleitet (Feld D.1/Marke war leer) -- bitte prüfen.');
+
+    const pr=splitPowerRpm(d.p2_p4);
+    if(pr.derived) derivationWarnings.push('Leistung aus "'+str(d.p2_p4)+'" aufgeteilt in '+pr.kw+' kW und Nenndrehzahl '+pr.rpm+' U/min -- bitte prüfen.');
+
+    if(year) derivationWarnings.push('Baujahr '+year+' wurde aus der Erstzulassung ('+firstReg+') abgeleitet, nicht bestätigt -- Erstzulassung ist nicht zwingend das Herstellungsjahr.');
+
     return {
       license_plate: plate, plate,
       vin: str(d.vin).toUpperCase(),
-      brand: str(d.d1), make: str(d.d1),
-      model: str(d.d3),
+      brand: bm.brand, make: bm.brand,
+      model: bm.model,
       year,
       first_registration: firstReg, firstRegistration: firstReg,
       owner_name: ownerName,
       address,
       engine_displacement_cm3: str(d.p1),
-      engine_power_kw: str(d.p2_p4),
+      engine_power_kw: pr.kw,
+      engine_rated_rpm: pr.rpm,
       fuel_type: str(d.p3),
       color: str(d.r), paint: str(d.r),
       hsn, tsn, kba: (hsn && tsn) ? (hsn+' '+tsn) : '',
       maxWeight: str(d.f1) || str(d.f2),
       seats: str(d.s1),
-      vehicleClass: str(d.j)
+      vehicleClass: str(d.j),
+      _derivationWarnings: derivationWarnings
     };
   }
 
-  function buildWarnings(d){
+  function buildWarnings(d, derivationWarnings){
     d=d||{};
-    const w=[];
+    const w=(derivationWarnings||[]).slice();
     if(d.vin && d.vin_valid===false) w.push('VIN-Prüfziffer unsicher'+(d.vin_validation_msg?(': '+d.vin_validation_msg):''));
     if(d.hsn && d.hsn_valid===false) w.push('HSN passt nicht zum Fahrzeugkatalog'+(d.hsn_validation_msg?(': '+d.hsn_validation_msg):''));
     if(d.tsn && d.tsn_valid===false) w.push('TSN passt nicht zum Fahrzeugkatalog'+(d.tsn_validation_msg?(': '+d.tsn_validation_msg):''));
@@ -135,7 +196,9 @@
     }
     const d=js.data||{};
     const mapped=mapScan(d);
-    mapped.validationWarnings=buildWarnings(d);
+    const derivationWarnings=mapped._derivationWarnings||[];
+    delete mapped._derivationWarnings;
+    mapped.validationWarnings=buildWarnings(d, derivationWarnings);
     mapped.cutouts=buildCutouts(d);
     mapped.kbaFound=(d.kba_found===true);
     mapped.documentId=str(d.document_id);
@@ -143,5 +206,5 @@
     return mapped;
   }
 
-  W.Autosiastik={read, mapScan, buildWarnings, buildCutouts, rawTextFields};
+  W.Autosiastik={read, mapScan, buildWarnings, buildCutouts, rawTextFields, splitBrandModel, splitPowerRpm, isBlankish};
 })(window.WP=window.WP||{});

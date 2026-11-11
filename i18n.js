@@ -479,7 +479,7 @@ window.WP_INV_DE = {
       noReqs:'No requests yet.',exportFull:'Export full JSON',importJson:'Import JSON',reseed:'Reload demo data',
       devNotesLbl:'Dev notes',notesSaved:'Notes saved',invalidFile:'Invalid file',pdfSaved:'PDF saved',
       reportWord:'Report',mechanic:'Technician',saveSlim:'Saved after reducing photos',saveFail:'Local save failed — export a backup now',loggedInAs:'Signed in as',helpTitle:'Werkivo — short guide',help1:'Sign in (mechanic: ismail / 1977A).',help2:'Photograph the registration — customer and vehicle are created.',help3:'Check mileage, open a job or invoice.',help4:'Lines like Henry: number, qty, Enter.',help5:'Save → preview → print / PDF (number stays).',helpInv:'The invoice stays German. UI language only changes the screens.',archive:'Document archive',conflicts:'Sync conflicts',impressum:'Imprint',privacy:'Privacy',scheinFilled:'Registration read — check and save',nextForCar:'Next: appointment, invoice or quote',alignSchein:'Fit the registration card inside the gold frame',retake:'Retake',usePhoto:'Use photo',noFlash:'Flash not available',fromWhatsApp:'From WhatsApp',waNoShareIcon:'WhatsApp on iPhone does not show web apps in Share. Save the photo in the chat, then pick it here.',waSaveInChat:'In the chat: open the photo → Share → Save Image',waThenPick:'Back here: choose the saved photo',vehicleExists:'This vehicle is already saved — not created twice',waPickHint:'WhatsApp → photo → Share → Werkivo. Or save the photo and pick the file.',waGoHint:'Open WhatsApp, choose the photo, tap Share and pick Werkivo. The image returns here.',openWhatsApp:'Open WhatsApp',
-      possibleDuplicateCustomer:'Customer may already exist',possibleDuplicateHint:'A customer named "{name}" already exists. Link the scanned vehicle to them, or create a separate customer record?',createNewCustAnyway:'Create new customer anyway',scanAborted:'Scan cancelled — nothing was saved',autosiastikError:'Vehicle-document scan service failed: {msg}'
+      possibleDuplicateCustomer:'Customer may already exist',possibleDuplicateHint:'A customer named "{name}" already exists. Link the scanned vehicle to them, or create a separate customer record?',createNewCustAnyway:'Create new customer anyway',scanAborted:'Scan cancelled — nothing was saved',autosiastikError:'Vehicle-document scan service failed: {msg}',useThisData:'Use this data'
     },
     de:{
       pdfFailLib:'PDF-Bibliothek konnte nicht geladen werden',pdfNotLoaded:'PDF-Bibliothek fehlt — Seite aktualisieren',
@@ -502,7 +502,7 @@ window.WP_INV_DE = {
       noReqs:'Noch keine Anfragen.',exportFull:'Komplettes JSON exportieren',importJson:'JSON importieren',reseed:'Demodaten laden',
       devNotesLbl:'Entwickler-Notizen',notesSaved:'Notizen gespeichert',invalidFile:'Ungültige Datei',pdfSaved:'PDF gespeichert',
       reportWord:'Bericht',mechanic:'Techniker',saveSlim:'Gespeichert nach Verkleinern der Fotos',saveFail:'Lokales Speichern fehlgeschlagen — jetzt Backup exportieren',loggedInAs:'Sie sind angemeldet als',helpTitle:'Werkivo — Kurz-Anleitung',help1:'Anmelden (Mechaniker: ismail / 1977A).',help2:'Fahrzeugschein fotografieren — Kunde und Fahrzeug werden angelegt.',help3:'km-Stand prüfen, Auftrag oder Rechnung öffnen.',help4:'Positionen wie in Henry: Nummer, Menge, Enter.',help5:'Speichern → Vorschau → Drucken / PDF (Belegnummer bleibt).',helpInv:'Die Rechnung bleibt immer Deutsch. Die Programmsprache ändert nur die Bedienung.',archive:'Beleg-Archiv',conflicts:'Sync-Konflikte',impressum:'Impressum',privacy:'Datenschutz',scheinFilled:'Fahrzeugschein gelesen — prüfen und speichern',nextForCar:'Weiter: Termin, Rechnung oder Kostenvoranschlag',alignSchein:'Fahrzeugschein in den goldenen Rahmen legen',retake:'Erneut aufnehmen',usePhoto:'Foto verwenden',noFlash:'Blitz nicht verfügbar',fromWhatsApp:'Aus WhatsApp',waNoShareIcon:'Auf dem iPhone erscheint keine Web-App in Teilen. Foto im Chat sichern, dann hier wählen.',waSaveInChat:'Im Chat: Foto öffnen → Teilen → Bild sichern',waThenPick:'Zurück: gespeichertes Foto wählen',vehicleExists:'Fahrzeug schon vorhanden — wird nicht doppelt gespeichert',waPickHint:'WhatsApp → Foto → Teilen → Werkivo. Oder Foto speichern und Datei wählen.',waGoHint:'WhatsApp öffnen, Foto wählen, Teilen → Werkivo. Das Bild kommt zurück ins Programm.',openWhatsApp:'WhatsApp öffnen',
-      possibleDuplicateCustomer:'Kunde eventuell schon vorhanden',possibleDuplicateHint:'Ein Kunde namens "{name}" existiert bereits. Das gescannte Fahrzeug mit diesem Kunden verknüpfen oder einen neuen, separaten Kunden anlegen?',createNewCustAnyway:'Trotzdem neuen Kunden anlegen',scanAborted:'Scan abgebrochen — es wurde nichts gespeichert',autosiastikError:'Fahrzeugschein-Scan fehlgeschlagen: {msg}'
+      possibleDuplicateCustomer:'Kunde eventuell schon vorhanden',possibleDuplicateHint:'Ein Kunde namens "{name}" existiert bereits. Das gescannte Fahrzeug mit diesem Kunden verknüpfen oder einen neuen, separaten Kunden anlegen?',createNewCustAnyway:'Trotzdem neuen Kunden anlegen',scanAborted:'Scan abgebrochen — es wurde nichts gespeichert',autosiastikError:'Fahrzeugschein-Scan fehlgeschlagen: {msg}',useThisData:'Diese Daten übernehmen'
     },
     ar:{
       pdfFailLib:'تعذر تحميل مكتبة PDF',pdfNotLoaded:'مكتبة PDF غير محمّلة — حدّث الصفحة',
@@ -525,7 +525,7 @@ window.WP_INV_DE = {
       noReqs:'ما في طلبات بعد.',exportFull:'تصدير JSON كامل',importJson:'استيراد JSON',reseed:'إعادة بيانات التجربة',
       devNotesLbl:'ملاحظات تطوير',notesSaved:'تم حفظ الملاحظات',invalidFile:'ملف غير صالح',pdfSaved:'تم حفظ PDF',
       reportWord:'تقرير',mechanic:'الميكانيكي',saveSlim:'الحفظ تم بعد تخفيف الصور',saveFail:'تعذر الحفظ المحلي — صدّر نسخة احتياطية',loggedInAs:'مسجّل الدخول باسم',helpTitle:'Werkivo — دليل مختصر',help1:'تسجيل الدخول (الميكانيكي: ismail / 1977A).',help2:'صوّر ورقة السيارة — ينحفظ العميل والسيارة.',help3:'راجع الكم وافتح أمر أو فاتورة.',help4:'البنود مثل Henry: الرقم، الكمية، Enter.',help5:'حفظ ثم معاينة ثم طباعة / PDF (الرقم يبقى).',helpInv:'الفاتورة تبقى بالألمانية. لغة البرنامج للواجهة فقط.',archive:'أرشيف المستندات',conflicts:'تعارضات المزامنة',impressum:'البيان القانوني',privacy:'الخصوصية',scheinFilled:'تمت قراءة ورقة السيارة — راجع واحفظ',nextForCar:'التالي: موعد أو فاتورة أو تقدير',alignSchein:'حط كرت السيارة جوا الإطار الذهبي',retake:'إعادة التصوير',usePhoto:'اعتماد الصورة',noFlash:'الفلاش غير متاح',fromWhatsApp:'من واتساب',waNoShareIcon:'ع الآيفون واتساب ما بيظهر برامج الويب بالمشاركة. احفظ الصورة من المحادثة وبعدين اختارها من هون.',waSaveInChat:'بالمحادثة: افتح الصورة → مشاركة → حفظ الصورة',waThenPick:'ارجع لهون واختر الصورة المحفوظة',vehicleExists:'السيارة موجودة مسبقاً — ما رح تنحفظ مرتين',waPickHint:'واتساب → الصورة → مشاركة → Werkivo. أو احفظ الصورة واختر الملف.',waGoHint:'افتح واتساب، حدّد الصورة، مشاركة، واختر Werkivo. الصورة بترجع لهون.',openWhatsApp:'فتح واتساب',
-      possibleDuplicateCustomer:'ربما يوجد عميل بهذا الاسم مسبقاً',possibleDuplicateHint:'يوجد عميل باسم "{name}" مسبقاً. اربط السيارة الممسوحة بهذا العميل أو أنشئ سجل عميل منفصل؟',createNewCustAnyway:'إنشاء عميل جديد رغم ذلك',scanAborted:'تم إلغاء المسح — لم يُحفظ أي شيء',autosiastikError:'فشلت خدمة مسح ورقة السيارة: {msg}'
+      possibleDuplicateCustomer:'ربما يوجد عميل بهذا الاسم مسبقاً',possibleDuplicateHint:'يوجد عميل باسم "{name}" مسبقاً. اربط السيارة الممسوحة بهذا العميل أو أنشئ سجل عميل منفصل؟',createNewCustAnyway:'إنشاء عميل جديد رغم ذلك',scanAborted:'تم إلغاء المسح — لم يُحفظ أي شيء',autosiastikError:'فشلت خدمة مسح ورقة السيارة: {msg}',useThisData:'اعتماد هذه البيانات'
     }
   };
   Object.keys(z).forEach(c=>{ if(window.WP_I18N&&WP_I18N[c]) Object.assign(WP_I18N[c], z[c]); });
@@ -701,7 +701,7 @@ window.langOptions = function(selected){
       needCustomer:'Select a customer or a vehicle linked to a customer',
       saveShowDesign:'Save and preview',addedFrom:'Added from',
       notFoundLocal:'Not found locally. Complete name and price or open Katy.',
-      needSku:'Enter a part number',maxWeight:'Max weight (kg)',seats:'Seats',vClass:'Vehicle class',
+      needSku:'Enter a part number',maxWeight:'Max weight (kg)',seats:'Seats',vClass:'Vehicle class',ratedRpm:'Rated speed (rpm)',
       readingAI:'Reading registration with AI...',ocrManual2:'Automatic read failed. Enter manually.',
       newCustShort:'New customer',scanOpenJob:'Scan registration — open job',
       kmNowEx:'Current mileage',repairNeeded:'Work required',saveOpenJob:'Save and open job',
@@ -737,7 +737,7 @@ window.langOptions = function(selected){
       needCustomer:'Kunde oder zugeordnetes Fahrzeug wählen',
       saveShowDesign:'Speichern und Vorschau',addedFrom:'Übernommen aus',
       notFoundLocal:'Lokal nicht gefunden. Name und Preis ergänzen oder Katy öffnen.',
-      needSku:'Teilenummer eingeben',maxWeight:'Zul. Gesamtmasse (kg)',seats:'Sitze',vClass:'Fahrzeugklasse',
+      needSku:'Teilenummer eingeben',maxWeight:'Zul. Gesamtmasse (kg)',seats:'Sitze',vClass:'Fahrzeugklasse',ratedRpm:'Nenndrehzahl (U/min)',
       readingAI:'Schein wird per KI gelesen...',ocrManual2:'Automatik fehlgeschlagen. Manuell eingeben.',
       newCustShort:'Neuer Kunde',scanOpenJob:'Schein scannen — Auftrag öffnen',
       kmNowEx:'Aktueller km-Stand',repairNeeded:'Gewünschte Arbeit',saveOpenJob:'Speichern und Auftrag öffnen',
@@ -773,7 +773,7 @@ window.langOptions = function(selected){
       needCustomer:'اختر العميل أو سيارة مربوطة بعميل',
       saveShowDesign:'حفظ وعرض التصميم',addedFrom:'تمت الإضافة من',
       notFoundLocal:'ما انوجدت محلياً. كمّل الاسم والسعر أو افتح Katy.',
-      needSku:'أدخل رقم القطعة',maxWeight:'الوزن الأقصى (kg)',seats:'عدد المقاعد',vClass:'فئة المركبة',
+      needSku:'أدخل رقم القطعة',maxWeight:'الوزن الأقصى (kg)',seats:'عدد المقاعد',vClass:'فئة المركبة',ratedRpm:'سرعة الدوران الاسمية (U/min)',
       readingAI:'جارٍ قراءة ورقة السيارة بالذكاء الاصطناعي...',ocrManual2:'تعذرت القراءة التلقائية. أدخل يدوياً.',
       newCustShort:'زبون جديد',scanOpenJob:'تصوير ورقة السيارة — فتح أمر',
       kmNowEx:'الكيلومتر الحالي',repairNeeded:'وصف التصليح المطلوب',saveOpenJob:'حفظ وفتح الأمر',

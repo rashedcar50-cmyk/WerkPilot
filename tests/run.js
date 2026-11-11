@@ -699,6 +699,49 @@ async function decideLogin(cand, pass){
   const openaiReadIdx=ocrSrcFull.indexOf('await openaiRead(imgColor)');
   assert(autosiastikBlockIdx>0 && openaiReadIdx>autosiastikBlockIdx, 'PROOF: Autosiastik is attempted before the existing OpenAI-based pipeline, which remains as a fallback, not removed');
 
+  // --- Real-device findings (2026-11-11, Nissan Almera Zulassungsbescheinigung
+  // + a prior VW test): the provider prints some fields in combined/blank
+  // forms that need a GENERAL, document-format-agnostic fix -- not a value
+  // hardcoded for any one vehicle. ----------------------------------------
+  assert(Auto.splitPowerRpm('85/5600').kw==='85' && Auto.splitPowerRpm('85/5600').rpm==='5600' && Auto.splitPowerRpm('85/5600').derived===true, 'splitPowerRpm splits an old-style combined "kW/Drehzahl" cell');
+  assert(Auto.splitPowerRpm('75/3000').kw==='75' && Auto.splitPowerRpm('75/3000').rpm==='3000', 'splitPowerRpm is format-general, not specific to one vehicle (VW test case)');
+  const plainKw=Auto.splitPowerRpm('85');
+  assert(plainKw.kw==='85' && plainKw.rpm==='' && plainKw.derived===false, 'splitPowerRpm leaves a plain single kW value (new-style template) untouched -- no invented RPM');
+  assert(Auto.splitPowerRpm('').kw==='' && Auto.splitPowerRpm('').rpm==='', 'splitPowerRpm never invents values for an empty field');
+
+  assert(Auto.isBlankish('') && Auto.isBlankish('-') && Auto.isBlankish('—') && !Auto.isBlankish('OPEL'), 'isBlankish recognizes empty/dash placeholders printed on some documents');
+  const bm1=Auto.splitBrandModel('-', 'NISSAN ALMERA');
+  assert(bm1.brand==='NISSAN' && bm1.model==='ALMERA' && bm1.derived===true, 'splitBrandModel derives the brand from the model text ONLY when D.1 itself is blank/dash, using a known-manufacturer list (general, not a NISSAN-specific hardcode)');
+  const bmAnyMake=Auto.splitBrandModel('', 'SKODA OCTAVIA');
+  assert(bmAnyMake.brand==='SKODA' && bmAnyMake.model==='OCTAVIA', 'splitBrandModel works for any manufacturer in the known list, not just the one seen during testing');
+  const bm2=Auto.splitBrandModel('OPEL', 'Astra Sports Tourer');
+  assert(bm2.brand==='OPEL' && bm2.model==='Astra Sports Tourer' && bm2.derived===false, 'splitBrandModel leaves brand/model alone when D.1 already has a real value');
+  const bm3=Auto.splitBrandModel('', 'Totally Unrecognized Model Name');
+  assert(bm3.brand==='' && bm3.derived===false, 'splitBrandModel never invents a brand when no known manufacturer name matches -- stays empty for review, not guessed');
+
+  const nissanScan=Auto.mapScan({d1:'-', d3:'NISSAN ALMERA', p1:'1769', p2_p4:'85/5600', ez_string:'19.05.2004', f1:'1735', s1:'5', j:'01'});
+  assert(nissanScan.brand==='NISSAN' && nissanScan.model==='ALMERA', 'mapScan applies the brand/model split end-to-end');
+  assert(nissanScan.engine_power_kw==='85' && nissanScan.engine_rated_rpm==='5600', 'mapScan applies the power/RPM split end-to-end, keeping both values (neither is silently dropped)');
+  assert(nissanScan.engine_displacement_cm3==='1769', 'mapScan still preserves Hubraum exactly as the provider returned it (1769) -- any 769-vs-1769 mismatch is upstream recognition, not our mapping, and must never be "corrected" by guessing');
+  assert(nissanScan.maxWeight==='1735' && nissanScan.seats==='5', 'mapScan still passes through f1/s1 when the provider actually returns them -- confirms the pipeline has no bug dropping these fields');
+  assert(nissanScan._derivationWarnings.some(w=>/Marke/.test(w)) && nissanScan._derivationWarnings.some(w=>/Leistung/.test(w)) && nissanScan._derivationWarnings.some(w=>/Baujahr/.test(w)), 'every derived (non-literal) value is flagged in _derivationWarnings for review, not presented as a plain confirmed fact');
+
+  const plainFormatScan=Auto.mapScan({d1:'VOLKSWAGEN', d3:'Golf', p2_p4:'66', ez_string:'01.01.2020'});
+  assert(plainFormatScan.brand==='VOLKSWAGEN' && plainFormatScan.engine_power_kw==='66' && !plainFormatScan.engine_rated_rpm, 'a newer-style document (plain D.1 + single kW value) is handled correctly too -- same code path supports both old and new certificate formats');
+  assert(!plainFormatScan._derivationWarnings.some(w=>/Marke/.test(w)) && !plainFormatScan._derivationWarnings.some(w=>/Leistung/.test(w)), 'no derivation warning is raised for fields that were NOT derived (D.1 already present, power already a single value)');
+
+  // --- Regression: the review panel must survive long enough to be read --
+  // Bug found during real-device testing: scanVehicleDocument() rendered
+  // the review panel and then called closeModal() in the very same click
+  // handler, destroying it before a human could read it. Fixed with an
+  // explicit two-step gate (read -> show review -> second click confirms).
+  const custSrc3=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
+  const scanFnBody=(custSrc3.match(/function scanVehicleDocument\(\)\{[\s\S]*?\r?\n\}/)||[''])[0];
+  assert(/let ready=false/.test(scanFnBody), 'PROOF OF FIX: scanVehicleDocument has an explicit ready/confirmed state, not a single auto-continuing step');
+  const firstReadIdx=scanFnBody.indexOf('renderScheinReview(ai)');
+  const closeModalIdx=scanFnBody.indexOf('closeModal();', firstReadIdx); // the real call, not the explanatory comment above it
+  assert(firstReadIdx>0 && closeModalIdx>firstReadIdx && scanFnBody.slice(firstReadIdx,closeModalIdx).includes('return;'), 'PROOF OF FIX: rendering the review and closing the modal are in different passes (an explicit `return` separates them) -- the review is no longer destroyed in the same continuation that renders it');
+
   // --- Dedup: do not merge customers by name alone --------------------------
   // Reproduces the exact scenario the integration must handle: a brand-new
   // vehicle scan whose owner name matches an EXISTING customer by text alone.
