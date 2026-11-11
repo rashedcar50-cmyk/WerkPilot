@@ -53,8 +53,19 @@
     maxWeight:'Zul. Gesamtmasse (kg)', seats:'Sitze',
     owner_name:'Halter', address:'Anschrift'
   };
-  function kv(label, val){
-    return `<div class="ocr-kv"><span class="ocr-kv-k">${label}</span><span class="ocr-kv-v">${val===''||val==null?'<i>—</i>':val}</span></div>`;
+  // Fields the provider frequently leaves unread (small print on the
+  // document) and for which WerkPilot has no alternate extraction path --
+  // an empty value here means "needs manual entry", not "confirmed empty",
+  // so it must read differently from a plain "—".
+  const MANUAL_ENTRY_IF_EMPTY=new Set(['maxWeight','seats']);
+  function kv(label, val, key){
+    let shown=val;
+    if(val===''||val==null){
+      shown = (key && MANUAL_ENTRY_IF_EMPTY.has(key))
+        ? '<i>nicht vom Anbieter geliefert — bitte manuell eintragen</i>'
+        : '<i>—</i>';
+    }
+    return `<div class="ocr-kv"><span class="ocr-kv-k">${label}</span><span class="ocr-kv-v">${shown}</span></div>`;
   }
   function renderReview(ai, containerSel){
     containerSel=containerSel||'#ocrReview';
@@ -81,7 +92,7 @@
     // Mapped fields -- exactly what will be offered to save, so a mapping
     // mistake is visible here, before the save click, not after.
     html+='<div class="ocr-fieldset"><b>Zugeordnete Felder</b>'+
-      Object.keys(MAPPED_FIELD_LABELS).map(k=>kv(MAPPED_FIELD_LABELS[k], ai[k]!=null?esc_(ai[k]):'')).join('')+
+      Object.keys(MAPPED_FIELD_LABELS).map(k=>kv(MAPPED_FIELD_LABELS[k], ai[k]!=null?esc_(ai[k]):'', k)).join('')+
       '</div>';
 
     if(warnings.length){

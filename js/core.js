@@ -285,6 +285,14 @@ function persistNow(){
   }
 }
 function save(immediate){
+  // Always invalidate the companyRows()/rowById() memo synchronously, even
+  // when the actual disk write below is debounced -- otherwise a row
+  // pushed into db.* and immediately read back via companyRows() (e.g.
+  // scanning a document creates a customer+vehicle and opens vehicleModal
+  // in the same tick) sees the stale pre-push cache until the debounced
+  // write fires ~80ms later. flushRows() itself is O(1), so there is no
+  // performance reason to debounce it along with the disk write.
+  flushRows();
   if(immediate){ if(_saveTimer) clearTimeout(_saveTimer); persistNow(); return; }
   if(_saveTimer) clearTimeout(_saveTimer);
   _saveTimer=setTimeout(persistNow, 80);

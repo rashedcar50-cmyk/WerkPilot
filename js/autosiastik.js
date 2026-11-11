@@ -17,25 +17,75 @@
     catch(e){ return FALLBACK_MAKES; }
   }
 
-  // Some printed certificates leave D.1 (Marke) blank or a bare dash and
-  // fold the brand into D.3 (Handelsbezeichnung) instead, e.g. D.3="NISSAN
-  // ALMERA". This only ever extracts a name that is ALREADY printed on the
-  // document (matched against a known-manufacturer list), never invents
-  // one -- and only runs when D.1 itself gives us nothing to show.
-  function splitBrandModel(d1, d3){
-    const brand=str(d1), model=str(d3);
-    if(!isBlankish(brand)) return {brand, model, derived:false};
-    if(!model) return {brand:'', model:'', derived:false};
-    const list=knownMakes();
-    for(let i=0;i<list.length;i++){
-      const mk=list[i];
-      const re=new RegExp('^'+mk.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
-      if(re.test(model)){
-        const rest=model.replace(re,'').trim();
-        return {brand:mk, model: rest||model, derived:true};
+  // --- Brand/model resolution ------------------------------------------
+  // The API returns brand/model from TWO independent sources that can
+  // disagree:
+  //   d1/d3     -- OCR-read directly from THIS document's own D.1/D.3
+  //                fields ("Der Inhalt des Feld D1/D3").
+  //   maker/model -- "ermittelt aus KBA Daten": looked up from the German
+  //                vehicle type-approval catalog by HSN/TSN, i.e. NOT read
+  //                from this document at all.
+  // Priority: the document's own D.1 wins outright when it has anything to
+  // show (it's the ground truth for *this* vehicle). Only when D.1 is
+  // blank/a dash do we fall back to the catalog's `maker` (still a real,
+  // provider-supplied field -- just from a different source, so it's
+  // flagged as such). Only when NEITHER is usable do we fall back to the
+  // last-resort heuristic of matching a known manufacturer name at the
+  // start of the model text. Every fallback is flagged for review; nothing
+  // here invents a brand that isn't already printed/returned somewhere.
+  function resolveBrandModel(d1, d3, maker, catalogModel){
+    d1=str(d1); d3=str(d3); maker=str(maker); catalogModel=str(catalogModel);
+    const warnings=[];
+    let brand='', brandSource='';
+    if(!isBlankish(d1)){ brand=d1; brandSource='document'; }
+    else if(maker){ brand=maker; brandSource='catalog'; }
+
+    const baseModel = !isBlankish(d3) ? d3 : catalogModel;
+    const modelSource = !isBlankish(d3) ? 'document' : (catalogModel ? 'catalog' : '');
+
+    if(!brand && baseModel){
+      const list=knownMakes();
+      for(let i=0;i<list.length;i++){
+        const mk=list[i];
+        const re=new RegExp('^'+mk.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+        if(re.test(baseModel)){ brand=mk; brandSource='derived'; break; }
       }
     }
-    return {brand:'', model, derived:false};
+
+    let model=baseModel;
+    if(brand && baseModel){
+      const re=new RegExp('^'+brand.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+      const rest=baseModel.replace(re,'').trim();
+      if(rest) model=rest;
+    }
+
+    if(brandSource==='catalog') warnings.push('Marke "'+brand+'" stammt aus dem Fahrzeugkatalog (HSN/TSN), nicht direkt aus dem Dokument (Feld D.1 war leer) -- bitte mit dem Fahrzeugschein abgleichen.');
+    else if(brandSource==='derived') warnings.push('Marke "'+brand+'" wurde aus der Modellbezeichnung abgeleitet (D.1 leer, kein Katalogeintrag verfügbar) -- bitte prüfen.');
+
+    return {brand, model, brandSource, modelSource, warnings};
+  }
+
+  // --- Generic same-concept conflict resolution -------------------------
+  // Some fields exist twice: once read directly from the document, once
+  // looked up from the KBA catalog by HSN/TSN. When only one is present,
+  // use it. When both are present and agree, use it with confidence. When
+  // they DISAGREE, this deliberately does NOT guess which is right (not
+  // "pick the bigger number", not "always prefer the catalog") -- it
+  // leaves the field blank and surfaces both values for human review.
+  function numEq(a,b){
+    const na=parseFloat(String(a).replace(',','.'));
+    const nb=parseFloat(String(b).replace(',','.'));
+    if(isNaN(na)||isNaN(nb)) return null;
+    return na===nb;
+  }
+  function resolveNumericField(label, docVal, catalogVal){
+    docVal=str(docVal); catalogVal=str(catalogVal);
+    if(!docVal && !catalogVal) return {value:'', conflict:false};
+    if(!docVal) return {value:catalogVal, conflict:false};
+    if(!catalogVal) return {value:docVal, conflict:false};
+    if(numEq(docVal,catalogVal)===true) return {value:docVal, conflict:false};
+    return {value:'', conflict:true, docVal, catalogVal,
+      warning: label+' unklar: Dokument liest "'+docVal+'", Fahrzeugkatalog (HSN/TSN) nennt "'+catalogVal+'" -- bitte im Original-Dokument prüfen und manuell eintragen.'};
   }
 
   // Some certificate templates (and some national variants) print P.2.4 as
@@ -71,13 +121,22 @@
     const hsn = str(d.hsn), tsn = str(d.tsn);
     const derivationWarnings=[];
 
-    const bm=splitBrandModel(d.d1, d.d3);
-    if(bm.derived) derivationWarnings.push('Marke "'+bm.brand+'" wurde aus der Modellbezeichnung abgeleitet (Feld D.1/Marke war leer) -- bitte prüfen.');
+    const bm=resolveBrandModel(d.d1, d.d3, d.maker, d.model);
+    derivationWarnings.push(...bm.warnings);
 
     const pr=splitPowerRpm(d.p2_p4);
     if(pr.derived) derivationWarnings.push('Leistung aus "'+str(d.p2_p4)+'" aufgeteilt in '+pr.kw+' kW und Nenndrehzahl '+pr.rpm+' U/min -- bitte prüfen.');
+    // Cross-check the (possibly just-split) kW against the catalog's own
+    // power_kw -- same conflict-or-confirm treatment as Hubraum below.
+    const kwCheck=resolveNumericField('Leistung (kW)', pr.kw, d.power_kw);
+    if(kwCheck.conflict) derivationWarnings.push(kwCheck.warning);
 
     if(year) derivationWarnings.push('Baujahr '+year+' wurde aus der Erstzulassung ('+firstReg+') abgeleitet, nicht bestätigt -- Erstzulassung ist nicht zwingend das Herstellungsjahr.');
+
+    // Hubraum: p1 is read from THIS document; ccm is looked up from the
+    // KBA catalog by HSN/TSN. Never silently prefer either on conflict.
+    const ccmCheck=resolveNumericField('Hubraum (cm³)', d.p1, d.ccm);
+    if(ccmCheck.conflict) derivationWarnings.push(ccmCheck.warning);
 
     return {
       license_plate: plate, plate,
@@ -88,8 +147,8 @@
       first_registration: firstReg, firstRegistration: firstReg,
       owner_name: ownerName,
       address,
-      engine_displacement_cm3: str(d.p1),
-      engine_power_kw: pr.kw,
+      engine_displacement_cm3: ccmCheck.value,
+      engine_power_kw: kwCheck.conflict ? '' : (kwCheck.value||pr.kw),
       engine_rated_rpm: pr.rpm,
       fuel_type: str(d.p3),
       color: str(d.r), paint: str(d.r),
@@ -112,10 +171,28 @@
     return w;
   }
 
+  // Some API fields (e.g. `plate`) are nested objects (PlateDe: raw,
+  // district_code, letters, digits, season, valid, ...), not plain
+  // strings. Rendered directly in an HTML template they stringify to
+  // "[object Object]" -- this flattens them into a readable "key=value,
+  // key2=value2" form instead, recursing for doubly-nested objects (e.g.
+  // plate.season).
+  function flattenForDisplay(v){
+    if(v==null) return '';
+    if(typeof v!=='object') return String(v);
+    if(Array.isArray(v)) return v.map(flattenForDisplay).filter(Boolean).join('; ');
+    return Object.keys(v)
+      .filter(k=>!/_img$/.test(k) && v[k]!=null && v[k]!=='')
+      .map(k=>k+'='+flattenForDisplay(v[k]))
+      .join(', ');
+  }
+
   // Strips the (large, base64) *_img fields so the remaining object is safe
   // to keep around and show in a review/trace panel -- this is what lets a
   // mismatch between the provider's own field and our mapping be inspected
-  // without needing the browser's Network tab.
+  // without needing the browser's Network tab. Nested objects are
+  // flattened to readable text (see flattenForDisplay) rather than shown
+  // as "[object Object]".
   function rawTextFields(d){
     d=d||{};
     const out={};
@@ -124,7 +201,7 @@
       if(k==='extra_pages') return;
       const v=d[k];
       if(v==null || v==='') return;
-      out[k]=v;
+      out[k]=(v && typeof v==='object') ? flattenForDisplay(v) : v;
     });
     return out;
   }
@@ -206,5 +283,5 @@
     return mapped;
   }
 
-  W.Autosiastik={read, mapScan, buildWarnings, buildCutouts, rawTextFields, splitBrandModel, splitPowerRpm, isBlankish};
+  W.Autosiastik={read, mapScan, buildWarnings, buildCutouts, rawTextFields, resolveBrandModel, splitPowerRpm, resolveNumericField, flattenForDisplay, isBlankish};
 })(window.WP=window.WP||{});

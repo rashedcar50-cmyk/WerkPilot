@@ -710,25 +710,76 @@ async function decideLogin(cand, pass){
   assert(Auto.splitPowerRpm('').kw==='' && Auto.splitPowerRpm('').rpm==='', 'splitPowerRpm never invents values for an empty field');
 
   assert(Auto.isBlankish('') && Auto.isBlankish('-') && Auto.isBlankish('—') && !Auto.isBlankish('OPEL'), 'isBlankish recognizes empty/dash placeholders printed on some documents');
-  const bm1=Auto.splitBrandModel('-', 'NISSAN ALMERA');
-  assert(bm1.brand==='NISSAN' && bm1.model==='ALMERA' && bm1.derived===true, 'splitBrandModel derives the brand from the model text ONLY when D.1 itself is blank/dash, using a known-manufacturer list (general, not a NISSAN-specific hardcode)');
-  const bmAnyMake=Auto.splitBrandModel('', 'SKODA OCTAVIA');
-  assert(bmAnyMake.brand==='SKODA' && bmAnyMake.model==='OCTAVIA', 'splitBrandModel works for any manufacturer in the known list, not just the one seen during testing');
-  const bm2=Auto.splitBrandModel('OPEL', 'Astra Sports Tourer');
-  assert(bm2.brand==='OPEL' && bm2.model==='Astra Sports Tourer' && bm2.derived===false, 'splitBrandModel leaves brand/model alone when D.1 already has a real value');
-  const bm3=Auto.splitBrandModel('', 'Totally Unrecognized Model Name');
-  assert(bm3.brand==='' && bm3.derived===false, 'splitBrandModel never invents a brand when no known manufacturer name matches -- stays empty for review, not guessed');
+
+  // --- Real-device findings round 2 (2026-11-11, raw Autosiastik payload
+  // read directly from the live "Rohdaten des Anbieters" panel by the
+  // user): ccm/maker/model/power_kw are documented as "ermittelt aus KBA
+  // Daten" -- looked up from the type-approval catalog by HSN/TSN -- which
+  // is a DIFFERENT source than p1/d1/d3 (read directly from this specific
+  // document). They can legitimately disagree; neither is automatically
+  // more correct. ----------------------------------------------------------
+  const bm1=Auto.resolveBrandModel('-', 'NISSAN ALMERA', '', '');
+  assert(bm1.brand==='NISSAN' && bm1.model==='ALMERA' && bm1.brandSource==='derived', 'resolveBrandModel falls back to text-derivation only when NEITHER D.1 nor a catalog maker is available');
+  const bmCatalog=Auto.resolveBrandModel('-', 'NISSAN ALMERA', 'Nissan', 'Nissan ALMERA FLH 1.8');
+  assert(bmCatalog.brand==='Nissan' && bmCatalog.brandSource==='catalog', 'PROOF OF FIX: when the catalog maker field is available, it is used BEFORE falling back to guessing the brand from model text (the real Nissan Almera case: maker="Nissan" was present but the old code ignored it)');
+  assert(bmCatalog.model==='ALMERA', 'model is still taken from the document\'s own D.3 (more specific to this exact document) and has the resolved brand prefix stripped');
+  const bmAnyMake=Auto.resolveBrandModel('', 'SKODA OCTAVIA', '', '');
+  assert(bmAnyMake.brand==='SKODA' && bmAnyMake.model==='OCTAVIA', 'resolveBrandModel works for any manufacturer in the known list, not just the one seen during testing');
+  const bm2=Auto.resolveBrandModel('OPEL', 'Astra Sports Tourer', 'SomeOtherMaker', 'Astra');
+  assert(bm2.brand==='OPEL' && bm2.model==='Astra Sports Tourer' && bm2.brandSource==='document', 'the document\'s own D.1 wins outright when present, even if the catalog maker disagrees -- D.1 is the ground truth for this specific vehicle');
+  const bm3=Auto.resolveBrandModel('', 'Totally Unrecognized Model Name', '', '');
+  assert(bm3.brand==='' && bm3.brandSource==='', 'resolveBrandModel never invents a brand when no known manufacturer name matches and no catalog maker exists -- stays empty for review, not guessed');
+
+  // Hubraum conflict (p1 vs ccm): the exact real-world case. Neither value
+  // is blindly preferred -- the field is left blank and both are surfaced.
+  const ccmConflict=Auto.resolveNumericField('Hubraum (cm³)', '769', '1769');
+  assert(ccmConflict.conflict===true && ccmConflict.value==='', 'PROOF OF FIX: a genuine Hubraum conflict (document "769" vs catalog "1769") is surfaced for review, NOT silently resolved by picking either value');
+  assert(/769/.test(ccmConflict.warning) && /1769/.test(ccmConflict.warning), 'the conflict warning names both candidate values so a human can check the real document');
+  const ccmAgree=Auto.resolveNumericField('Hubraum (cm³)', '1769', '1769');
+  assert(ccmAgree.conflict===false && ccmAgree.value==='1769', 'when document and catalog agree, the value is used with no conflict noise');
+  const ccmOnlyCatalog=Auto.resolveNumericField('Hubraum (cm³)', '', '1769');
+  assert(ccmOnlyCatalog.conflict===false && ccmOnlyCatalog.value==='1769', 'when only the catalog has a value (document field unread), it is used -- nothing to conflict with');
+  const ccmOnlyDoc=Auto.resolveNumericField('Hubraum (cm³)', '1769', '');
+  assert(ccmOnlyDoc.conflict===false && ccmOnlyDoc.value==='1769', 'when only the document has a value, it is used');
+  assert(Auto.resolveNumericField('x','','').conflict===false && Auto.resolveNumericField('x','','').value==='', 'no conflict and no invented value when both sources are empty');
+
+  // The user's exact real raw payload (as read from the live "Rohdaten"
+  // panel), minus personal fields -- end-to-end through mapScan().
+  const realNissanRaw={
+    d1:'-', d3:'NISSAN ALMERA', maker:'Nissan', model:'Nissan ALMERA FLH 1.8',
+    p1:'769', ccm:'1769', p2_p4:'85/5600', power_kw:'85',
+    hsn:'3144', tsn:'031', vin:'SJNFBAN16U0504041', registrationNumber:'RZ AA4763',
+    ez_string:'19.05.2004',
+    plate:{raw:'RZ AA4763', district_code:'RZ', letters:'AA', digits:4763, formatted:'RZ-AA 4763', compact:'RZAA4763', valid:true}
+  };
+  const realNissanScan=Auto.mapScan(realNissanRaw);
+  assert(realNissanScan.brand==='Nissan', 'PROOF OF FIX: brand resolves to the catalog maker field ("Nissan") for the real reported case, instead of the old text-derivation path');
+  assert(realNissanScan.model==='ALMERA', 'model keeps the document\'s own, more specific D.3 text with the brand prefix stripped');
+  assert(realNissanScan.engine_displacement_cm3==='', 'PROOF OF FIX: Hubraum is left BLANK (not "769") because the document (769) and catalog (1769) genuinely conflict -- exactly the real bug report');
+  assert(realNissanScan._derivationWarnings.some(w=>/Fahrzeugkatalog/.test(w) && /Marke/.test(w)), 'a warning explains the brand came from the catalog, not the document');
+  assert(realNissanScan._derivationWarnings.some(w=>/Hubraum/.test(w) && /769/.test(w) && /1769/.test(w)), 'a warning names both the document and catalog Hubraum values for manual review');
+  assert(realNissanScan.engine_power_kw==='85' && realNissanScan.engine_rated_rpm==='5600', 'Leistung/Drehzahl split still works and agrees with the catalog power_kw (no conflict in this real case)');
+  assert(realNissanScan.maxWeight==='' && realNissanScan.seats==='', 'maxWeight/seats stay empty exactly as the real payload had no f1/s1 -- never invented');
 
   const nissanScan=Auto.mapScan({d1:'-', d3:'NISSAN ALMERA', p1:'1769', p2_p4:'85/5600', ez_string:'19.05.2004', f1:'1735', s1:'5', j:'01'});
-  assert(nissanScan.brand==='NISSAN' && nissanScan.model==='ALMERA', 'mapScan applies the brand/model split end-to-end');
+  assert(nissanScan.brand==='NISSAN' && nissanScan.model==='ALMERA', 'mapScan applies the brand/model split end-to-end when no catalog maker is present either (falls back to text-derivation)');
   assert(nissanScan.engine_power_kw==='85' && nissanScan.engine_rated_rpm==='5600', 'mapScan applies the power/RPM split end-to-end, keeping both values (neither is silently dropped)');
-  assert(nissanScan.engine_displacement_cm3==='1769', 'mapScan still preserves Hubraum exactly as the provider returned it (1769) -- any 769-vs-1769 mismatch is upstream recognition, not our mapping, and must never be "corrected" by guessing');
+  assert(nissanScan.engine_displacement_cm3==='1769', 'with no conflicting catalog ccm, mapScan preserves Hubraum exactly as the document/provider returned it (1769)');
   assert(nissanScan.maxWeight==='1735' && nissanScan.seats==='5', 'mapScan still passes through f1/s1 when the provider actually returns them -- confirms the pipeline has no bug dropping these fields');
   assert(nissanScan._derivationWarnings.some(w=>/Marke/.test(w)) && nissanScan._derivationWarnings.some(w=>/Leistung/.test(w)) && nissanScan._derivationWarnings.some(w=>/Baujahr/.test(w)), 'every derived (non-literal) value is flagged in _derivationWarnings for review, not presented as a plain confirmed fact');
 
   const plainFormatScan=Auto.mapScan({d1:'VOLKSWAGEN', d3:'Golf', p2_p4:'66', ez_string:'01.01.2020'});
   assert(plainFormatScan.brand==='VOLKSWAGEN' && plainFormatScan.engine_power_kw==='66' && !plainFormatScan.engine_rated_rpm, 'a newer-style document (plain D.1 + single kW value) is handled correctly too -- same code path supports both old and new certificate formats');
   assert(!plainFormatScan._derivationWarnings.some(w=>/Marke/.test(w)) && !plainFormatScan._derivationWarnings.some(w=>/Leistung/.test(w)), 'no derivation warning is raised for fields that were NOT derived (D.1 already present, power already a single value)');
+
+  // --- Nested-object fields (e.g. `plate`) must render as readable text,
+  // never "[object Object]" -------------------------------------------------
+  const flatPlate=Auto.flattenForDisplay({raw:'RZ AA4763', district_code:'RZ', digits:4763, formatted:'RZ-AA 4763', valid:true, empty_field:null});
+  assert(!/\[object Object\]/.test(flatPlate), 'PROOF OF FIX: a nested object field never renders as "[object Object]"');
+  assert(/RZ AA4763/.test(flatPlate) && /RZ-AA 4763/.test(flatPlate) && /true/.test(flatPlate), 'flattenForDisplay renders the nested object\'s actual field values readably');
+  assert(!/empty_field/.test(flatPlate), 'flattenForDisplay omits null/empty keys from a nested object rather than showing them blank');
+  const rawWithPlate=Auto.rawTextFields({plate:{raw:'RZ AA4763', valid:true}, hsn:'3144'});
+  assert(typeof rawWithPlate.plate==='string' && !/\[object Object\]/.test(rawWithPlate.plate), 'PROOF OF FIX: rawTextFields (used by the review panel) flattens plate instead of leaving a raw object that stringifies to "[object Object]"');
 
   // --- Regression: the review panel must survive long enough to be read --
   // Bug found during real-device testing: scanVehicleDocument() rendered
@@ -741,6 +792,45 @@ async function decideLogin(cand, pass){
   const firstReadIdx=scanFnBody.indexOf('renderScheinReview(ai)');
   const closeModalIdx=scanFnBody.indexOf('closeModal();', firstReadIdx); // the real call, not the explanatory comment above it
   assert(firstReadIdx>0 && closeModalIdx>firstReadIdx && scanFnBody.slice(firstReadIdx,closeModalIdx).includes('return;'), 'PROOF OF FIX: rendering the review and closing the modal are in different passes (an explicit `return` separates them) -- the review is no longer destroyed in the same continuation that renders it');
+
+  // --- Regression: companyRows() must never return a stale customer/
+  // vehicle list right after a push -------------------------------------
+  // Real bug found via live browser testing (2026-11-12): scanning a
+  // document creates a customer+vehicle via findOrCreateFromSchein(), then
+  // immediately opens vehicleModal(v) in the same tick. vehicleModal reads
+  // companyRows('customers') to render the <select>, but that function
+  // memoizes its result and only invalidated the memo via flushRows()
+  // inside the DEBOUNCED persistNow() (fired by save() ~80ms later) --
+  // audit()/save() had already returned by the time vehicleModal ran, so
+  // the brand-new customer was simply missing from the <select> entirely
+  // (not just unselected). Fixed by having save() invalidate the memo
+  // synchronously regardless of the debounce.
+  {
+    const coreSandbox={
+      window:{addEventListener:()=>{}}, console, setTimeout, clearTimeout,
+      localStorage:(function(){ const m={}; return { getItem:k=>(k in m)?m[k]:null, setItem:(k,v)=>{m[k]=String(v);}, removeItem:k=>{delete m[k];} }; })()
+    };
+    vm.createContext(coreSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/core.js'),'utf8'), coreSandbox);
+    // core.js's own top-level `let db=load(), session=null;` creates
+    // lexical bindings private to this vm context, not properties on the
+    // sandbox object -- so the whole sequence (seed, assert, mutate,
+    // assert again) has to run as ONE script in that same context rather
+    // than alternating with host-side property access, or it would be
+    // reading/writing a different `db` than the one companyRows() closes
+    // over. The script's own completion value carries the results out.
+    const flushRowsResult=vm.runInContext(`
+      db={customers:[{id:'c1',companyId:'de',name:'Existing'}], vehicles:[], audit:[], settings:{}};
+      session={company:{id:'de'}, user:{name:'tester'}};
+      const beforeCount=companyRows('customers').length;
+      db.customers.push({id:'c2',companyId:'de',name:'Brand New'});
+      audit('customer.create','Brand New'); // calls the debounced save(), as findOrCreateFromSchein does
+      const after=companyRows('customers');
+      ({beforeCount, afterCount:after.length, hasNew:after.some(c=>c.id==='c2')});
+    `, coreSandbox);
+    assert(flushRowsResult.beforeCount===1, 'sandbox sanity: companyRows sees the one seeded customer');
+    assert(flushRowsResult.afterCount===2 && flushRowsResult.hasNew, 'PROOF OF FIX: companyRows() reflects a just-pushed row immediately after audit()/save(), without waiting for the debounced disk write');
+  }
 
   // --- Dedup: do not merge customers by name alone --------------------------
   // Reproduces the exact scenario the integration must handle: a brand-new
