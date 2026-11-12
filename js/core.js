@@ -128,23 +128,32 @@ function load(){
   if(window.WP && WP.Engine) WP.Engine.migrate(merged);
   restoreOpenAI(merged);
 
-  if(!Array.isArray(merged.users) || !merged.users.length) merged.users=clone(seed.users);
-  // No known password is ever auto-injected here anymore -- see the note
-  // above seed.users. A missing developer account still gets created (the
-  // app needs one to function), just without a value anyone can read in
-  // source; app.js's first-time-setup flow asks for a real password
-  // before granting that account a session.
-  if(!merged.users.some(u=>u.role==='developer')) merged.users.push({u:'Rashid',p:null,name:'Rashid Tabah',role:'developer'});
-  merged.users.forEach(u=>{
-    if(u.role==='developer' && (u.u==='owner' || u.u==='Rashid')){
-      u.u='Rashid';
-      if(!u.name || u.name==='صاحب الورشة / تطوير') u.name='Rashid Tabah';
-    }
-    if(u.role==='mechanic' && (u.u==='mechanic' || u.u==='ismail')){
-      u.u='ismail';
-      if(!u.name) u.name='Ismail';
-    }
-  });
+  // Login-unification migration (2026-11-13): the separate local
+  // username/password accounts above were the root cause of the
+  // cross-device split -- each device had its OWN independent local
+  // account, so "linking to the cloud" meant resending THAT device's own
+  // local password as the assumed cloud password, which only ever
+  // happened to work on the one device that originally created the
+  // cloud identity. Login is now ALWAYS a direct Supabase sign-in (see
+  // app.js's login()/completeLogin()) -- there is no local password check
+  // left to gate. db.cloudUsers is a local DISPLAY-ONLY cache (name/role
+  // per cloud email), never a credential; resolveCloudProfile() below
+  // seeds it from whatever local account was already cloud-linked (so
+  // the owner's name/role carries over once, on the device that had it),
+  // then the old local accounts are cleared -- run once per device (the
+  // cloudLoginMigrated flag), not on every load, so a later manual role
+  // change in Settings is never silently re-overwritten.
+  if(!merged.cloudUsers) merged.cloudUsers={};
+  if(!merged.settings.cloudLoginMigrated){
+    (merged.users||[]).forEach(u=>{
+      if(u && u.cloudEmail){
+        const key=String(u.cloudEmail).trim().toLowerCase();
+        if(key) merged.cloudUsers[key]={name:u.name||u.cloudEmail, role:u.role||'developer'};
+      }
+    });
+    merged.users=[];
+    merged.settings.cloudLoginMigrated=true;
+  }
   if(!Array.isArray(merged.companies) || !merged.companies.length) merged.companies=clone(seed.companies);
   ensureCompanyProfiles(merged);
   stripTstBranding(merged); migrateLegalName(merged);
@@ -353,6 +362,19 @@ function askConfirm(title, detail, onYes){
 }
 window.askConfirm=askConfirm;
 function audit(action,detail=''){db.audit.unshift({id:id('a'),ts:new Date().toISOString(),user:session?.user?.name||'system',company:session?.company?.id||'',action,detail});save()}
+// Login-unification (2026-11-13): the ONLY account record login now needs
+// -- a local display cache (name/role) keyed by the cloud email that just
+// signed in, never a credential. Auto-provisions a full-access profile
+// the first time a given cloud email is ever seen (this app's login is a
+// single unified account per workshop, not a multi-user roster), while
+// preserving a name/role a previous migration or manual Settings edit
+// already set for that email.
+function resolveCloudProfile(email){
+  const key=String(email||'').trim().toLowerCase();
+  if(!db.cloudUsers) db.cloudUsers={};
+  if(!db.cloudUsers[key]) db.cloudUsers[key]={name:email, role:'developer'};
+  return {email:key, name:db.cloudUsers[key].name, role:db.cloudUsers[key].role};
+}
 function companyRows(name){
   const cid=session&&session.company&&session.company.id;
   if(!cid) return [];

@@ -1,17 +1,14 @@
-/* Cloud (Supabase Auth) identity layer -- added 2026-11-08.
+/* Cloud (Supabase Auth) identity layer -- added 2026-11-08, made the
+ * SOLE login gate on 2026-11-13 (see js/app.js's login()/completeLogin()).
  *
- * Design: the existing local username/password login (js/app.js's
- * login()) stays the ONLY thing that gates using the app at all,
- * including fully offline with no Supabase configured -- nothing here
- * can lock a user out of the local app. This layer additionally signs
- * the SAME person into a real Supabase Auth identity, using the SAME
- * password, purely so RLS (row level security) on the Supabase side can
- * actually tell who is asking instead of trusting any anon request
- * (see supabase/rls-fix-proposal/). A local account gains a cloud
- * identity by setting db.users[].cloudEmail once (via the forced
- * password-rotation step, or the "link to cloud" action in Settings);
- * until then it keeps working exactly as before, just without
- * authenticated sync.
+ * Design: logging into the app IS signing into this real Supabase Auth
+ * identity -- there is no separate local username/password check left
+ * (the old dual system was the root cause of the original cross-device
+ * report: each device's own, independently-set local password only
+ * coincidentally matched the shared cloud password on the one device
+ * that first created it). RLS (row level security) on the Supabase side
+ * can therefore always tell who is asking, never trusting an anon
+ * request (see supabase/rls-fix-proposal/).
  *
  * Company/role scoping is carried in the Supabase Auth user's own
  * app_metadata (company_ids: string[], role: string) -- settable only
@@ -52,72 +49,25 @@
     try{ await sb.auth.signOut(); }catch(e){}
   }
 
-  // Creates (or, if it already exists, simply authenticates) the cloud
-  // identity for a local account, using the SAME password the person
-  // just chose locally -- called once, from forcePasswordSetup / the
-  // Settings "link to cloud" action. Never touches app_metadata (that
-  // stays admin-only); a freshly linked account has no company access
-  // until the owner provisions it (see provision-user.js) -- this only
-  // creates the login identity itself.
+  // Login-unification (2026-11-13): there is no "link this device"
+  // step anymore -- login (above) already is the cloud sign-in, so the
+  // old linkAccountToCloud()/syncCloudPassword() dance (sending THIS
+  // device's local password as a guess at the cloud password, then
+  // trying to keep a separate local hash in sync with it forever after)
+  // is gone outright, not just unused. That guesswork was the actual
+  // root cause of the original cross-device report: a second device's
+  // independently-set local password only ever coincidentally matched
+  // the real cloud password on the one device that first created it.
   //
-  // Cross-device sync bugfix (2026-11-12): the "already exists" fallback
-  // described above was only ever a comment -- signUp() on an email that
-  // already has a cloud identity just returns an error, and nothing ever
-  // tried signing in instead. In practice this meant: if a device's local
-  // password ever diverged from the cloud identity's real password (the
-  // two are only ever kept in sync by syncCloudPassword(), which itself
-  // silently no-ops if that device has no live cloud session at the
-  // moment the local password changes -- e.g. it was offline), every
-  // future login's signInCloud() would keep failing forever, with no
-  // visible error and no way to recover short of resetting the cloud
-  // password out-of-band. Re-running "link to cloud" in Settings with the
-  // CURRENT local password now also repairs exactly this case: if signUp
-  // reports the identity already exists, it retries as a normal sign-in
-  // with the same (just-typed) password -- if that succeeds, the account
-  // was already linked and working, just needed re-authenticating; if it
-  // also fails, the real problem (a genuinely different password) is
-  // returned instead of the confusing "already registered" message.
-  async function linkAccountToCloud(email, password){
-    const sb = client();
-    if(!sb || !email) return {ok:false, skipped:true};
-    try{
-      const {data, error} = await sb.auth.signUp({email, password});
-      if(error){
-        if(/already registered|already been registered|user_already_exists/i.test(error.message||'')){
-          const retry = await signInCloud(email, password);
-          if(retry.ok) return {ok:true, user:retry.user, reauthenticated:true};
-          // Cross-device link bugfix (2026-11-12): this email already has a
-          // cloud identity, but the password just typed (THIS device's own
-          // local app password -- the caller always tries that first, as a
-          // convenience) doesn't match it. That's expected whenever a
-          // second device's local password was set independently of the
-          // first device's -- NOT a generic failure, and not something
-          // retrying the same password will ever fix. Flagged separately so
-          // the UI can offer the one thing that actually resolves it:
-          // entering THAT cloud account's own (possibly different) password,
-          // instead of silently repeating "linking failed" forever.
-          return {ok:false, error: retry.error||error, emailTaken:true};
-        }
-        return {ok:false, error};
-      }
-      return {ok:true, user:data.user, needsEmailConfirm: !data.session};
-    }catch(e){ return {ok:false, error:e}; }
-  }
-
-  // Keeps a cloud-linked account's password in sync after a LOCAL
-  // password change (Settings page) -- signs in with the OLD password
-  // first (the caller must do that before calling this, or pass it in)
-  // isn't needed here: updateUser works on the current cloud session,
-  // so this only does anything if that account is already signed in
-  // to the cloud. If it isn't (e.g. this browser never linked, or the
-  // cloud session expired), it's a silent no-op -- never blocks the
-  // local password change.
-  async function syncCloudPassword(email, newPassword){
+  // Now that login IS the cloud session,
+  // "change password" has exactly one real target -- the cloud account's
+  // own password -- instead of a local hash that then had to be kept in
+  // sync with it. Only does anything if a cloud session already exists,
+  // which it always does for a logged-in user under the new flow.
+  async function changeCloudPassword(newPassword){
     const sb = client();
     if(!sb) return {ok:false, skipped:true};
     try{
-      const {data:sessionData} = await sb.auth.getSession();
-      if(!sessionData || !sessionData.session) return {ok:false, skipped:true};
       const {error} = await sb.auth.updateUser({password:newPassword});
       if(error) return {ok:false, error};
       return {ok:true};
@@ -193,11 +143,8 @@
   }
 
   W.CloudAuth = {
-    cloudAuthAvailable, signInCloud, signOutCloud, linkAccountToCloud,
-    syncCloudPassword, requestPasswordReset, isRecoveryLink,
+    cloudAuthAvailable, signInCloud, signOutCloud,
+    changeCloudPassword, requestPasswordReset, isRecoveryLink,
     completePasswordReset, clearRecoveryParamsFromUrl, redirectBase
   };
 })(window.WP=window.WP||{});
-window.syncCloudPassword = async function(email, newPassword){
-  return window.WP.CloudAuth.syncCloudPassword(email, newPassword);
-};
