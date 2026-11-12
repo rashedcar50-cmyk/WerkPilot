@@ -746,13 +746,23 @@ async function decideLogin(cand, pass){
   assert(Auto.resolveNumericField('x','','').conflict===false && Auto.resolveNumericField('x','','').value==='', 'no conflict and no invented value when both sources are empty');
 
   // The user's exact real raw payload (as read from the live "Rohdaten"
-  // panel), minus personal fields -- end-to-end through mapScan().
+  // panel), minus personal fields -- end-to-end through mapScan(). Extended
+  // 2026-11-12 (BASIC package + field reconfiguration) with the SAME real
+  // vehicle's actual values for every newly-configured field, taken from a
+  // fresh live scan reusing this already-public fixture's VIN/plate (no NEW
+  // real-VIN data is introduced here -- this exact vehicle was already
+  // committed in the 2026-11-11 round-2 fixture above).
   const realNissanRaw={
     d1:'-', d3:'NISSAN ALMERA', maker:'Nissan', model:'Nissan ALMERA FLH 1.8',
     p1:'769', ccm:'1769', p2_p4:'85/5600', power_kw:'85',
     hsn:'3144', tsn:'031', vin:'SJNFBAN16U0504041', registrationNumber:'RZ AA4763',
     ez_string:'19.05.2004',
-    plate:{raw:'RZ AA4763', district_code:'RZ', letters:'AA', digits:4763, formatted:'RZ-AA 4763', compact:'RZAA4763', valid:true}
+    plate:{raw:'RZ AA4763', district_code:'RZ', letters:'AA', digits:4763, formatted:'RZ-AA 4763', compact:'RZAA4763', valid:true},
+    hu:'10.2026', field_2_2:'03100000-', field_3:'7',
+    d2_1:'N16', d2_2:'-', d2_3:'-', d2_4:null,
+    field_14:'EURO 3', field_14_1:'0444', field_22:'ZU 151152AFELGE 15X6J16JJ7',
+    f1:'1735', f2:'1735', g:'2531348', s1:'5', r:'Blau',
+    field_15_1:'185/65R15 83S', field_15_2:'185/65R15 83S', field_6:'-'
   };
   const realNissanScan=Auto.mapScan(realNissanRaw);
   assert(realNissanScan.brand==='Nissan', 'PROOF OF FIX: brand resolves to the catalog maker field ("Nissan") for the real reported case, instead of the old text-derivation path');
@@ -761,7 +771,33 @@ async function decideLogin(cand, pass){
   assert(realNissanScan._derivationWarnings.some(w=>/Fahrzeugkatalog/.test(w) && /Marke/.test(w)), 'a warning explains the brand came from the catalog, not the document');
   assert(realNissanScan._derivationWarnings.some(w=>/Hubraum/.test(w) && /769/.test(w) && /1769/.test(w)), 'a warning names both the document and catalog Hubraum values for manual review');
   assert(realNissanScan.engine_power_kw==='85' && realNissanScan.engine_rated_rpm==='5600', 'Leistung/Drehzahl split still works and agrees with the catalog power_kw (no conflict in this real case)');
-  assert(realNissanScan.maxWeight==='' && realNissanScan.seats==='', 'maxWeight/seats stay empty exactly as the real payload had no f1/s1 -- never invented');
+  // --- BASIC-package field reconfiguration (2026-11-12): this document's
+  // seats/color were NOT returned by the account's prior field settings;
+  // the user's instruction was explicit NOT to assume they remain
+  // unsupported -- this is the direct proof that, once configured, the
+  // provider DOES return them (real values: Sitze=5, Farbe=Blau).
+  assert(realNissanScan.maxWeight==='1735', 'PROOF: F.1 (zul. Gesamtmasse) now arrives once the BASIC package/field settings were activated');
+  assert(realNissanScan.seats==='5', 'PROOF: the account reconfiguration DOES make S.1 (Sitze) available -- the old "not supported" conclusion no longer holds');
+  assert(realNissanScan.color==='Blau' && realNissanScan.paint==='Blau', 'PROOF: R (Farbe) is likewise now populated after the reconfiguration');
+  // --- Newly-mapped fields (this phase): every one of the user's exactly
+  // listed Seite 1/2/3 fields that wasn't mapped before.
+  assert(realNissanScan.nextHu==='10.2026', 'mapScan reads HU (Hauptuntersuchung) from the provider\'s own "hu" field');
+  assert(realNissanScan.tsnFull==='03100000-', 'mapScan reads Feld 2.2 (the full HSN/TSN key string) separately from the already-split hsn/tsn');
+  assert(realNissanScan.vinCheckDigit==='7', 'mapScan reads Feld 3 (Prüfziffer zur VIN) from field_3');
+  assert(realNissanScan.typ1==='N16' && realNissanScan.typ2==='-' && realNissanScan.typ3==='-' && realNissanScan.typ4==='', 'mapScan reads D.2.1-D.2.4 (Typ/Variante/Version) as four separate fields -- a blank/dash one stays empty, never invented');
+  assert(realNissanScan.emissionClass==='EURO 3', 'mapScan reads Feld 14 (nationale Emissionsklasse) separately from Feld 14.1');
+  assert(realNissanScan.emissionCode==='0444', 'mapScan reads Feld 14.1 (Code zu V.9/P.9) as its own field, not merged into Feld 14');
+  assert(realNissanScan.specialNotes==='ZU 151152AFELGE 15X6J16JJ7', 'mapScan reads Feld 22 (Sondereintragungen) verbatim');
+  assert(realNissanScan.maxWeightNational==='1735', 'PROOF: F.2 is mapped to its OWN field (maxWeightNational), never merged with F.1 (maxWeight) even though they agree on this document');
+  assert(realNissanScan.unladenWeight==='2531348', 'mapScan preserves G (Leermasse) exactly as returned, even though 2531348 kg is an implausible curb weight -- never auto-corrected, left for the shop to verify against the physical document');
+  assert(realNissanScan.tireAxle1==='185/65R15 83S' && realNissanScan.tireAxle2==='185/65R15 83S', 'mapScan reads Feld 15.1/15.2 (Bereifung Achse 1/2) as separate fields');
+  assert(realNissanScan.dateK==='-', 'mapScan reads Feld 6 (Datum zu K) as its own raw value (a dash here, not blanked to look "valid")');
+  // Never-zero guarantee for the new fields too (field codes used instead
+  // of literal 0/empty-looking defaults).
+  const emptyNew=Auto.mapScan({});
+  ['nextHu','tsnFull','vinCheckDigit','typ1','typ2','typ3','typ4','emissionClass','emissionCode','specialNotes','maxWeightNational','unladenWeight','tireAxle1','tireAxle2','dateK'].forEach(k=>{
+    assert(emptyNew[k]==='', `PROOF: ${k} stays an empty string (never "0" or null) when the provider returned nothing for it`);
+  });
 
   const nissanScan=Auto.mapScan({d1:'-', d3:'NISSAN ALMERA', p1:'1769', p2_p4:'85/5600', ez_string:'19.05.2004', f1:'1735', s1:'5', j:'01'});
   assert(nissanScan.brand==='NISSAN' && nissanScan.model==='ALMERA', 'mapScan applies the brand/model split end-to-end when no catalog maker is present either (falls back to text-derivation)');
@@ -960,6 +996,105 @@ async function decideLogin(cand, pass){
     assert(second.vehicle.id===first.vehicle.id, 'the second save resolves to the SAME vehicle record rather than inserting a new one');
   }
 
+  // 5) The newly-configured BASIC-package fields reach the saved vehicle
+  //    record end-to-end (form -> db.vehicles), and the raw provider
+  //    response is kept on its OWN field, separate from the corrected
+  //    values -- not merely visible in a diagnostic panel.
+  {
+    const {sb,db}=makeSaveSandbox();
+    const rawSnapshot={hu:'10.2026', d2_1:'N16', field_14:'EURO 3'};
+    const form={
+      owner_name:'Erweiterte Felder Kunde', license_plate:'B-EF 1', vin:'VIN-EXTENDED-FIELDS-01', brand:'NISSAN', model:'ALMERA',
+      nextHu:'10.2026', tsnFull:'03100000-', vinCheckDigit:'7',
+      typ1:'N16', typ2:'-', typ3:'-', typ4:'',
+      emissionClass:'EURO 3', emissionCode:'0444', specialNotes:'ZU 151152AFELGE 15X6J16JJ7',
+      maxWeightNational:'1735', unladenWeight:'2531348',
+      tireAxle1:'185/65R15 83S', tireAxle2:'185/65R15 83S', dateK:'-',
+      ocrRaw: JSON.stringify(rawSnapshot)
+    };
+    const {vehicle}=await sb.WP.ScheinWizard.executeSave({form, vehicleDecision:{mode:'create'}, customerDecision:{mode:'new'}});
+    assert(db.vehicles.length===1 && db.vehicles[0].id===vehicle.id, 'sanity: exactly one vehicle record created');
+    assert(vehicle.nextHu==='10.2026' && vehicle.tsnFull==='03100000-' && vehicle.vinCheckDigit==='7', 'PROOF: HU/Feld 2.2/Feld 3 reach the saved vehicle record, not just the form');
+    assert(vehicle.typ1==='N16' && vehicle.typ2==='-' && vehicle.typ3==='-' && vehicle.typ4==='', 'PROOF: D.2.1-D.2.4 all reach the saved record as four separate fields');
+    assert(vehicle.emissionClass==='EURO 3' && vehicle.emissionCode==='0444', 'PROOF: Feld 14/14.1 reach the saved record as two separate fields');
+    assert(vehicle.specialNotes==='ZU 151152AFELGE 15X6J16JJ7', 'PROOF: Feld 22 reaches the saved record');
+    assert(vehicle.maxWeightNational==='1735' && vehicle.unladenWeight==='2531348', 'PROOF: F.2 and G reach the saved record, each under its own key (never merged with F.1/maxWeight)');
+    assert(vehicle.tireAxle1==='185/65R15 83S' && vehicle.tireAxle2==='185/65R15 83S' && vehicle.dateK==='-', 'PROOF: Feld 15.1/15.2/6 reach the saved record');
+    assert(vehicle.ocrRaw===JSON.stringify(rawSnapshot), 'PROOF: the original raw provider response is stored on its own field (ocrRaw), kept separate from the corrected values above');
+
+    // Re-saving (e.g. a manual correction with no fresh scan) must not
+    // erase the original snapshot just because this particular save call
+    // had no new ocrRaw to offer.
+    const form2=Object.assign({}, form, {vinCheckDigit:'9', ocrRaw:''});
+    const {vehicle:vehicle2}=await sb.WP.ScheinWizard.executeSave({form:form2, vehicleDecision:{mode:'update', id:vehicle.id}, customerDecision:{mode:'existing', id:vehicle.customerId}});
+    assert(vehicle2.vinCheckDigit==='9', 'the manual correction is applied');
+    assert(vehicle2.ocrRaw===JSON.stringify(rawSnapshot), 'PROOF: a save with no new scan (empty ocrRaw) never erases the previously-stored original raw response');
+  }
+
+  // --- Cloud sync: the new fields must reach Supabase, not stay
+  // local-only -- and must read back correctly in an INDEPENDENT session
+  // (a fresh loadVehiclesFromCloud(), simulating reopening the app). -----
+  {
+    const capturedRows=[];
+    const cloudSandbox={
+      console,
+      db:{customers:[], vehicles:[]}, session:{company:{id:'de'}},
+      save:()=>{},
+      cloudCompanyFilter:q=>q,
+      mergeByCompany:(table, rows)=>{ cloudSandbox._merged=rows; }
+    };
+    cloudSandbox.window={ supabaseClient:{
+      from(table){
+        return {
+          update(row){ capturedRows.push({table,op:'update',row}); return {eq:()=>Promise.resolve({error:null})}; },
+          insert(row){ capturedRows.push({table,op:'insert',row}); return {select:()=>({single:()=>Promise.resolve({data:{id:777},error:null})})}; },
+          select(){ return Promise.resolve({data:[{
+            id:777, company_id:'de', customer_id:null, plate:'B-EF 1', vin:'VIN-EXTENDED-FIELDS-01',
+            make:'NISSAN', model:'ALMERA', year:'2004', engine:'', paint:'Blau', km:0, next_service_km:0, photo:'',
+            hsn:'3144', tsn:'031', kba:'3144 031', first_registration:'19.05.2004',
+            engine_displacement_cm3:'', engine_power_kw:'85', rated_rpm:'5600', fuel_type:'Benzin',
+            max_weight:'1735', seats:'5', vehicle_class:'01', ocr_source:'autosiastik',
+            next_hu:'10.2026', tsn_full:'03100000-', vin_check_digit:'7',
+            typ1:'N16', typ2:'-', typ3:'-', typ4:'',
+            emission_class:'EURO 3', emission_code:'0444', special_notes:'ZU 151152AFELGE 15X6J16JJ7',
+            max_weight_national:'1735', unladen_weight:'2531348',
+            tire_axle1:'185/65R15 83S', tire_axle2:'185/65R15 83S', date_k:'-',
+            ocr_raw:JSON.stringify({hu:'10.2026'})
+          }], error:null}); }
+        };
+      }
+    }};
+    vm.createContext(cloudSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), cloudSandbox);
+
+    const vForUpsert={id:'v-t1', companyId:'de', customerId:'', plate:'B-EF 1', vin:'VIN-EXTENDED-FIELDS-01', make:'NISSAN', model:'ALMERA', year:'2004', paint:'Blau',
+      hsn:'3144', tsn:'031', kba:'3144 031', firstRegistration:'19.05.2004', engine_power_kw:'85', ratedRpm:'5600', fuel_type:'Benzin',
+      maxWeight:'1735', seats:'5', vehicleClass:'01', ocrSource:'autosiastik',
+      nextHu:'10.2026', tsnFull:'03100000-', vinCheckDigit:'7', typ1:'N16', typ2:'-', typ3:'-', typ4:'',
+      emissionClass:'EURO 3', emissionCode:'0444', specialNotes:'ZU 151152AFELGE 15X6J16JJ7',
+      maxWeightNational:'1735', unladenWeight:'2531348', tireAxle1:'185/65R15 83S', tireAxle2:'185/65R15 83S', dateK:'-',
+      ocrRaw: JSON.stringify({hu:'10.2026'})
+    };
+    await cloudSandbox.upsertVehicleCloud(vForUpsert);
+    const upserted=capturedRows.find(r=>r.table==='vehicles');
+    assert(!!upserted, 'upsertVehicleCloud actually calls sb.from(\'vehicles\')');
+    const row=upserted.row;
+    assert(row.next_hu==='10.2026' && row.tsn_full==='03100000-' && row.vin_check_digit==='7', 'PROOF: the newly-configured fields are included in the row sent to Supabase, not kept local-only');
+    assert(row.typ1==='N16' && row.emission_class==='EURO 3' && row.emission_code==='0444' && row.special_notes==='ZU 151152AFELGE 15X6J16JJ7', 'PROOF: D.2.1/Feld14/14.1/22 all reach the Supabase row');
+    assert(row.max_weight_national==='1735' && row.unladen_weight==='2531348', 'PROOF: F.2 and G reach Supabase under their own columns, never merged with max_weight (F.1)');
+    assert(row.ocr_raw===JSON.stringify({hu:'10.2026'}), 'PROOF: the original raw response is synced to its own column, separate from the corrected fields');
+    assert(row.hsn==='3144' && row.engine_power_kw==='85' && row.max_weight==='1735' && row.seats==='5' && row.vehicle_class==='01', 'PROOF OF FIX (known limitation closed): the Phase-4 fields that were previously local-only (hsn/engine_power_kw/maxWeight/seats/vehicleClass) are now ALSO synced to Supabase');
+
+    await cloudSandbox.loadVehiclesFromCloud();
+    const reloaded=(cloudSandbox._merged||[])[0];
+    assert(!!reloaded, 'loadVehiclesFromCloud merges the row back in');
+    assert(reloaded.nextHu==='10.2026' && reloaded.tsnFull==='03100000-' && reloaded.vinCheckDigit==='7', 'PROOF: reopening in an independent session (a fresh loadVehiclesFromCloud) reads the new fields back correctly');
+    assert(reloaded.emissionClass==='EURO 3' && reloaded.specialNotes==='ZU 151152AFELGE 15X6J16JJ7', 'PROOF: Feld 14/22 survive a full save -> cloud -> reload round trip');
+    assert(reloaded.maxWeightNational==='1735' && reloaded.unladenWeight==='2531348', 'PROOF: F.2/G survive the round trip under their own keys');
+    assert(reloaded.ocrRaw===JSON.stringify({hu:'10.2026'}), 'PROOF: the original raw response survives the round trip too, still separate from the corrected fields');
+    assert(reloaded.seats==='5' && reloaded.vehicleClass==='01' && reloaded.maxWeight==='1735', 'PROOF: the previously local-only Phase-4 fields now also survive a cloud round trip');
+  }
+
   // --- Static check: every scan entry point goes through the SAME wizard,
   // not a second parallel implementation. --------------------------------
   const camSrc=fs.readFileSync(path.join(root,'js/camera.js'),'utf8');
@@ -984,8 +1119,22 @@ async function decideLogin(cand, pass){
   // are all visible and correctable before matching/saving, not silently
   // missing from the form entirely. ------------------------------------
   const wizardSrc=fs.readFileSync(path.join(root,'js/schein-wizard.js'),'utf8');
-  ["'w_rpm'","'w_weight'","'w_seats'","'w_firstreg'","'w_year'","'w_hsn'","'w_tsn'","'w_cc'","'w_kw'","'w_fuel'","'w_color'","'w_class'"].forEach(k=>{
+  ["'w_rpm'","'w_weight'","'w_seats'","'w_firstreg'","'w_year'","'w_hsn'","'w_tsn'","'w_cc'","'w_kw'","'w_fuel'","'w_color'","'w_class'",
+   "'w_hu'","'w_tsnfull'","'w_vincheck'","'w_typ1'","'w_typ2'","'w_typ3'","'w_typ4'","'w_emclass'","'w_emcode'","'w_notes'","'w_weightnat'","'w_unladen'","'w_tire1'","'w_tire2'","'w_datek'"].forEach(k=>{
     assert(wizardSrc.includes(k), `the wizard's review step has an editable field for ${k} -- it must be correctable, not just displayed read-only`);
+  });
+
+  // --- Requirement: F.1/F.2/G must never be collapsed into one field, and
+  // power/kW must stay separate from RPM, and firstRegistration separate
+  // from year -- all already true structurally, this guards against a
+  // future regression merging them back together.
+  assert(/maxWeight\s*:\s*str\(d\.f1\)\s*,/.test(fs.readFileSync(path.join(root,'js/autosiastik.js'),'utf8')), 'PROOF: maxWeight (F.1) is mapped alone, no longer OR\'d with F.2 -- the two certificate fields are kept separate');
+
+  // --- renderReview()/collectForm()/executeSave() must carry the new
+  // fields end-to-end (form -> saved vehicle record), not just display
+  // them in a diagnostic panel.
+  ['nextHu','tsnFull','vinCheckDigit','typ1','typ2','typ3','typ4','emissionClass','emissionCode','specialNotes','maxWeightNational','unladenWeight','tireAxle1','tireAxle2','dateK','ocrRaw'].forEach(k=>{
+    assert(wizardSrc.includes(k+':'), `collectForm()/executeSave() carries ${k} from the review form into the saved record`);
   });
 
   if(failed){ console.error(failed+' failed'); process.exit(1); }

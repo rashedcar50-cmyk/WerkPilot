@@ -153,9 +153,31 @@
       fuel_type: str(d.p3),
       color: str(d.r), paint: str(d.r),
       hsn, tsn, kba: (hsn && tsn) ? (hsn+' '+tsn) : '',
-      maxWeight: str(d.f1) || str(d.f2),
+      // F.1 (technisch zulässige Gesamtmasse) and F.2 (zulässige Gesamtmasse
+      // im Zulassungsstaat) are two DIFFERENT certificate fields, not two
+      // sources for the same fact -- they must never be merged/OR'd, so
+      // maxWeight (F.1) is kept separate from maxWeightNational (F.2) below.
+      maxWeight: str(d.f1),
       seats: str(d.s1),
       vehicleClass: str(d.j),
+      // --- Newly-configured BASIC-package fields (2026-11-12) -- field
+      // names/meanings taken from the provider's own OpenAPI schema
+      // (component ScanResponseDe), not guessed from the printed license
+      // codes. Kept as separate, honestly-labeled raw values; nothing here
+      // is auto-corrected (e.g. `g` can look implausible on this document
+      // but is preserved exactly as returned for the shop to verify).
+      nextHu: str(d.hu), // "Datum der Hauptuntersuchung (HU)"
+      tsnFull: str(d.field_2_2), // "Der Inhalt des Feld 2.2" (full HSN/TSN key string)
+      vinCheckDigit: str(d.field_3), // "Prüfziffer zur VIN"
+      typ1: str(d.d2_1), typ2: str(d.d2_2), typ3: str(d.d2_3), typ4: str(d.d2_4), // "Feld D2.1-4: Typ/Variante/Version"
+      emissionClass: str(d.field_14), // "Bezeichnung der nationalen Emissionsklasse"
+      emissionCode: str(d.field_14_1), // "Code zu V9 oder P9"
+      specialNotes: str(d.field_22), // "Die Sondereintragungen"
+      maxWeightNational: str(d.f2), // "Im Zulassungsstaat zulässige Gesamtmasse" (F.2, distinct from F.1)
+      unladenWeight: str(d.g), // "Leermasse in KG" (G)
+      tireAxle1: str(d.field_15_1), // "Bereifung Achse 1"
+      tireAxle2: str(d.field_15_2), // "Bereifung Achse 2"
+      dateK: str(d.field_6), // "Datum zu K" (K = Genehmigungsnummer)
       _derivationWarnings: derivationWarnings
     };
   }

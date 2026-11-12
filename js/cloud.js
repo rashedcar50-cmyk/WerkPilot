@@ -178,7 +178,17 @@ async function loadVehiclesFromCloud(){
       id:'v_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
       customerId:localIdForCloudId('customers', r.customer_id), plate:r.plate||'', vin:r.vin||'',
       make:r.make||'', model:r.model||'', year:r.year||'', engine:r.engine||'',
-      paint:r.paint||'', km:r.km||0, nextServiceKm:r.next_service_km||0, photo:r.photo||''
+      paint:r.paint||'', km:r.km||0, nextServiceKm:r.next_service_km||0, photo:r.photo||'',
+      hsn:r.hsn||'', tsn:r.tsn||'', kba:r.kba||'', firstRegistration:r.first_registration||'',
+      engine_displacement_cm3:r.engine_displacement_cm3||'', engine_power_kw:r.engine_power_kw||'',
+      ratedRpm:r.rated_rpm||'', fuel_type:r.fuel_type||'', maxWeight:r.max_weight||'',
+      seats:r.seats||'', vehicleClass:r.vehicle_class||'', ocrSource:r.ocr_source||'',
+      nextHu:r.next_hu||'', tsnFull:r.tsn_full||'', vinCheckDigit:r.vin_check_digit||'',
+      typ1:r.typ1||'', typ2:r.typ2||'', typ3:r.typ3||'', typ4:r.typ4||'',
+      emissionClass:r.emission_class||'', emissionCode:r.emission_code||'', specialNotes:r.special_notes||'',
+      maxWeightNational:r.max_weight_national||'', unladenWeight:r.unladen_weight||'',
+      tireAxle1:r.tire_axle1||'', tireAxle2:r.tire_axle2||'', dateK:r.date_k||'',
+      ocrRaw: r.ocr_raw ? (typeof r.ocr_raw==='string'?r.ocr_raw:JSON.stringify(r.ocr_raw)) : ''
     })));
     return true;
   }catch(e){console.warn(e);return false}
@@ -188,7 +198,17 @@ async function upsertVehicleCloud(v){
     const sb=window.supabaseClient; if(!sb) return;
     const customerCloudId = await resolveCloudId('customers', v.customerId, upsertCustomerCloud);
     const yearNum = v.year!=null && String(v.year).trim()!=='' ? (parseInt(v.year,10)||null) : null;
-    const row={company_id:v.companyId||'de',customer_id:customerCloudId,plate:v.plate||'',vin:v.vin||'',make:v.make||'',model:v.model||'',year:yearNum,engine:v.engine||'',paint:v.paint||'',km:Number(v.km||0),next_service_km:Number(v.nextServiceKm||0),photo:(v.photo&&v.photo.length<180000)?v.photo:''};
+    const row={company_id:v.companyId||'de',customer_id:customerCloudId,plate:v.plate||'',vin:v.vin||'',make:v.make||'',model:v.model||'',year:yearNum,engine:v.engine||'',paint:v.paint||'',km:Number(v.km||0),next_service_km:Number(v.nextServiceKm||0),photo:(v.photo&&v.photo.length<180000)?v.photo:'',
+      hsn:v.hsn||'', tsn:v.tsn||'', kba:v.kba||'', first_registration:v.firstRegistration||'',
+      engine_displacement_cm3:v.engine_displacement_cm3||'', engine_power_kw:v.engine_power_kw||'',
+      rated_rpm:v.ratedRpm||'', fuel_type:v.fuel_type||'', max_weight:v.maxWeight||'',
+      seats:v.seats||'', vehicle_class:v.vehicleClass||'', ocr_source:v.ocrSource||'',
+      next_hu:v.nextHu||'', tsn_full:v.tsnFull||'', vin_check_digit:v.vinCheckDigit||'',
+      typ1:v.typ1||'', typ2:v.typ2||'', typ3:v.typ3||'', typ4:v.typ4||'',
+      emission_class:v.emissionClass||'', emission_code:v.emissionCode||'', special_notes:v.specialNotes||'',
+      max_weight_national:v.maxWeightNational||'', unladen_weight:v.unladenWeight||'',
+      tire_axle1:v.tireAxle1||'', tire_axle2:v.tireAxle2||'', date_k:v.dateK||'',
+      ocr_raw:v.ocrRaw||''};
     if(v.cloudId){
       const {error}=await sb.from('vehicles').update(row).eq('id',v.cloudId);
       if(error){ console.warn('upsertVehicle',error.message); markSyncError(v,error.message); } else markSyncOk(v);
