@@ -655,7 +655,7 @@ async function decideLogin(cand, pass){
   assert(/completeLogin\(cand,\s*p1\)/.test(appSrc3), 'the post-first-time-setup path passes the newly-chosen password to completeLogin');
   assert(/await WP\.CloudAuth\.signInCloud\(cand\.cloudEmail,\s*plainPass\)/.test(appSrc3), 'completeLogin awaits the cloud sign-in');
   const cloudSignInIdx=appSrc3.indexOf('await WP.CloudAuth.signInCloud(cand.cloudEmail');
-  const syncAllCloudIdx=appSrc3.indexOf('syncAllCloud().finally');
+  const syncAllCloudIdx=appSrc3.indexOf('syncAllCloud(true).finally');
   assert(cloudSignInIdx>0 && syncAllCloudIdx>cloudSignInIdx, 'PROOF OF FIX: cloud sign-in happens BEFORE cloud sync starts, so sync calls carry a real authenticated session, not just the anon key');
 
   // --- Fix: reconnecting must retry locally-pending/failed cloud writes ----
@@ -666,9 +666,9 @@ async function decideLogin(cand, pass){
   // still set). Proof: syncAllCloud's own source now calls
   // retryPendingCloud() as its very first step, before any load*FromCloud().
   const cloudSrc=fs.readFileSync(path.join(root,'js/cloud.js'),'utf8');
-  assert(/function retryPendingCloud\(\)/.test(cloudSrc), 'retryPendingCloud() exists');
+  assert(/function retryPendingCloud\(manual\)/.test(cloudSrc), 'retryPendingCloud() exists');
   const syncAllCloudBodyIdx=cloudSrc.indexOf('function syncAllCloud');
-  const retryIdx=cloudSrc.indexOf('retryPendingCloud()', syncAllCloudBodyIdx);
+  const retryIdx=cloudSrc.indexOf('retryPendingCloud(manual)', syncAllCloudBodyIdx);
   const firstLoadIdx=cloudSrc.indexOf('loadCustomersFromCloud()', syncAllCloudBodyIdx);
   assert(retryIdx>0 && firstLoadIdx>retryIdx, 'PROOF OF FIX: syncAllCloud retries pending local writes before pulling from the cloud');
 
@@ -1429,6 +1429,98 @@ async function decideLogin(cand, pass){
     diagSandbox.navigator.onLine=false;
     const d8=diagSandbox.cloudDiagnostics();
     assert(d8.status==='offline', 'offline is detected and takes priority over a stale recorded error from before the connection dropped');
+  }
+
+  // =========================================================================
+  // Mobile root-cause fix (2026-11-12): "new row violates row-level
+  // security policy" has two genuinely different real causes that read
+  // identically in the error TEXT alone: (a) a validly, currently
+  // authenticated identity with simply no company_memberships row, and
+  // (b) a session that looks signed-in locally but has actually gone
+  // invalid server-side (a real mobile-browser failure mode). Reproduced
+  // against a REAL local Supabase stack (not mocked) and confirmed
+  // character-for-character against the real reported error -- see the
+  // session transcript. getUser() (a genuine server round-trip, unlike
+  // getSession() which only reads the locally-cached token) is the one
+  // call that tells these apart with evidence. markSyncError() now fires
+  // it automatically on a company-category error and relabels the
+  // diagnostic distinctly ("session-expired") when the server itself
+  // says the token is no longer good, instead of leaving it as the less
+  // actionable "no company access".
+  // =========================================================================
+  {
+    const sessionSandbox={ console, db:{settings:{}}, session:{company:{id:'de'}}, save:()=>{} };
+    let getUserCalls=0, getUserShouldFail=true;
+    sessionSandbox.window={ supabaseClient:{ auth:{
+      getUser: async()=>{ getUserCalls++; return getUserShouldFail ? {data:{user:null}, error:{message:'invalid JWT'}} : {data:{user:{id:'u1'}}, error:null}; }
+    }}};
+    vm.createContext(sessionSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), sessionSandbox);
+
+    const rec={id:'v1'};
+    sessionSandbox.markSyncError(rec, 'new row violates row-level security policy for table "vehicles"');
+    await new Promise(r=>setTimeout(r,20));
+    assert(getUserCalls===1, 'PROOF: a company-category rejection triggers exactly one real getUser() server round-trip to check whether the session is genuinely still valid');
+    assert(sessionSandbox.db.settings.cloudAuthError==='session-expired', 'PROOF OF FIX: when the server itself rejects the token (getUser fails), the diagnostic is relabeled "session-expired" -- a clear, specific, actionable state -- instead of staying the vaguer "no company access"');
+
+    // Reset and try the OTHER real case: the session genuinely IS still
+    // valid server-side, so the rejection really is about membership,
+    // not a stale token -- must NOT be mislabeled as session-expired.
+    sessionSandbox.db.settings.cloudAuthError='';
+    getUserShouldFail=false;
+    sessionSandbox.markSyncError(rec, 'new row violates row-level security policy for table "vehicles"');
+    await new Promise(r=>setTimeout(r,20));
+    assert(sessionSandbox.db.settings.cloudAuthError==='', 'PROOF: when getUser() confirms the session IS genuinely still valid server-side, the rejection is correctly left as a real company-access gap, never mislabeled as an expired session');
+
+    sessionSandbox.db.settings.cloudAuthError='session-expired';
+    const d2=sessionSandbox.cloudDiagnostics();
+    assert(d2.status==='session-expired', 'cloudDiagnostics() surfaces the session-expired state as its own distinct status, not folded into the generic auth-failed bucket');
+  }
+
+  // --- Mobile root-cause fix: automatic sync triggers must never hammer a
+  // request that is stuck on a company/auth rejection forever -- no
+  // amount of silent retrying can fix "not authenticated" or "no
+  // membership"; only an explicit user action (after actually fixing the
+  // real problem) should retry those. A genuinely transient/unknown error
+  // keeps retrying automatically as before. --------------------------------
+  {
+    const retrySandbox={ console, db:{ vehicles:[
+      {id:'v-company', companyId:'de', cloudId:null, syncError:'new row violates row-level security policy for table "vehicles"'},
+      {id:'v-auth', companyId:'de', cloudId:null, syncError:'Invalid login credentials'},
+      {id:'v-network', companyId:'de', cloudId:null, syncError:'Failed to fetch'},
+      {id:'v-fresh', companyId:'de', cloudId:null, syncError:''}
+    ], customers:[],purchases:[],inventory:[],expenses:[],repairs:[],appointments:[],invoices:[] },
+    session:{company:{id:'de'}}, save:()=>{}, attempted:[] };
+    retrySandbox.window={};
+    vm.createContext(retrySandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), retrySandbox);
+    // cloud.js's own `function upsertVehicleCloud(){...}` etc. are
+    // top-level function declarations -- hoisted lexical bindings in
+    // THIS vm context, not properties of the sandbox object, so setting
+    // retrySandbox.upsertVehicleCloud BEFORE running cloud.js would just
+    // create a same-named property that cloudSyncTables()'s own closure
+    // never sees (it resolves the real, later-declared function instead).
+    // Reassigning them via a script evaluated IN this same context, AFTER
+    // cloud.js has run, replaces the actual bindings everything closes
+    // over -- the same technique used for the db/session aliasing issue
+    // elsewhere in this file.
+    const attempted=retrySandbox.attempted;
+    vm.runInContext(`
+      function mk(){ return (rec)=>{ attempted.push(rec.id); return Promise.resolve(); }; }
+      upsertCustomerCloud=mk(); upsertVehicleCloud=mk();
+      upsertPurchaseCloud=mk(); upsertInventoryCloud=mk();
+      upsertExpenseCloud=mk(); upsertRepairCloud=mk();
+      upsertAppointmentCloud=mk(); upsertInvoiceCloud=mk();
+    `, retrySandbox);
+
+    await retrySandbox.retryPendingCloud(); // automatic trigger -- no `manual` flag
+    assert(!attempted.includes('v-company'), 'PROOF OF FIX: an automatic retry trigger skips a record stuck on a company/RLS rejection -- retrying it blindly forever can never succeed');
+    assert(!attempted.includes('v-auth'), 'PROOF OF FIX: an automatic retry trigger also skips a record stuck on an auth rejection, for the same reason');
+    assert(attempted.includes('v-network') && attempted.includes('v-fresh'), 'a genuinely transient (network) or brand-new-pending record is still retried automatically as before -- the backoff is specific to company/auth, not a blanket pause');
+
+    attempted.length=0;
+    await retrySandbox.retryPendingCloud(true); // explicit user action (e.g. just re-linked, or tapped "sync now")
+    assert(attempted.includes('v-company') && attempted.includes('v-auth'), 'PROOF OF FIX: an explicit user-triggered retry (manual:true) DOES retry records stuck on a company/auth rejection -- the whole point of re-linking or tapping "sync now" after fixing the real problem');
   }
 
   // --- Per-record badge: proves the indicator reflects EACH record's own

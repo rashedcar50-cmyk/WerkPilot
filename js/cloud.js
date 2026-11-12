@@ -81,6 +81,30 @@ function markSyncOk(x){ if(x){ x.syncError=''; x.syncPending=false; scheduleSync
 function markSyncError(x, message){
   if(x){ x.syncError=message||'sync failed'; x.syncPending=false; save(); scheduleSyncRerender(); }
   if(db && db.settings){ db.settings.lastSyncError={message, at:new Date().toISOString()}; }
+  // Mobile root-cause fix (2026-11-12): "new row violates row-level
+  // security policy" has TWO genuinely different real causes that read
+  // identically in the error text alone -- (a) a validly, currently
+  // authenticated identity that simply has no company_memberships row
+  // for this workshop, and (b) a session that LOOKS signed-in locally
+  // but has actually expired/gone invalid server-side (a known failure
+  // mode when a mobile browser tab sits backgrounded long enough that
+  // its token refresh timer gets suspended). These need different
+  // messages and the same one action (sign in again) -- (a) additionally
+  // needs the owner to grant access, which no client-side action can do.
+  // getUser() is the one call that actually asks the AUTH SERVER "is
+  // this token still good right now" (unlike getSession(), which only
+  // reads the locally-cached token and its claimed, not verified,
+  // expiry) -- so it's the only way to tell these apart with evidence
+  // instead of guessing from the error text alone.
+  if(classifySyncError(message)==='company' && typeof window!=='undefined' && window.supabaseClient){
+    window.supabaseClient.auth.getUser().then(({data, error})=>{
+      if(!db || !db.settings) return;
+      if(error || !(data && data.user)){
+        db.settings.cloudAuthError='session-expired';
+        try{ save(); scheduleSyncRerender(); }catch(e){}
+      }
+    }).catch(()=>{});
+  }
 }
 
 async function loadPurchasesFromCloud(){
@@ -456,12 +480,23 @@ function cloudSyncTables(){
     ['appointments', upsertAppointmentCloud], ['invoices', upsertInvoiceCloud]
   ];
 }
-async function retryPendingCloud(){
+// Mobile root-cause fix (2026-11-12): this used to retry EVERY pending
+// record on EVERY trigger (online, tab-visible, every 5 minutes) with no
+// exceptions -- harmless for a transient network blip, but for a
+// company/auth-category rejection (no valid session, or no membership
+// for this workshop), no amount of silent automatic retrying can ever
+// succeed; it would just re-send the identical doomed request forever.
+// Automatic triggers now skip a record stuck on a company/auth error --
+// only an explicit user action (the "retry now" button on that record,
+// or "sync now" after actually signing back in) retries those, via
+// `manual:true`.
+async function retryPendingCloud(manual){
   const companyId = session && session.company && session.company.id;
   if(!companyId) return;
   for(const [table, fn] of cloudSyncTables()){
     const pending = (db[table]||[]).filter(x => x.companyId===companyId && (!x.cloudId || x.syncError));
-    await Promise.all(pending.map(rec => fn(rec).catch(e => console.warn('retryPendingCloud', table, e))));
+    const toRetry = manual ? pending : pending.filter(x => !['company','auth'].includes(classifySyncError(x.syncError)));
+    await Promise.all(toRetry.map(rec => fn(rec).catch(e => console.warn('retryPendingCloud', table, e))));
   }
 }
 // Mobile sync-diagnosis bugfix (2026-11-12): a bare "pending" badge on
@@ -495,6 +530,7 @@ function cloudDiagnostics(){
   let status;
   if(typeof navigator!=='undefined' && navigator.onLine===false) status='offline';
   else if(authError==='not-linked-on-this-device') status='not-linked';
+  else if(authError==='session-expired') status='session-expired';
   else if(authError) status='auth-failed';
   else if(lastErrCategory==='company') status='no-company-access';
   else if(lastErrCategory==='network') status='network';
@@ -523,7 +559,11 @@ function pendingSyncCount(){
   return n;
 }
 let _cloudSyncInFlight=null;
-function syncAllCloud(){
+// `manual:true` (the user's own "sync now" / post-relink retry) also
+// retries records stuck on a company/auth error -- the automatic
+// triggers below never pass it, so they can never hammer a persistently
+// -rejected request (see retryPendingCloud's own comment).
+function syncAllCloud(manual){
   // Never run two full sync passes at once (e.g. the 'online' handler
   // and a visibility-change refresh firing close together) -- share the
   // one in-flight promise instead of racing duplicate pushes.
@@ -532,7 +572,7 @@ function syncAllCloud(){
      and invoices resolve their relations against db.customers /
      db.vehicles while loading, so those two load sequentially before
      everything else (which has no inter-dependencies among itself). */
-  _cloudSyncInFlight = retryPendingCloud()
+  _cloudSyncInFlight = retryPendingCloud(manual)
     .then(()=>loadCustomersFromCloud())
     .then(()=>loadVehiclesFromCloud())
     .then(()=>Promise.all([
