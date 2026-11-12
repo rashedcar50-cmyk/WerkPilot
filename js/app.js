@@ -92,9 +92,31 @@ function completeLogin(cand, plainPass){
   // at all are all silently tolerated -- this never blocks the local
   // login that already succeeded above.
   (async()=>{
+    // Cross-device sync bugfix (2026-11-12): this result used to be
+    // discarded entirely (bare try/catch, no check on `r.ok`) -- a wrong
+    // or stale cloud password, or this device simply never having been
+    // linked at all, was silently indistinguishable from "cloud sync
+    // working fine", because the local save always succeeds regardless.
+    // Recorded here so the dashboard can show a clear, actionable banner
+    // instead of every save quietly staying local-only forever. See
+    // js/cloud.js's pendingSyncCount()/db.settings.cloudAuthError.
     if(cand.cloudEmail && plainPass && window.WP && WP.CloudAuth){
-      try{ await WP.CloudAuth.signInCloud(cand.cloudEmail, plainPass); }catch(e){}
+      try{
+        const r=await WP.CloudAuth.signInCloud(cand.cloudEmail, plainPass);
+        db.settings.cloudAuthError = r.ok ? '' : String((r.error&&r.error.message)||'cloud-signin-failed');
+      }catch(e){ db.settings.cloudAuthError = String(e&&e.message||'cloud-signin-failed'); }
+    } else if(window.WP && WP.CloudAuth && WP.CloudAuth.cloudAuthAvailable()){
+      // Cloud is configured but THIS account has never been linked on
+      // THIS device -- cloudEmail lives only in this device's own local
+      // storage and never syncs, so linking on one device never carries
+      // over to another. Distinct from a failed sign-in so Settings can
+      // tell the user which action to take.
+      db.settings.cloudAuthError = 'not-linked-on-this-device';
+    } else {
+      db.settings.cloudAuthError='';
     }
+    db.settings.cloudAuthCheckedAt = new Date().toISOString();
+    save();
     syncAllCloud().finally(async ()=>{
       WP.run("afterLogin", session);
       if(/share=1/.test(location.search) || await consumeSharedWhatsApp()){
@@ -641,6 +663,25 @@ window.goBack=function(){
   render();
 };
 
+// Cross-device sync bugfix (2026-11-12): makes "this device hasn't
+// actually reached the cloud" visible instead of silent. Three distinct
+// states, each needing a different user action:
+//   - cloudAuthError==='not-linked-on-this-device' -> this account was
+//     never linked to the cloud on THIS device (linking lives only in
+//     this device's own local storage, never syncs) -- go link it.
+//   - any other truthy cloudAuthError -> the cloud sign-in itself failed
+//     (wrong/stale password) -- go re-link with the current password.
+//   - pendingSyncCount()>0 with no auth error -> auth is fine, some
+//     records just haven't pushed yet (will retry automatically).
+function cloudSyncBannerHtml(){
+  if(typeof db==='undefined' || !db.settings) return '';
+  const err=db.settings.cloudAuthError;
+  if(err==='not-linked-on-this-device') return `<div class="alert tap" onclick="goPage('settings')"><b>${t('cloudNotLinkedTitle')}:</b> ${t('cloudNotLinkedBody')}</div>`;
+  if(err) return `<div class="alert tap" onclick="goPage('settings')"><b>${t('cloudAuthFailTitle')}:</b> ${esc(err)}</div>`;
+  const pending=(typeof pendingSyncCount==='function')?pendingSyncCount():0;
+  if(pending>0) return `<div class="alert tap" onclick="goPage('settings')"><b>${t('cloudPendingTitle')}:</b> ${pending}</div>`;
+  return '';
+}
 function dashboard(){
  const inv=companyRows('invoices'),exp=companyRows('expenses'),rep=openRepairs(),veh=companyRows('vehicles');
  const sales=inv.reduce((a,x)=>a+Number(x.total||0),0),costs=exp.reduce((a,x)=>a+Number(x.amount||0),0);
@@ -658,6 +699,7 @@ function dashboard(){
  </div>
  ${low.length?`<div class="alert tap" onclick="goPage('inventory')"><b>${t('stockAlert')}:</b> ${low.map(x=>esc(dLabel(x.name))+' ('+x.qty+')').join(' · ')}</div>`:''}
  ${due.length?`<div class="alert tap" onclick="goPage('vehicles')"><b>${t('maintDue')}:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' km').join(' · ')}</div>`:''}
+ ${cloudSyncBannerHtml()}
  ${(window.WP&&WP.Quality&&WP.Quality.workshopLegalGaps().length)?`<div class="alert tap" onclick="goPage('settings')"><b>${t('legalGaps')}:</b> ${esc(WP.Quality.workshopLegalGaps().join(', '))}</div>`:''}
  ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
  return `<div class="card" style="margin-top:12px"><b>${t('vatReport')}</b>

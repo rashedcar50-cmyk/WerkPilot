@@ -590,6 +590,59 @@ async function decideLogin(cand, pass){
   const appSrc4=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
   assert(/onAuthStateChange\(\(event\)=>\{\s*\n\s*if\(event==='PASSWORD_RECOVERY'\) window\._wpRecoveryConfirmed=true;/.test(appSrc4), 'app.js registers the PASSWORD_RECOVERY listener right where the Supabase client is created');
 
+  // --- Cross-device sync bugfix: linkAccountToCloud() must actually
+  // re-authenticate when the identity already exists, not just fail with
+  // "already registered" -- this is exactly the recovery path for a
+  // device whose local password drifted from its cloud password (the
+  // most likely reason a device's saves silently never reach Supabase).
+  // The comment above the function already claimed this fallback
+  // existed; it didn't -- this proves the real fix.
+  function loadAuthForLink(signUpBehavior, signInBehavior){
+    const sandbox={
+      window:{ supabaseClient:{ auth:{
+        signUp: signUpBehavior,
+        signInWithPassword: signInBehavior
+      }}},
+      console
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/auth.js'),'utf8'), sandbox);
+    return sandbox;
+  }
+  {
+    // Case 1: brand-new email -- signUp succeeds normally, no fallback needed.
+    const sbx=loadAuthForLink(
+      async()=>({data:{user:{email:'new@example.test'}, session:{}}, error:null}),
+      async()=>{ throw new Error('signIn should not be called when signUp succeeds'); }
+    );
+    const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('new@example.test','Pw1');
+    assert(r.ok===true && !r.reauthenticated, 'a genuinely new cloud identity is created normally, no fallback triggered');
+  }
+  {
+    // Case 2: email already registered, and the CURRENT password is
+    // actually still correct -- falls back to a normal sign-in and
+    // succeeds, instead of surfacing a confusing "already registered"
+    // error for an account that's actually fine.
+    const sbx=loadAuthForLink(
+      async()=>({data:null, error:{message:'User already registered'}}),
+      async({email,password})=>({data:{user:{email}}, error:null})
+    );
+    const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('existing@example.test','CorrectPw');
+    assert(r.ok===true && r.reauthenticated===true, 'PROOF OF FIX: re-linking an already-registered identity with its CORRECT current password now succeeds via sign-in fallback, instead of just failing');
+  }
+  {
+    // Case 3: email already registered, but the password typed now is
+    // genuinely wrong/stale -- the fallback sign-in also fails, and the
+    // real problem is surfaced (not silently swallowed).
+    const signInErr={message:'Invalid login credentials'};
+    const sbx=loadAuthForLink(
+      async()=>({data:null, error:{message:'User already registered'}}),
+      async()=>({data:null, error:signInErr})
+    );
+    const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('existing@example.test','WrongPw');
+    assert(r.ok===false && r.error===signInErr, 'when the identity exists AND the password is genuinely wrong, the real sign-in error is returned, not a misleading generic failure');
+  }
+
   // --- Cloud Auth: wiring into the real login flow -------------------------
   // Proof the plaintext password typed at login is threaded through to
   // completeLogin (needed to silently sign into the linked cloud account
@@ -614,9 +667,89 @@ async function decideLogin(cand, pass){
   // retryPendingCloud() as its very first step, before any load*FromCloud().
   const cloudSrc=fs.readFileSync(path.join(root,'js/cloud.js'),'utf8');
   assert(/function retryPendingCloud\(\)/.test(cloudSrc), 'retryPendingCloud() exists');
-  const retryIdx=cloudSrc.indexOf('return retryPendingCloud()');
-  const firstLoadIdx=cloudSrc.indexOf('loadCustomersFromCloud()', cloudSrc.indexOf('function syncAllCloud'));
+  const syncAllCloudBodyIdx=cloudSrc.indexOf('function syncAllCloud');
+  const retryIdx=cloudSrc.indexOf('retryPendingCloud()', syncAllCloudBodyIdx);
+  const firstLoadIdx=cloudSrc.indexOf('loadCustomersFromCloud()', syncAllCloudBodyIdx);
   assert(retryIdx>0 && firstLoadIdx>retryIdx, 'PROOF OF FIX: syncAllCloud retries pending local writes before pulling from the cloud');
+
+  // --- Cross-device sync bugfix (2026-11-12): the root-cause investigation
+  // for "vehicle added on one device never appears on another" found that
+  // a failed/skipped cloud sign-in was silently swallowed -- completeLogin
+  // discarded signInCloud's result entirely, so a device that was never
+  // linked, or whose local password had drifted from its cloud password,
+  // kept "succeeding" at login and showing every local save as if nothing
+  // were wrong. These checks prove the result is now recorded. -----------
+  assert(/db\.settings\.cloudAuthError\s*=\s*r\.ok\s*\?\s*''\s*:/.test(appSrc3), 'PROOF OF FIX: completeLogin now records whether the cloud sign-in actually succeeded, instead of discarding the result');
+  assert(/not-linked-on-this-device/.test(appSrc3), 'completeLogin distinguishes "never linked on this device" from "sign-in failed" -- cloudEmail lives only in local storage and never travels between devices');
+
+  // --- Cross-device sync bugfix: pendingSyncCount() and the dashboard
+  // banner it feeds must actually reflect unsynced records (no cloudId or
+  // a recorded syncError), scoped to the current company. -----------------
+  {
+    const pendSandbox={ console, db:{ vehicles:[
+      {id:'v1', companyId:'de', cloudId:5, syncError:''},
+      {id:'v2', companyId:'de', cloudId:null, syncError:''},
+      {id:'v3', companyId:'de', cloudId:9, syncError:'network error'},
+      {id:'v4', companyId:'es', cloudId:null, syncError:''}
+    ], customers:[], purchases:[], inventory:[], expenses:[], repairs:[], appointments:[], invoices:[] },
+    session:{company:{id:'de'}}, save:()=>{}, cloudCompanyFilter:q=>q, upsertCustomerCloud:()=>{}, upsertVehicleCloud:()=>{}, upsertPurchaseCloud:()=>{}, upsertInventoryCloud:()=>{}, upsertExpenseCloud:()=>{}, upsertRepairCloud:()=>{}, upsertAppointmentCloud:()=>{}, upsertInvoiceCloud:()=>{} };
+    pendSandbox.window={};
+    vm.createContext(pendSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), pendSandbox);
+    assert(pendSandbox.pendingSyncCount()===2, 'PROOF: pendingSyncCount counts a never-synced record (v2, no cloudId) and a record with a recorded error (v3), scoped to the current company -- v1 (synced) and v4 (other company) are excluded');
+  }
+
+  // --- Cross-device sync bugfix: the actual duplicate found live in
+  // production -- the three demo-seed vehicles (shipped identically on
+  // every fresh install) ended up as SIX rows in the cloud, because every
+  // device that ever synced them had its own never-set cloudId and
+  // blindly inserted its own copy. VIN is a real unique identifier, so
+  // upsertVehicleCloud must look up an existing cloud row by VIN before
+  // inserting a vehicle with no local cloudId yet, and adopt/update that
+  // row instead of creating a second one. -------------------------------
+  {
+    const calls=[];
+    const dedupSandbox={ console, db:{vehicles:[],customers:[]}, session:{company:{id:'de'}}, save:()=>{}, cloudCompanyFilter:q=>q, markSyncOk:()=>{}, markSyncError:()=>{} };
+    dedupSandbox.window={ supabaseClient:{
+      from(table){
+        return {
+          select(){ calls.push({table,op:'select'});
+            return { eq:()=>({ limit:()=>({ maybeSingle:async()=>({data:{id:72}, error:null}) }) }) };
+          },
+          update(row){ calls.push({table,op:'update',row}); return {eq:(col,val)=>{ calls.push({table,op:'update-eq',val}); return Promise.resolve({error:null}); }}; },
+          insert(){ calls.push({table,op:'insert'}); throw new Error('insert should not be called when a cloud row already matches this VIN'); }
+        };
+      }
+    }};
+    vm.createContext(dedupSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), dedupSandbox);
+    const v={id:'v-dup-test', companyId:'de', customerId:'', vin:'WVWZZZ1JZYW123456', plate:'B-AK 1234', make:'VW', model:'Golf 7', year:'2018'};
+    await dedupSandbox.upsertVehicleCloud(v);
+    const didSelect=calls.some(c=>c.op==='select' && c.table==='vehicles');
+    const didUpdate=calls.some(c=>c.op==='update-eq' && c.val===72);
+    const didInsert=calls.some(c=>c.op==='insert');
+    assert(didSelect, 'PROOF OF FIX: before inserting a vehicle with no local cloudId, upsertVehicleCloud now looks up an existing cloud row by VIN first');
+    assert(didUpdate && !didInsert, 'PROOF OF FIX: when a cloud row with the same VIN already exists (id 72), it is UPDATED, never duplicated by a second INSERT');
+    assert(v.cloudId===72, 'the local record adopts the EXISTING cloud row\'s id, so the next save goes straight to an update');
+  }
+  {
+    // No matching VIN in the cloud -- a genuinely new vehicle still inserts normally.
+    const calls=[];
+    const noDupSandbox={ console, db:{vehicles:[],customers:[]}, session:{company:{id:'de'}}, save:()=>{}, cloudCompanyFilter:q=>q, markSyncOk:()=>{}, markSyncError:()=>{} };
+    noDupSandbox.window={ supabaseClient:{
+      from(table){
+        return {
+          select(){ return { eq:()=>({ limit:()=>({ maybeSingle:async()=>({data:null, error:null}) }) }) }; },
+          insert(row){ calls.push({table,op:'insert',row}); return {select:()=>({single:async()=>({data:{id:999},error:null})})}; }
+        };
+      }
+    }};
+    vm.createContext(noDupSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), noDupSandbox);
+    const v={id:'v-new-test', companyId:'de', customerId:'', vin:'BRANDNEWVIN000001', plate:'K-NN 1', make:'Nissan', model:'Almera', year:'2004'};
+    await noDupSandbox.upsertVehicleCloud(v);
+    assert(calls.some(c=>c.op==='insert') && v.cloudId===999, 'a vehicle with no matching VIN in the cloud still inserts normally, exactly once');
+  }
   assert(/!x\.cloudId \|\| x\.syncError/.test(cloudSrc), 'retryPendingCloud selects records with no cloudId yet OR a recorded sync error');
 
   // --- Settings page: password change must be hashed + validated ----------
