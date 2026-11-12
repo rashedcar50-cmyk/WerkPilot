@@ -1,22 +1,53 @@
 /* Customers + vehicles + Schein bind */
-// Cross-device sync bugfix (2026-11-12): a record that hasn't actually
-// reached the cloud yet (no cloudId) or is sitting on a recorded push
-// error (syncError) now shows a small, honest "pending" marker in the
-// list instead of looking identical to one that's fully synced -- the
-// exact gap that let two different devices silently diverge for days
-// with no visible sign anything was wrong.
-function syncBadge(row){
+// Mobile sync-diagnosis bugfix (2026-11-12): the original badge spelled
+// out the full "pending sync" phrase inline on every row -- fine on a
+// desktop table, but on a narrow phone screen that text wraps/bloats
+// every row, and its reason was only reachable via a `title` tooltip,
+// which doesn't exist on touch at all (no hover). Now a single small
+// tappable icon per record, STRICTLY based on that record's own
+// cloudId/syncError (never a page-wide status), opening a real tap
+// panel with the exact reason and a per-record retry -- not a guess,
+// not a global state applied to every row alike.
+function syncBadge(row, table){
   if(!row) return '';
-  if(row.syncError) return ` <span class="status warn" title="${esc(row.syncError)}">⏳ ${esc(t('cloudPendingTitle'))}</span>`;
-  if(!row.cloudId) return ` <span class="status warn">⏳ ${esc(t('cloudPendingTitle'))}</span>`;
+  if(row.syncError || !row.cloudId){
+    return ` <button type="button" class="status warn sync-badge" onclick="event.stopPropagation();showSyncDetail('${table}','${row.id}')">⏳</button>`;
+  }
   return '';
 }
+// Opens the tap-accessible detail for ONE record (never a shared/global
+// status) -- its own cloud id (or lack of one) and its own last error,
+// with a retry limited to that single record via the SAME upsert
+// function a normal save already uses (no reimplementation, no risk of
+// re-uploading/duplicating anything else).
+async function showSyncDetail(table, id){
+  const row=(db[table]||[]).find(x=>x.id===id);
+  if(!row) return;
+  const label = table==='vehicles' ? (row.plate||row.vin||'-') : (row.companyName||row.name||'-');
+  const synced = !!row.cloudId && !row.syncError;
+  const body = `
+    <div class="okbox">${esc(label)}</div>
+    <div class="field"><label>${t('syncDetailCloudId')}</label><div>${row.cloudId ? esc(String(row.cloudId)) : t('syncDetailNotSynced')}</div></div>
+    ${row.syncError ? `<div class="alert">${esc(row.syncError)}</div>` : (synced?`<div class="okbox">${t('syncDetailSynced')}</div>`:'')}
+    <div id="syncDetailMsg" class="muted"></div>
+  `;
+  if(synced){ modal(t('syncDetailTitle'), body, null, t('closeBtn')); return; }
+  const upsertFn = table==='vehicles' ? upsertVehicleCloud : (table==='customers' ? upsertCustomerCloud : null);
+  modal(t('syncDetailTitle'), body, upsertFn ? (async()=>{
+    const msg=$('#syncDetailMsg'); if(msg) msg.textContent=t('cloudSyncingNow');
+    await upsertFn(row);
+    closeModal();
+    toast(row.syncError ? t('syncDetailRetryFail') : t('syncDetailRetryOk'));
+    render();
+  }) : null, t('syncDetailRetryBtn'));
+}
+window.showSyncDetail=showSyncDetail;
 function customers(){
  const rows=companyRows('customers');
  $('#content').innerHTML=head(t('customers'),canEdit()?`<button class="btn ok" id="scanCust">📷 ${t('scanSchein')}</button><button class="btn primary" id="add">${t('newCustomer')}</button>`:'')+
  listShareBar('customers')+
  table([t('name'),t('phone'),t('taxId'),t('address'),t('cars'),t('action')],rows.map(c=>[
-  esc(c.companyName? (c.companyName+' · '+(c.contact||c.name||'')) : (c.name||'-'))+syncBadge(c),
+  esc(c.companyName? (c.companyName+' · '+(c.contact||c.name||'')) : (c.name||'-'))+syncBadge(c,'customers'),
   esc(c.phone||'-'),esc(c.taxId||c.ustId||'-'),esc(c.address||'-'),
   db.vehicles.filter(v=>v.customerId===c.id).length,
   canEdit()?`<button class="btn small" onclick="editCustomer('${c.id}')">${t('edit')}</button>
@@ -165,7 +196,7 @@ function vehicles(){
  listShareBar('vehicles')+
  table([t('photo'),t('customer'),t('plate'),'VIN',t('make'),t('model'),t('year'),t('action')],rows.map(v=>[
    carThumb(v),
-   esc(customerName(v.customerId)),esc(v.plate||'-')+syncBadge(v),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
+   esc(customerName(v.customerId)),esc(v.plate||'-')+syncBadge(v,'vehicles'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
    canEdit()?`<button class="btn small" onclick="editVehicle('${v.id}')">${t('edit')}</button> <button class="btn small" onclick="addVehiclePhoto('${v.id}')">${t('photo')}</button>`:'—'
  ]), 'vehicles');
  if(canEdit()){

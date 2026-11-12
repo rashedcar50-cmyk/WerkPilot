@@ -48,6 +48,7 @@ table{width:100%;border-collapse:collapse;min-width:720px;background:var(--panel
 th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:start;vertical-align:top}
 th{background:#efebe3;position:sticky;top:0}
 .status{padding:4px 8px;border-radius:999px;background:#efebe3;color:#1c212b}.status.ok{background:#d7efe0}.status.warn{background:#f3e2c4}
+.sync-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;min-width:26px;padding:0;margin-inline-start:4px;border:none;font-size:14px;line-height:1;cursor:pointer;vertical-align:middle}
 .modal-back{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:18px;z-index:120}
 .modal{width:min(760px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
 .modal .toolbar{position:sticky;bottom:0;background:var(--panel);padding:10px 0 18px;z-index:3}
