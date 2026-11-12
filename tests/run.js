@@ -641,6 +641,18 @@ async function decideLogin(cand, pass){
     );
     const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('existing@example.test','WrongPw');
     assert(r.ok===false && r.error===signInErr, 'when the identity exists AND the password is genuinely wrong, the real sign-in error is returned, not a misleading generic failure');
+    assert(r.emailTaken===true, 'PROOF OF FIX: this specific case (cloud identity exists, THIS device\'s local password does not match it) is flagged distinctly via emailTaken -- the real root cause of the original cross-device report, where each device\'s own independently-set local password was silently assumed to equal the shared cloud password');
+  }
+  {
+    // Case 4: a genuinely different, unrelated signUp failure (not an
+    // "already registered" case at all) must NOT be flagged emailTaken --
+    // that flag means one specific thing, never a catch-all.
+    const sbx=loadAuthForLink(
+      async()=>({data:null, error:{message:'Signup requires a valid password'}}),
+      async()=>{ throw new Error('signIn should not be called for a non-already-registered signUp error'); }
+    );
+    const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('bad@example.test','x');
+    assert(r.ok===false && !r.emailTaken, 'a genuinely different signUp error is not misreported as emailTaken');
   }
 
   // --- Cloud Auth: wiring into the real login flow -------------------------
@@ -692,6 +704,37 @@ async function decideLogin(cand, pass){
   assert(/function openCloudLinkModal/.test(appSrc3) && /window\.openCloudLinkModal=openCloudLinkModal/.test(appSrc3), 'openCloudLinkModal() exists and is reachable from inline onclick handlers (tap targets), not just from Settings');
   assert(/function cloudSyncNowBtn/.test(appSrc3) && /window\.cloudSyncNowBtn=cloudSyncNowBtn/.test(appSrc3), 'a direct, one-tap "sync now" action exists for the pending case, instead of only waiting silently for the next automatic trigger');
   assert(/function cloudDiagModal/.test(appSrc3) && /window\.cloudDiagModal=cloudDiagModal/.test(appSrc3), 'a full diagnostics panel (connection/account/workshop/pending count/last error, each shown separately) is reachable with one tap from the banner');
+
+  // --- Real cross-device root cause (2026-11-12): the ACTUAL reason the
+  // Opel saved on mobile never reached the cloud while the Nissan saved on
+  // the laptop did -- each device's local app password is set up
+  // independently (js/core.js's seed() ships every account with p:null,
+  // nothing links them), yet "link to cloud" always resent THIS device's
+  // own local password as the assumed cloud password. The laptop's local
+  // password happened to already equal the cloud account's real password
+  // (it was the device that originally created that cloud identity); the
+  // phone's did not, so every linking attempt failed as a generic
+  // "linkCloudFailed" with no way for the user to recover -- confirmed live
+  // in production: last_sign_in_at on the one real auth.users row stayed
+  // frozen for hours even while the user kept retrying on the phone,
+  // because signInCloud was never once called with the phone's real cloud
+  // password. Both tap targets (the banner's openCloudLinkModal and the
+  // Settings panel's inline form) must offer the one thing that actually
+  // resolves this: a second, separate password field for the EXISTING
+  // cloud account's own password, calling signInCloud directly -- never
+  // silently reusing the local password a second time, never a dead end.
+  assert(/r\.emailTaken/.test(appSrc3), 'openCloudLinkModal distinguishes the emailTaken case from a generic failure');
+  const openLinkIdx=appSrc3.indexOf('function openCloudLinkModal');
+  const openLinkEnd=appSrc3.indexOf('window.openCloudLinkModal=openCloudLinkModal');
+  const openLinkBody=appSrc3.slice(openLinkIdx, openLinkEnd);
+  assert(/qCloudTakenBox/.test(openLinkBody) && /qCloudExistingPass/.test(openLinkBody), 'PROOF OF FIX: openCloudLinkModal reveals a SEPARATE existing-cloud-password field instead of just failing when the local password does not match the cloud account');
+  assert(/WP\.CloudAuth\.signInCloud\(email,\s*existingPass\)/.test(openLinkBody), 'PROOF OF FIX: the fallback signs in with the SEPARATELY typed cloud password, not the local password that just failed');
+  assert(/qCloudForgot.*forgotPasswordModal\(\)/.test(openLinkBody) || /forgotPasswordModal\(\);/.test(openLinkBody), 'the fallback also offers resetting the cloud password for a user who genuinely does not know it');
+  const settingsLinkIdx=appSrc3.indexOf("$('#linkCloudBtn')) $('#linkCloudBtn').onclick");
+  const settingsLinkBody=appSrc3.slice(settingsLinkIdx, settingsLinkIdx+1400);
+  assert(/r\.emailTaken/.test(settingsLinkBody) && /cloudTakenBox/.test(settingsLinkBody) && /cloudExistingPass/.test(settingsLinkBody), 'PROOF OF FIX: the Settings page\'s own "link to cloud" form has the SAME existing-cloud-password fallback as the banner\'s modal, not just one of the two places a user might try to link');
+  assert(/WP\.CloudAuth\.signInCloud\(email,\s*existingPass\)/.test(settingsLinkBody), 'Settings\' fallback also signs in with the separately typed cloud password');
+  assert(/async function finishCloudLink/.test(appSrc3), 'finishCloudLink centralizes "record the link + retry stuck records" so both tap targets cannot drift apart');
 
   // --- Cross-device sync bugfix: pendingSyncCount() and the dashboard
   // banner it feeds must actually reflect unsynced records (no cloudId or

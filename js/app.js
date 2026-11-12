@@ -173,6 +173,7 @@ function forcePasswordSetup(cand, freshAccount){
     if(email){
       const r=await WP.CloudAuth.linkAccountToCloud(email, p1);
       if(r.ok){ cand.cloudEmail=email; }
+      else if(r.emailTaken){ toast(t('linkCloudEmailTaken')); }
       else if(r.error){ toast(t('linkCloudFailed')); }
     }
     save(true);
@@ -695,6 +696,20 @@ function cloudSyncBannerHtml(){
 // links (or re-links/self-heals a drifted password for) THIS device's
 // cloud identity, reusing the exact same verified-local-password ->
 // linkAccountToCloud() path Settings already uses.
+// Cross-device link bugfix (2026-11-12): finishes a link once we already
+// have a WORKING cloud session for `email` (either linkAccountToCloud's own
+// retry succeeded, or the caller just signed in directly with the real
+// cloud password via the emailTaken fallback below) -- records the link
+// locally and retries anything that was stuck, exactly once, shared by
+// both paths so they can't drift.
+async function finishCloudLink(u, email){
+  u.cloudEmail=email; db.settings.cloudAuthError=''; save(true);
+  // manual:true -- the whole point of (re)linking is to retry records
+  // that were stuck on a company/auth error, not just newly-pending
+  // ones; the automatic triggers deliberately skip those (see
+  // retryPendingCloud), so only this explicit action retries them.
+  await syncAllCloud(true);
+}
 function openCloudLinkModal(){
   modal(t('linkCloudSectionTitle'), `
     <p class="muted" style="font-size:.85rem">${t('linkCloudEmailHint')}</p>
@@ -703,6 +718,12 @@ function openCloudLinkModal(){
       <div class="field"><label>${t('linkCloudCurrentPass')}</label><input id="qCloudPass" type="password" autocomplete="current-password"></div>
     </div>
     <div id="qCloudMsg" class="muted"></div>
+    <div id="qCloudTakenBox" hidden>
+      <p class="muted" style="font-size:.85rem">${t('linkCloudEmailTakenHint')}</p>
+      <div class="field"><label>${t('linkCloudExistingPass')}</label><input id="qCloudExistingPass" type="password" autocomplete="current-password"></div>
+      <button type="button" class="btn small" id="qCloudTryExisting">${t('linkCloudTryExistingBtn')}</button>
+      <button type="button" class="btn small ghost" id="qCloudForgot">${t('forgotPassword')}</button>
+    </div>
   `, async()=>{
     const email=$('#qCloudEmail').value.trim(), curPass=$('#qCloudPass').value;
     const msg=$('#qCloudMsg');
@@ -712,13 +733,26 @@ function openCloudLinkModal(){
     msg.textContent='...';
     const r=await WP.CloudAuth.linkAccountToCloud(email, curPass);
     if(r.ok){
-      u.cloudEmail=email; db.settings.cloudAuthError=''; save(true);
-      // manual:true -- the whole point of re-linking is to retry records
-      // that were stuck on a company/auth error, not just newly-pending
-      // ones; the automatic triggers deliberately skip those (see
-      // retryPendingCloud), so only this explicit action retries them.
-      await syncAllCloud(true);
+      await finishCloudLink(u, email);
       closeModal(); render(); toast(t('linkCloudOk'));
+    } else if(r.emailTaken){
+      // The local password just typed isn't this cloud account's real
+      // password -- never generically "failed" here, always point at the
+      // one thing that actually resolves it (its own, possibly different,
+      // password -- or resetting it).
+      msg.textContent=t('linkCloudEmailTaken');
+      const box=$('#qCloudTakenBox'); if(box) box.hidden=false;
+      if($('#qCloudTryExisting')) $('#qCloudTryExisting').onclick=async()=>{
+        const existingPass=$('#qCloudExistingPass').value;
+        if(!existingPass) return;
+        msg.textContent='...';
+        const r2=await WP.CloudAuth.signInCloud(email, existingPass);
+        if(r2.ok){
+          await finishCloudLink(u, email);
+          closeModal(); render(); toast(t('linkCloudOk'));
+        } else { msg.textContent=t('linkCloudFailed'); }
+      };
+      if($('#qCloudForgot')) $('#qCloudForgot').onclick=()=>{ closeModal(); forgotPasswordModal(); };
     } else { msg.textContent=t('linkCloudFailed'); }
   }, t('linkCloudBtn'));
 }
@@ -1663,6 +1697,12 @@ function settings(){
   </div>
   <button class="btn" id="linkCloudBtn">${t('linkCloudBtn')}</button>
   <span id="linkCloudMsg" class="muted" style="margin-left:10px"></span>
+  <div id="cloudTakenBox" hidden style="margin-top:8px">
+   <p class="muted" style="font-size:.85rem">${t('linkCloudEmailTakenHint')}</p>
+   <div class="field"><label>${t('linkCloudExistingPass')}</label><input id="cloudExistingPass" type="password" autocomplete="current-password"></div>
+   <button type="button" class="btn small" id="cloudTryExisting">${t('linkCloudTryExistingBtn')}</button>
+   <button type="button" class="btn small ghost" id="cloudForgot">${t('forgotPassword')}</button>
+  </div>
  </div>`:''}
  <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
@@ -1683,7 +1723,20 @@ function settings(){
    if(!u || !(await WP.Engine.passOk(u.p, curPass))){ msg.textContent=t('loginBad'); return; }
    msg.textContent='...';
    const r=await WP.CloudAuth.linkAccountToCloud(email, curPass);
-   if(r.ok){ u.cloudEmail=email; save(true); msg.textContent=t('linkCloudOk'); }
+   if(r.ok){ await finishCloudLink(u, email); msg.textContent=t('linkCloudOk'); render(); }
+   else if(r.emailTaken){
+     msg.textContent=t('linkCloudEmailTaken');
+     const box=$('#cloudTakenBox'); if(box) box.hidden=false;
+     if($('#cloudTryExisting')) $('#cloudTryExisting').onclick=async()=>{
+       const existingPass=$('#cloudExistingPass').value;
+       if(!existingPass) return;
+       msg.textContent='...';
+       const r2=await WP.CloudAuth.signInCloud(email, existingPass);
+       if(r2.ok){ await finishCloudLink(u, email); msg.textContent=t('linkCloudOk'); render(); }
+       else{ msg.textContent=t('linkCloudFailed'); }
+     };
+     if($('#cloudForgot')) $('#cloudForgot').onclick=()=>{ forgotPasswordModal(); };
+   }
    else{ msg.textContent=t('linkCloudFailed'); }
  };
  $('#saveset').onclick=()=>{

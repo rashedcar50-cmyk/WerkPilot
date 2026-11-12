@@ -86,7 +86,17 @@
         if(/already registered|already been registered|user_already_exists/i.test(error.message||'')){
           const retry = await signInCloud(email, password);
           if(retry.ok) return {ok:true, user:retry.user, reauthenticated:true};
-          return {ok:false, error: retry.error||error};
+          // Cross-device link bugfix (2026-11-12): this email already has a
+          // cloud identity, but the password just typed (THIS device's own
+          // local app password -- the caller always tries that first, as a
+          // convenience) doesn't match it. That's expected whenever a
+          // second device's local password was set independently of the
+          // first device's -- NOT a generic failure, and not something
+          // retrying the same password will ever fix. Flagged separately so
+          // the UI can offer the one thing that actually resolves it:
+          // entering THAT cloud account's own (possibly different) password,
+          // instead of silently repeating "linking failed" forever.
+          return {ok:false, error: retry.error||error, emailTaken:true};
         }
         return {ok:false, error};
       }
