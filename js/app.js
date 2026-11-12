@@ -25,11 +25,21 @@ function nav(){
  ];
 }
 
+// Login-unification (2026-11-13): login is now a direct Supabase sign-in
+// -- there is no separate local username/password check left to pass
+// first. This is the actual fix for the original cross-device report:
+// the old flow checked a LOCAL, per-device password and only tried the
+// cloud as an optional, silently-tolerated afterthought, so two devices
+// with two independently-set local passwords behaved like two different
+// accounts even though both pointed at the same cloud identity. Now the
+// same email+password genuinely has to work the same way everywhere,
+// because it IS the one real account, checked against the one real
+// database, every time.
 function login(){
  applyUiLang();
  $('#app').innerHTML=`<div class="login-screen"><div class="login-card">
  <div class="brand-mark"><img class="app-logo login-logo" src="logo-app.jpg" alt="TABAH AUTO"></div>
- <div class="field"><label>${t('user')}</label><input id="lu" autocomplete="username"></div>
+ <div class="field"><label>${t('resetPasswordEmailLabel')}</label><input id="lu" type="email" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
  <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'de')}</select></div>
  <button class="btn primary full" id="loginBtn">${t('login')}</button>
@@ -44,142 +54,48 @@ function login(){
  $('#loginBtn').onclick=async ()=>{
   if(lg) {db.settings.uiLang=lg.value;save();}
   if(window._loginFails>=5) return $('#loginErr').textContent=t('loginBlocked');
-  const name=$('#lu').value.trim(), pass=$('#lp').value;
-  const cand=(db.users||[]).find(x=>x.u===name);
-  // Security fix (2026-11-09): a disabled account is rejected outright,
-  // before any password check -- same error message as "wrong
-  // password" so a disabled username can't be distinguished from one
-  // that just doesn't exist or was typed wrong.
-  if(cand && cand.disabled){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
-  // Security fix (audit 2026-11-08): an account with no password yet
-  // (cand.p==null, a fresh seed -- see core.js) can never pass the normal
-  // passOk check by design, so it is routed straight to first-time setup
-  // instead of being rejected as "wrong password". An account still on
-  // the old published default (see engine.js's LEGACY_DEFAULT_PASSWORDS)
-  // passes the normal check first -- proving the person typing it really
-  // does know that value -- and is then forced to replace it before a
-  // session is granted, rather than being let in on a value anyone could
-  // read in this app's own public source history.
-  const freshAccount=cand && cand.p==null;
-  const legacyDefault=cand && !freshAccount && WP.Engine.isLegacyDefaultPassword(cand.u, pass);
-  const ok=freshAccount || (cand && WP.Engine && await WP.Engine.passOk(cand.p, pass));
-  if(!ok){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
-  if(!freshAccount && !legacyDefault && cand.p===pass && WP.Engine.hashPassAsync){
-    try{ cand.p=await WP.Engine.hashPassAsync(pass); save(true); }catch(e){}
+  const email=$('#lu').value.trim(), pass=$('#lp').value;
+  if(!email || !pass){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
+  if(!(window.WP && WP.CloudAuth && WP.CloudAuth.cloudAuthAvailable())){
+    $('#loginErr').textContent=t('cloudOffline'); return toast(t('cloudOffline'));
   }
+  $('#loginBtn').disabled=true;
+  let r;
+  try{ r=await WP.CloudAuth.signInCloud(email, pass); } finally { $('#loginBtn').disabled=false; }
+  if(!r || !r.ok){ window._loginFails++; $('#loginErr').textContent=t('loginBad'); return toast(t('loginBad')); }
   window._loginFails=0;
-  if(freshAccount || legacyDefault){
-    return forcePasswordSetup(cand, freshAccount);
-  }
-  completeLogin(cand, pass);
+  completeLogin(r.user);
  };
 }
 
-// Security fix (audit 2026-11-08): the one place a session is actually
-// granted, shared by the normal path and the post-first-time-setup path
-// below -- so "set a real password" always leads here via the exact same
-// code a normal login uses, never a parallel shortcut.
-function completeLogin(cand, plainPass){
+// The one place a session is actually granted, now fed only by a real,
+// just-verified Supabase user (see login() above) -- never a local
+// record whose password could silently drift from the cloud's.
+function completeLogin(user){
   const startPage=(location.search.match(/[?&]page=([a-z]+)/)||[])[1]||'dashboard';
-  session={user:WP.Engine.publicUser(cand),company:db.companies[0],page:startPage};
+  const profile=resolveCloudProfile(user.email);
+  session={user:profile, company:db.companies[0], page:startPage};
   audit('login');
-  // Cloud identity fix (2026-11-08): if this account has been linked to
-  // a cloud account (cand.cloudEmail), sign into Supabase Auth with the
-  // SAME password they just typed locally -- AWAITED before sync runs --
-  // so the sync calls below (and any RLS policy on the Supabase side)
-  // see a real authenticated user instead of just the public anon key.
-  // A missing link, a wrong/stale cloud password, or no cloud configured
-  // at all are all silently tolerated -- this never blocks the local
-  // login that already succeeded above.
-  (async()=>{
-    // Cross-device sync bugfix (2026-11-12): this result used to be
-    // discarded entirely (bare try/catch, no check on `r.ok`) -- a wrong
-    // or stale cloud password, or this device simply never having been
-    // linked at all, was silently indistinguishable from "cloud sync
-    // working fine", because the local save always succeeds regardless.
-    // Recorded here so the dashboard can show a clear, actionable banner
-    // instead of every save quietly staying local-only forever. See
-    // js/cloud.js's pendingSyncCount()/db.settings.cloudAuthError.
-    if(cand.cloudEmail && plainPass && window.WP && WP.CloudAuth){
-      try{
-        const r=await WP.CloudAuth.signInCloud(cand.cloudEmail, plainPass);
-        db.settings.cloudAuthError = r.ok ? '' : String((r.error&&r.error.message)||'cloud-signin-failed');
-      }catch(e){ db.settings.cloudAuthError = String(e&&e.message||'cloud-signin-failed'); }
-    } else if(window.WP && WP.CloudAuth && WP.CloudAuth.cloudAuthAvailable()){
-      // Cloud is configured but THIS account has never been linked on
-      // THIS device -- cloudEmail lives only in this device's own local
-      // storage and never syncs, so linking on one device never carries
-      // over to another. Distinct from a failed sign-in so Settings can
-      // tell the user which action to take.
-      db.settings.cloudAuthError = 'not-linked-on-this-device';
-    } else {
-      db.settings.cloudAuthError='';
-    }
-    db.settings.cloudAuthCheckedAt = new Date().toISOString();
-    save();
-    // manual:true -- a fresh login is itself a deliberate re-authentication;
-    // retry even records previously stuck on a company/auth error instead
-    // of leaving them skipped until an extra explicit "sync now" tap.
-    syncAllCloud(true).finally(async ()=>{
-      WP.run("afterLogin", session);
-      if(/share=1/.test(location.search) || await consumeSharedWhatsApp()){
-        session.page='customers';
-        render();
+  db.settings.cloudAuthError='';
+  db.settings.cloudAuthCheckedAt=new Date().toISOString();
+  save();
+  // manual:true -- a fresh login is itself a deliberate re-authentication;
+  // retry even records previously stuck on a company/auth error instead
+  // of leaving them skipped until an extra explicit "sync now" tap.
+  syncAllCloud(true).finally(async ()=>{
+    WP.run("afterLogin", session);
+    if(/share=1/.test(location.search) || await consumeSharedWhatsApp()){
+      session.page='customers';
+      render();
+      setTimeout(()=>{
+        customerModal();
         setTimeout(()=>{
-          customerModal();
-          setTimeout(()=>{
-            applySharedFileTo('#doc');
-            if(window._sharedWaFile) ingestScheinFile(window._sharedWaFile);
-          }, 250);
-        }, 200);
-      } else render();
-    });
-  })();
-}
-
-// Security fix (audit 2026-11-08): a blocking, no-cancel modal -- the only
-// way out is setting a real password, never a dismiss/X button. Reached
-// either for a brand-new account (freshAccount, cand.p was null) or for
-// one that just proved it still knows the old published default (see
-// engine.js's LEGACY_DEFAULT_PASSWORDS): both need a real password before
-// this session is allowed to start, so the password box is never
-// pre-filled with the value that got them here.
-function forcePasswordSetup(cand, freshAccount){
-  // Cloud identity fix (2026-11-08): while someone is already here
-  // choosing a real password, also offer to link this account to a
-  // real Supabase Auth identity with that SAME password -- the natural,
-  // lowest-friction place to do it. Optional: leaving the email field
-  // blank keeps the account exactly as local-only as it is today.
-  const cloudAvailable=window.WP && WP.CloudAuth && WP.CloudAuth.cloudAuthAvailable();
-  $('#modalRoot').innerHTML=`<div class="modal-back"><div class="modal">
-   <div class="modal-head"><h2>${t('setPasswordTitle')||'Set a password'}</h2></div>
-   <p class="muted" style="margin:0 0 12px">${freshAccount ? (t('setPasswordFreshHint')||'This account has no password yet. Choose one now.') : (t('setPasswordLegacyHint')||'This account is still using a default password that is public in this app\'s own source history. Choose a new one now.')}</p>
-   <div class="field"><label>${t('newPassword')||t('pass')}</label><input id="fps1" type="password" autocomplete="new-password"></div>
-   <div class="field"><label>${t('newPasswordConfirm')||t('pass')}</label><input id="fps2" type="password" autocomplete="new-password"></div>
-   ${cloudAvailable?`<div class="field"><label>${t('linkCloudEmailLabel')}</label><input id="fpsEmail" type="email" autocomplete="email" value="${esc(cand.cloudEmail||'')}" placeholder="name@example.com"></div>
-   <p class="muted" style="font-size:.8rem;margin:0 0 10px">${t('linkCloudEmailHint')}</p>`:''}
-   <div class="login-fail" id="fpsErr"></div>
-   <div class="toolbar" style="margin-top:14px"><button class="btn primary" id="fpsSave">${t('save')}</button></div>
-  </div></div>`;
-  if(typeof scrubUiLang==='function') try{ scrubUiLang($('#modalRoot')); }catch(e){}
-  $('#fpsSave').onclick=async ()=>{
-    const p1=$('#fps1').value, p2=$('#fps2').value;
-    const err=$('#fpsErr');
-    if(!p1 || p1.length<6){ err.textContent=t('setPasswordTooShort')||'Password must be at least 6 characters.'; return; }
-    if(p1!==p2){ err.textContent=t('setPasswordMismatch')||'Passwords do not match.'; return; }
-    if(WP.Engine.isLegacyDefaultPassword(cand.u, p1)){ err.textContent=t('setPasswordStillDefault')||'Choose a password other than the old default.'; return; }
-    cand.p=WP.Engine.hashPassAsync ? await WP.Engine.hashPassAsync(p1) : p1;
-    const email=cloudAvailable && $('#fpsEmail') ? $('#fpsEmail').value.trim() : '';
-    if(email){
-      const r=await WP.CloudAuth.linkAccountToCloud(email, p1);
-      if(r.ok){ cand.cloudEmail=email; }
-      else if(r.emailTaken){ toast(t('linkCloudEmailTaken')); }
-      else if(r.error){ toast(t('linkCloudFailed')); }
-    }
-    save(true);
-    closeModal();
-    completeLogin(cand, p1);
-  };
+          applySharedFileTo('#doc');
+          if(window._sharedWaFile) ingestScheinFile(window._sharedWaFile);
+        }, 250);
+      }, 200);
+    } else render();
+  });
 }
 
 // Cloud identity fix (2026-11-08): request-a-reset-link modal, reached
@@ -242,13 +158,8 @@ function passwordResetScreen(){
     if(p1!==p2){ err.textContent=t('setPasswordMismatch'); return; }
     const r=await WP.CloudAuth.completePasswordReset(p1);
     if(!r.ok){ err.textContent=t('resetLinkInvalid'); return; }
-    // Keep the local account's password in lockstep, so the next login
-    // works with the new password through EITHER path, and the old one
-    // stops working through either path too.
-    if(r.email){
-      const u=(db.users||[]).find(x=>x.cloudEmail===r.email);
-      if(u){ u.p = WP.Engine.hashPassAsync ? await WP.Engine.hashPassAsync(p1) : p1; save(true); }
-    }
+    // Login-unification (2026-11-13): the cloud password just set here
+    // IS the login password now -- nothing local left to keep in sync.
     WP.CloudAuth.clearRecoveryParamsFromUrl();
     toast(t('resetPasswordDone'));
     login();
@@ -283,7 +194,7 @@ function bindShellEvents(){
  if($('#shopBtnTop')) $('#shopBtnTop').onclick=()=>{ closeMobileMenus(); openPartsShop(); };
  if($('#backBtn')) $('#backBtn').onclick=()=>{ closeMobileMenus(); goBack(); };
  const lo=$('#logout');
- if(lo) lo.onclick=()=>{audit('logout');session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
+ if(lo) lo.onclick=async ()=>{audit('logout'); try{ await WP.CloudAuth.signOutCloud(); }catch(e){} session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
  if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud(true).finally(()=>render(true))};
  if($('#addWorkshop')) $('#addWorkshop').onclick=()=>{ closeMobileMenus(); newWorkshopModal(); };
  if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{closeMobileMenus();db.settings.uiLang=e.target.value;save(true);applyUiLang();render(true);};
@@ -333,7 +244,7 @@ function render(force){
  if(typeof flushRows==='function') flushRows();
  document.documentElement.style.setProperty('--font',db.settings.font+'px');
  const lang=db.settings.uiLang||'de';
- const uid=session&&session.user&&session.user.u;
+ const uid=session&&session.user&&session.user.email;
  const cid=session&&session.company&&session.company.id;
  const shell=$('#app')&&$('#app').querySelector('.shell');
  if(!force && shell && $('#content') && WP._uiLang===lang && WP._uid===uid && WP._cid===cid){
@@ -681,9 +592,14 @@ function cloudSyncBannerHtml(){
   const row=(title,body,actionHtml)=>`<div class="alert"><b>${title}</b>${body?(': '+body):''} ${actionHtml||''} ${detailsBtn}</div>`;
   switch(d.status){
     case 'offline': return row(t('cloudOffline'), '', '');
-    case 'not-linked': return row(t('cloudNotLinkedTitle'), t('cloudNotLinkedBody'), `<button class="btn small primary" onclick="event.stopPropagation();openCloudLinkModal();">${t('cloudLinkNowBtn')}</button>`);
-    case 'session-expired': return row(t('cloudSessionExpiredTitle'), t('cloudSessionExpiredBody'), `<button class="btn small primary" onclick="event.stopPropagation();openCloudLinkModal();">${t('cloudRelinkBtn')}</button>`);
-    case 'auth-failed': return row(t('cloudAuthFailTitle'), esc(db.settings.cloudAuthError||''), `<button class="btn small primary" onclick="event.stopPropagation();openCloudLinkModal();">${t('cloudRelinkBtn')}</button>`);
+    // Login-unification (2026-11-13): "not linked"/"auth failed" as
+    // separate states are gone -- there is no local account to drift
+    // from the cloud anymore, so a session existing at all already means
+    // the cloud sign-in succeeded. The one real remaining failure mode is
+    // the token going stale mid-session (e.g. a mobile tab backgrounded
+    // long enough that its refresh timer got suspended) -- fixed the same
+    // way a normal session ever starts: sign out and log back in.
+    case 'session-expired': return row(t('cloudSessionExpiredTitle'), t('cloudSessionExpiredBody'), `<button class="btn small primary" onclick="event.stopPropagation();cloudForceRelogin();">${t('cloudRelinkBtn')}</button>`);
     case 'no-company-access': return row(t('cloudNoCompanyAccessTitle'), t('cloudNoCompanyAccessBody'), '');
     case 'network': return row(t('cloudNetworkTitle'), t('cloudNetworkBody'), '');
     case 'data-error': return row(t('cloudDataErrorTitle'), esc((d.lastError&&d.lastError.message)||''), '');
@@ -691,72 +607,14 @@ function cloudSyncBannerHtml(){
     default: return '';
   }
 }
-// Shared by the dashboard banner, Settings, and the mobile per-record
-// detail modal -- a mobile-usable, DIRECT action (not a navigation) that
-// links (or re-links/self-heals a drifted password for) THIS device's
-// cloud identity, reusing the exact same verified-local-password ->
-// linkAccountToCloud() path Settings already uses.
-// Cross-device link bugfix (2026-11-12): finishes a link once we already
-// have a WORKING cloud session for `email` (either linkAccountToCloud's own
-// retry succeeded, or the caller just signed in directly with the real
-// cloud password via the emailTaken fallback below) -- records the link
-// locally and retries anything that was stuck, exactly once, shared by
-// both paths so they can't drift.
-async function finishCloudLink(u, email){
-  u.cloudEmail=email; db.settings.cloudAuthError=''; save(true);
-  // manual:true -- the whole point of (re)linking is to retry records
-  // that were stuck on a company/auth error, not just newly-pending
-  // ones; the automatic triggers deliberately skip those (see
-  // retryPendingCloud), so only this explicit action retries them.
-  await syncAllCloud(true);
+// Login-unification (2026-11-13): the only self-heal a stale cloud
+// session needs now -- there is no separate "link" step to re-run, just
+// a fresh, real login (same path as any other login).
+async function cloudForceRelogin(){
+  try{ await WP.CloudAuth.signOutCloud(); }catch(e){}
+  session=null; login();
 }
-function openCloudLinkModal(){
-  modal(t('linkCloudSectionTitle'), `
-    <p class="muted" style="font-size:.85rem">${t('linkCloudEmailHint')}</p>
-    <div class="form-grid">
-      <div class="field"><label>${t('linkCloudEmailLabel')}</label><input id="qCloudEmail" type="email" autocomplete="email" value="${esc((db.users.find(x=>x.u===session.user.u)||{}).cloudEmail||'')}" placeholder="name@example.com"></div>
-      <div class="field"><label>${t('linkCloudCurrentPass')}</label><input id="qCloudPass" type="password" autocomplete="current-password"></div>
-    </div>
-    <div id="qCloudMsg" class="muted"></div>
-    <div id="qCloudTakenBox" hidden>
-      <p class="muted" style="font-size:.85rem">${t('linkCloudEmailTakenHint')}</p>
-      <div class="field"><label>${t('linkCloudExistingPass')}</label><input id="qCloudExistingPass" type="password" autocomplete="current-password"></div>
-      <button type="button" class="btn small" id="qCloudTryExisting">${t('linkCloudTryExistingBtn')}</button>
-      <button type="button" class="btn small ghost" id="qCloudForgot">${t('forgotPassword')}</button>
-    </div>
-  `, async()=>{
-    const email=$('#qCloudEmail').value.trim(), curPass=$('#qCloudPass').value;
-    const msg=$('#qCloudMsg');
-    const u=db.users.find(x=>x.u===session.user.u);
-    if(!email || !curPass){ msg.textContent=t('linkCloudFailed'); return; }
-    if(!u || !(await WP.Engine.passOk(u.p, curPass))){ msg.textContent=t('loginBad'); return; }
-    msg.textContent='...';
-    const r=await WP.CloudAuth.linkAccountToCloud(email, curPass);
-    if(r.ok){
-      await finishCloudLink(u, email);
-      closeModal(); render(); toast(t('linkCloudOk'));
-    } else if(r.emailTaken){
-      // The local password just typed isn't this cloud account's real
-      // password -- never generically "failed" here, always point at the
-      // one thing that actually resolves it (its own, possibly different,
-      // password -- or resetting it).
-      msg.textContent=t('linkCloudEmailTaken');
-      const box=$('#qCloudTakenBox'); if(box) box.hidden=false;
-      if($('#qCloudTryExisting')) $('#qCloudTryExisting').onclick=async()=>{
-        const existingPass=$('#qCloudExistingPass').value;
-        if(!existingPass) return;
-        msg.textContent='...';
-        const r2=await WP.CloudAuth.signInCloud(email, existingPass);
-        if(r2.ok){
-          await finishCloudLink(u, email);
-          closeModal(); render(); toast(t('linkCloudOk'));
-        } else { msg.textContent=t('linkCloudFailed'); }
-      };
-      if($('#qCloudForgot')) $('#qCloudForgot').onclick=()=>{ closeModal(); forgotPasswordModal(); };
-    } else { msg.textContent=t('linkCloudFailed'); }
-  }, t('linkCloudBtn'));
-}
-window.openCloudLinkModal=openCloudLinkModal;
+window.cloudForceRelogin=cloudForceRelogin;
 // One-tap manual sync -- useful the moment a phone regains connectivity
 // and the user doesn't want to wait for the next automatic trigger.
 // manual:true so it also retries anything stuck on a company/auth error.
@@ -773,7 +631,7 @@ function cloudDiagModal(){
   const d=(typeof cloudDiagnostics==='function')?cloudDiagnostics():{};
   modal(t('cloudDiagTitle'), `
     <div class="okbox"><b>${t('cloudDiagConnection')}:</b> ${d.online?t('cloudOnline'):t('cloudOffline')}</div>
-    <div class="okbox"><b>${t('cloudDiagAccount')}:</b> ${d.status==='not-linked'?t('cloudNotLinkedTitle'):(d.status==='session-expired'?t('cloudSessionExpiredTitle'):(d.status==='auth-failed'?t('cloudAuthFailTitle'):t('cloudStatusOk')))}</div>
+    <div class="okbox"><b>${t('cloudDiagAccount')}:</b> ${d.status==='session-expired'?t('cloudSessionExpiredTitle'):t('cloudStatusOk')}</div>
     <div class="okbox"><b>${t('cloudDiagWorkshop')}:</b> ${esc(d.companyId||'-')}${d.status==='no-company-access'?(' -- '+t('cloudNoCompanyAccessBody')):''}</div>
     <div class="okbox"><b>${t('cloudDiagPending')}:</b> ${d.pendingCount}</div>
     <div class="okbox"><b>${t('cloudDiagLastError')}:</b> ${d.lastError?esc(d.lastError.message)+' ('+esc(d.lastError.at||'')+')':t('cloudDiagNone')}</div>
@@ -1688,22 +1546,6 @@ function settings(){
  <div class="field"><label>${t('ownerGf')}</label><input id="wowner" value="${esc(w.workshopOwner||'')}"></div>
  <div class="field"><label>${t('newPass')}</label><input id="newpass" type="password" placeholder="${t('passUnchanged')}"></div>
  </div>
- ${(window.WP && WP.CloudAuth && WP.CloudAuth.cloudAuthAvailable())?`<div class="card" style="margin-top:12px">
-  <b>${t('linkCloudSectionTitle')}</b>
-  <p class="muted" style="font-size:.85rem">${t('linkCloudEmailHint')}</p>
-  <div class="form-grid">
-   <div class="field"><label>${t('linkCloudEmailLabel')}</label><input id="cloudEmail" type="email" autocomplete="email" value="${esc((db.users.find(x=>x.u===session.user.u)||{}).cloudEmail||'')}" placeholder="name@example.com"></div>
-   <div class="field"><label>${t('linkCloudCurrentPass')}</label><input id="cloudCurPass" type="password" autocomplete="current-password"></div>
-  </div>
-  <button class="btn" id="linkCloudBtn">${t('linkCloudBtn')}</button>
-  <span id="linkCloudMsg" class="muted" style="margin-left:10px"></span>
-  <div id="cloudTakenBox" hidden style="margin-top:8px">
-   <p class="muted" style="font-size:.85rem">${t('linkCloudEmailTakenHint')}</p>
-   <div class="field"><label>${t('linkCloudExistingPass')}</label><input id="cloudExistingPass" type="password" autocomplete="current-password"></div>
-   <button type="button" class="btn small" id="cloudTryExisting">${t('linkCloudTryExistingBtn')}</button>
-   <button type="button" class="btn small ghost" id="cloudForgot">${t('forgotPassword')}</button>
-  </div>
- </div>`:''}
  <p class="okbox">${t('invoiceNote')}</p>
  <div class="toolbar" style="margin-top:12px">
   <button class="btn primary" id="saveset">${t('save')}</button>
@@ -1715,30 +1557,6 @@ function settings(){
  </div>
  </div>`;
  if($('#lang')) $('#lang').onchange=()=>{db.settings.uiLang=$('#lang').value;save();applyUiLang();render();};
- if($('#linkCloudBtn')) $('#linkCloudBtn').onclick=async()=>{
-   const email=$('#cloudEmail').value.trim(), curPass=$('#cloudCurPass').value;
-   const msg=$('#linkCloudMsg');
-   const u=db.users.find(x=>x.u===session.user.u);
-   if(!email || !curPass){ msg.textContent=t('linkCloudFailed'); return; }
-   if(!u || !(await WP.Engine.passOk(u.p, curPass))){ msg.textContent=t('loginBad'); return; }
-   msg.textContent='...';
-   const r=await WP.CloudAuth.linkAccountToCloud(email, curPass);
-   if(r.ok){ await finishCloudLink(u, email); msg.textContent=t('linkCloudOk'); render(); }
-   else if(r.emailTaken){
-     msg.textContent=t('linkCloudEmailTaken');
-     const box=$('#cloudTakenBox'); if(box) box.hidden=false;
-     if($('#cloudTryExisting')) $('#cloudTryExisting').onclick=async()=>{
-       const existingPass=$('#cloudExistingPass').value;
-       if(!existingPass) return;
-       msg.textContent='...';
-       const r2=await WP.CloudAuth.signInCloud(email, existingPass);
-       if(r2.ok){ await finishCloudLink(u, email); msg.textContent=t('linkCloudOk'); render(); }
-       else{ msg.textContent=t('linkCloudFailed'); }
-     };
-     if($('#cloudForgot')) $('#cloudForgot').onclick=()=>{ forgotPasswordModal(); };
-   }
-   else{ msg.textContent=t('linkCloudFailed'); }
- };
  $('#saveset').onclick=()=>{
   try{
    db.settings.font=+$('#font').value||16;
@@ -1770,25 +1588,15 @@ function settings(){
    });
    const np=$('#newpass')&&$('#newpass').value;
    if(np){
-     // Security fix (audit 2026-11-08): this used to store the new
-     // password as plain text (`u.p=np`) with no length check and no
-     // check against the old published defaults -- bypassing every
-     // protection the login flow enforces (see forcePasswordSetup).
-     // Now hashed and validated the same way, and kept in sync with the
-     // linked cloud account (if any) so local and cloud logins never
-     // drift apart.
-     const u=db.users.find(x=>x.u===session.user.u);
-     if(u){
-       if(np.length<6){ toast(t('setPasswordTooShort')); return render(); }
-       if(WP.Engine.isLegacyDefaultPassword(u.u, np)){ toast(t('setPasswordStillDefault')); return render(); }
-       (async()=>{
-         u.p = WP.Engine.hashPassAsync ? await WP.Engine.hashPassAsync(np) : np;
-         if(u.cloudEmail && typeof syncCloudPassword==='function'){ try{ await syncCloudPassword(u.cloudEmail, np); }catch(e){} }
-         save(true);
-         toast(t('saved'));
-       })();
-       return render();
-     }
+     // Login-unification (2026-11-13): there is no local password left
+     // to hash -- the account IS the cloud account, so "change password"
+     // changes it there directly, the one real place it's checked.
+     if(np.length<6){ toast(t('setPasswordTooShort')); return render(); }
+     (async()=>{
+       const r=await WP.CloudAuth.changeCloudPassword(np);
+       if(r.ok) toast(t('saved')); else toast(t('linkCloudFailed'));
+     })();
+     return render();
    }
    save(true);
    if(typeof restoreOpenAI==='function') restoreOpenAI(db);

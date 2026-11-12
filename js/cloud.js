@@ -529,9 +529,11 @@ function cloudDiagnostics(){
   const authError = db && db.settings && db.settings.cloudAuthError;
   let status;
   if(typeof navigator!=='undefined' && navigator.onLine===false) status='offline';
-  else if(authError==='not-linked-on-this-device') status='not-linked';
+  // Login-unification (2026-11-13): 'not-linked'/'auth-failed' no longer
+  // exist as distinct states -- being logged in at all now means the
+  // cloud sign-in already succeeded (see app.js's completeLogin()), so
+  // db.settings.cloudAuthError is only ever '' or 'session-expired'.
   else if(authError==='session-expired') status='session-expired';
-  else if(authError) status='auth-failed';
   else if(lastErrCategory==='company') status='no-company-access';
   else if(lastErrCategory==='network') status='network';
   else if(lastErrCategory==='data') status='data-error';

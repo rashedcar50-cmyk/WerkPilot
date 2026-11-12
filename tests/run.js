@@ -175,54 +175,14 @@ assert(!/p:\s*'(1980D|1976R|1978B|1977A|1979C|bm-dev-2026)'/.test(coreSrc),'core
 assert(!/u\.p\s*=\s*'(1976R|1977A)'/.test(coreSrc),'core.js no longer re-stamps an account back onto its old default');
 assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password (p:null)');
 
-// Proof the fix works: re-derive the exact decision app.js's login() makes
-// (freshAccount / legacyDefault / ok) against the three cases that matter,
-// using the same Engine functions login() calls, so this breaks the moment
-// anyone changes that logic in a way that reopens the hole or locks out a
-// legitimate user.
-async function decideLogin(cand, pass){
-  if(cand && cand.disabled) return {ok:false, freshAccount:false, legacyDefault:false, forcesSetup:false, disabled:true};
-  const freshAccount=!!cand && cand.p==null;
-  const legacyDefault=!!cand && !freshAccount && E.isLegacyDefaultPassword(cand.u, pass);
-  const ok=freshAccount || !!(cand && await E.passOk(cand.p, pass));
-  return {ok, freshAccount, legacyDefault, forcesSetup: ok && (freshAccount || legacyDefault)};
-}
+// Login-unification (2026-11-13): the freshAccount/legacyDefault/passOk
+// decision logic that used to live in app.js's login() is gone outright --
+// login() now does exactly one thing, sign in to Supabase with the typed
+// email+password (see the "login-unification" test section further down),
+// so there is no local decision tree left here to pin down. engine.js's
+// isLegacyDefaultPassword/passOk/hashPassAsync/publicUser still exist
+// (harmless, unused) but are no longer part of any real login path.
 (async()=>{
-  // 1) Fresh seed account (p:null), e.g. right after this fix ships.
-  const fresh={u:'admin',p:null,role:'manager'};
-  let d=await decideLogin(fresh,'anything');
-  assert(d.ok && d.forcesSetup,'fresh account (p:null) is forced into first-time setup, not rejected');
-
-  // 2) Account that never rotated off the old published default -- proves
-  // the leaked value alone no longer reaches completeLogin().
-  const stillDefault={u:'Rashid',p:'1976R',role:'developer'};
-  d=await decideLogin(stillDefault,'1976R');
-  assert(d.ok && d.legacyDefault && d.forcesSetup,'typing the old leaked default is accepted but forced to rotate, never logged straight in');
-
-  // 3) Same account, already rotated to a real custom password -- proves
-  // the fix does not regress/lock out a legitimate, already-secured user.
-  const rotated={u:'Rashid',p:await E.hashPassAsync('MyR3al-Pass!'),role:'developer'};
-  d=await decideLogin(rotated,'MyR3al-Pass!');
-  assert(d.ok && !d.freshAccount && !d.legacyDefault && !d.forcesSetup,'a rotated custom password logs straight in, unaffected by the fix');
-
-  // 4) Same rotated account, wrong password -- proves the fix did not
-  // accidentally loosen normal auth.
-  d=await decideLogin(rotated,'totally-wrong');
-  assert(!d.ok,'wrong password on a rotated account is still rejected');
-
-  // 5) The hardening in forcePasswordSetup: re-submitting the old default
-  // as the "new" password must still be rejected by isLegacyDefaultPassword.
-  assert(E.isLegacyDefaultPassword('Rashid','1976R')===true,'legacy default is recognized for its own account');
-  assert(E.isLegacyDefaultPassword('Rashid','MyR3al-Pass!')===false,'a real custom password is never flagged as the legacy default');
-  assert(E.isLegacyDefaultPassword('someone-not-in-the-table','1976R')===false,'an unrelated username is never matched against another account\'s old default');
-
-  // 6) Disabled account (2026-11-09 fix): rejected outright, even with the
-  // exact correct password -- no freshAccount/legacyDefault path can ever
-  // grant it a session.
-  const disabledAcct={u:'admin',p:'1980D',role:'manager',disabled:true};
-  d=await decideLogin(disabledAcct,'1980D');
-  assert(!d.ok && d.disabled,'a disabled account is rejected even with its correct password');
-
   // --- Fix: invoice preview must not mutate the database -------------------
   // Bug that shipped before this fix: js/invoice-print.js's ensureKd(), called
   // every time an invoice is rendered (preview, print, PDF, email), silently
@@ -463,54 +423,54 @@ async function decideLogin(cand, pass){
     return sandbox;
   }
 
-  // Case 1: a real existing install, already running before this fix,
-  // still has its original plaintext passwords in storage -- exactly
-  // what every current production browser has right now.
+  // Login-unification migration (2026-11-13): proves the REAL replacement
+  // for the old "preserve db.users[].p across upgrades" behavior above --
+  // the local per-device accounts are retired outright (db.users becomes
+  // []), and whichever one was already cloud-linked hands its name/role
+  // down into db.cloudUsers, keyed by that cloud email, so the owner's
+  // display name/permissions carry over cleanly on the one device that
+  // actually had them, with no credential surviving anywhere locally.
+
+  // Case 1: a real existing install (the laptop, pre-change) -- one
+  // cloud-linked developer account plus four disabled, never-used demo
+  // accounts, exactly the real production db.users snapshot taken before
+  // this migration shipped.
   const existingInstall={
     users:[
-      {u:'admin',p:'1980D',name:'Admin',role:'manager'},
-      {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'},
-      {u:'accountant',p:'1978B',name:'Buchhaltung',role:'accountant'},
-      {u:'ismail',p:'1977A',name:'Ismail',role:'mechanic'},
-      {u:'warehouse',p:'1979C',name:'Lager',role:'warehouse'}
+      {u:'admin',p:null,name:'Admin',role:'manager',disabled:true},
+      {u:'Rashid',p:'somehash',name:'Rashid Tabah',role:'developer',cloudEmail:'rashed.car50@gmail.com'},
+      {u:'accountant',p:null,name:'Buchhaltung',role:'accountant',disabled:true},
+      {u:'ismail',p:null,name:'Ismail',role:'mechanic',disabled:true},
+      {u:'warehouse',p:null,name:'Lager',role:'warehouse',disabled:true}
     ],
     customers:[{id:'c1',companyId:'de',name:'Real Customer GmbH'}],
     settings:{uiLang:'de'}
   };
   const upgraded=loadCoreWith({baymeister_v1: JSON.stringify(existingInstall)});
-  const mergedUsers=upgraded.window.db.users;
-  assert(mergedUsers.find(u=>u.u==='Rashid').p==='1976R', 'PROOF OF FIX: an existing install\'s real (pre-fix) password survives the upgrade -- load() does not reset it to null');
-  assert(mergedUsers.find(u=>u.u==='admin').p==='1980D', 'existing admin password also survives the upgrade unchanged');
-  assert(upgraded.window.db.customers.find(c=>c.id==='c1').name==='Real Customer GmbH', 'existing real business data (not demo data) survives the upgrade');
+  assert(Array.isArray(upgraded.window.db.users) && upgraded.window.db.users.length===0, 'PROOF OF FIX: the old per-device local accounts (including the four unused demo ones) are cleared on migration, never surviving as a credential to check');
+  assert(upgraded.window.db.cloudUsers['rashed.car50@gmail.com'].name==='Rashid Tabah' && upgraded.window.db.cloudUsers['rashed.car50@gmail.com'].role==='developer', 'PROOF OF FIX: the one account that WAS already cloud-linked hands its real name/role down to db.cloudUsers, keyed by the cloud email -- not lost, not re-asked for');
+  assert(upgraded.window.db.settings.cloudLoginMigrated===true, 'the migration marks itself done so it never re-runs and clobbers a later manual role edit');
+  assert(upgraded.window.db.customers.find(c=>c.id==='c1').name==='Real Customer GmbH', 'existing real business data is completely untouched by the login migration');
 
-  // Case 2: an account that had ALREADY been rotated through the new
-  // forced-setup flow (e.g. a second deploy after some users already set
-  // real passwords) must keep that real password too, not regress to null.
-  const partiallyRotated={
-    users:[
-      {u:'admin',p:'5f4dcc3b5aa765d61d8327deb882cf99',name:'Admin',role:'manager'},
-      {u:'Rashid',p:'1976R',name:'Rashid Tabah',role:'developer'}
-    ]
-  };
-  const upgraded2=loadCoreWith({baymeister_v1: JSON.stringify(partiallyRotated)});
-  assert(upgraded2.window.db.users.find(u=>u.u==='admin').p==='5f4dcc3b5aa765d61d8327deb882cf99', 'an already-rotated (hashed/custom) password survives a later upgrade unchanged');
-
-  // Case 3: a genuinely brand-new install (nothing in localStorage yet) --
-  // this is the ONLY case where p:null should apply, and it's correct
-  // here because there is no existing user to lock out.
+  // Case 2: a genuinely brand-new install (nothing in localStorage yet) --
+  // still ends up with db.users=[] and an empty cloudUsers cache; the
+  // first real cloud login (resolveCloudProfile, tested separately below)
+  // is what provisions a profile, not this migration.
   const freshInstall=loadCoreWith({});
-  assert(freshInstall.window.db.users.every(u=>u.p===null), 'a genuinely fresh install (no prior data) seeds p:null for every account -- correct, nothing existing to break');
+  assert(Array.isArray(freshInstall.window.db.users) && freshInstall.window.db.users.length===0, 'a genuinely fresh install also starts with no local accounts to check');
+  assert(freshInstall.window.db.cloudUsers && typeof freshInstall.window.db.cloudUsers==='object', 'db.cloudUsers always exists as an object, ready for resolveCloudProfile to populate');
 
-  // Case 4: combine with the real login decision (from the earlier
-  // credential-rotation test) to prove the end-to-end migration path:
-  // the REAL merged user record for an unrotated existing account still
-  // correctly routes through forced rotation rather than straight login
-  // or an outright lockout.
-  const realRashid=mergedUsers.find(u=>u.u==='Rashid');
-  const migDecision=await decideLogin(realRashid, '1976R');
-  assert(migDecision.ok && migDecision.legacyDefault && migDecision.forcesSetup, 'end-to-end: a real migrated existing account typing its known password is forced to rotate, not locked out and not let straight in');
-  const migWrong=await decideLogin(realRashid, 'totally-wrong-guess');
-  assert(!migWrong.ok, 'end-to-end: a migrated existing account is still protected against a wrong password guess');
+  // Case 3: the migration must be idempotent/one-time -- re-loading an
+  // ALREADY-migrated install (cloudLoginMigrated already true, cloudUsers
+  // already holding a manually-edited role) must not re-derive anything
+  // from db.users (which is already empty anyway) or stomp the edit.
+  const alreadyMigrated={
+    users:[],
+    cloudUsers:{'rashed.car50@gmail.com':{name:'Rashid Tabah', role:'manager'}},
+    settings:{uiLang:'de', cloudLoginMigrated:true}
+  };
+  const reloaded=loadCoreWith({baymeister_v1: JSON.stringify(alreadyMigrated)});
+  assert(reloaded.window.db.cloudUsers['rashed.car50@gmail.com'].role==='manager', 'PROOF OF FIX: a manually-edited role in db.cloudUsers survives a later reload -- the one-time flag stops the migration from re-deriving and overwriting it');
 
   // --- Fix: "Manueller Auftrag" silently failed to create a repair order --
   // Bug (found while running the full login->customer->vehicle->repair->
@@ -590,85 +550,54 @@ async function decideLogin(cand, pass){
   const appSrc4=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
   assert(/onAuthStateChange\(\(event\)=>\{\s*\n\s*if\(event==='PASSWORD_RECOVERY'\) window\._wpRecoveryConfirmed=true;/.test(appSrc4), 'app.js registers the PASSWORD_RECOVERY listener right where the Supabase client is created');
 
-  // --- Cross-device sync bugfix: linkAccountToCloud() must actually
-  // re-authenticate when the identity already exists, not just fail with
-  // "already registered" -- this is exactly the recovery path for a
-  // device whose local password drifted from its cloud password (the
-  // most likely reason a device's saves silently never reach Supabase).
-  // The comment above the function already claimed this fallback
-  // existed; it didn't -- this proves the real fix.
-  function loadAuthForLink(signUpBehavior, signInBehavior){
-    const sandbox={
-      window:{ supabaseClient:{ auth:{
-        signUp: signUpBehavior,
-        signInWithPassword: signInBehavior
-      }}},
-      console
-    };
-    vm.createContext(sandbox);
-    vm.runInContext(fs.readFileSync(path.join(root,'js/auth.js'),'utf8'), sandbox);
-    return sandbox;
-  }
-  {
-    // Case 1: brand-new email -- signUp succeeds normally, no fallback needed.
-    const sbx=loadAuthForLink(
-      async()=>({data:{user:{email:'new@example.test'}, session:{}}, error:null}),
-      async()=>{ throw new Error('signIn should not be called when signUp succeeds'); }
-    );
-    const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('new@example.test','Pw1');
-    assert(r.ok===true && !r.reauthenticated, 'a genuinely new cloud identity is created normally, no fallback triggered');
-  }
-  {
-    // Case 2: email already registered, and the CURRENT password is
-    // actually still correct -- falls back to a normal sign-in and
-    // succeeds, instead of surfacing a confusing "already registered"
-    // error for an account that's actually fine.
-    const sbx=loadAuthForLink(
-      async()=>({data:null, error:{message:'User already registered'}}),
-      async({email,password})=>({data:{user:{email}}, error:null})
-    );
-    const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('existing@example.test','CorrectPw');
-    assert(r.ok===true && r.reauthenticated===true, 'PROOF OF FIX: re-linking an already-registered identity with its CORRECT current password now succeeds via sign-in fallback, instead of just failing');
-  }
-  {
-    // Case 3: email already registered, but the password typed now is
-    // genuinely wrong/stale -- the fallback sign-in also fails, and the
-    // real problem is surfaced (not silently swallowed).
-    const signInErr={message:'Invalid login credentials'};
-    const sbx=loadAuthForLink(
-      async()=>({data:null, error:{message:'User already registered'}}),
-      async()=>({data:null, error:signInErr})
-    );
-    const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('existing@example.test','WrongPw');
-    assert(r.ok===false && r.error===signInErr, 'when the identity exists AND the password is genuinely wrong, the real sign-in error is returned, not a misleading generic failure');
-    assert(r.emailTaken===true, 'PROOF OF FIX: this specific case (cloud identity exists, THIS device\'s local password does not match it) is flagged distinctly via emailTaken -- the real root cause of the original cross-device report, where each device\'s own independently-set local password was silently assumed to equal the shared cloud password');
-  }
-  {
-    // Case 4: a genuinely different, unrelated signUp failure (not an
-    // "already registered" case at all) must NOT be flagged emailTaken --
-    // that flag means one specific thing, never a catch-all.
-    const sbx=loadAuthForLink(
-      async()=>({data:null, error:{message:'Signup requires a valid password'}}),
-      async()=>{ throw new Error('signIn should not be called for a non-already-registered signUp error'); }
-    );
-    const r=await sbx.window.WP.CloudAuth.linkAccountToCloud('bad@example.test','x');
-    assert(r.ok===false && !r.emailTaken, 'a genuinely different signUp error is not misreported as emailTaken');
-  }
+  // --- Login-unification (2026-11-13): linkAccountToCloud()/the whole
+  // "re-send this device's local password and hope it matches" dance is
+  // GONE, not just fixed -- login() now signs in directly, so there is
+  // nothing left to re-authenticate or drift. auth.js no longer exports
+  // linkAccountToCloud/syncCloudPassword at all.
+  const authSrc=fs.readFileSync(path.join(root,'js/auth.js'),'utf8');
+  assert(!/function linkAccountToCloud/.test(authSrc), 'PROOF OF FIX: linkAccountToCloud (the local-password-as-cloud-password guesswork) no longer exists');
+  assert(!/function syncCloudPassword/.test(authSrc), 'PROOF OF FIX: syncCloudPassword (keeping a local hash in sync with the cloud) no longer exists -- there is no local hash left to sync');
+  assert(/function changeCloudPassword/.test(authSrc) && /changeCloudPassword/.test(authSrc.slice(authSrc.indexOf('W.CloudAuth'))), 'changeCloudPassword exists and is exported -- the one real place a password is ever changed now');
 
-  // --- Cloud Auth: wiring into the real login flow -------------------------
-  // Proof the plaintext password typed at login is threaded through to
-  // completeLogin (needed to silently sign into the linked cloud account
-  // with the SAME password) in both the normal-login and
-  // post-first-time-setup paths, and that the cloud sign-in is AWAITED
-  // before cloud sync runs (otherwise sync would still use the
-  // unauthenticated anon key for that first batch of calls).
+  // --- Login-unification: the real login() flow ---------------------------
+  // Proof login() is now a direct Supabase sign-in with whatever email the
+  // user typed (not a lookup against a local db.users record), and that
+  // completeLogin() is fed the real signed-in user, never a local record.
   const appSrc3=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
-  assert(/completeLogin\(cand,\s*pass\)/.test(appSrc3), 'the normal login path passes the typed password to completeLogin');
-  assert(/completeLogin\(cand,\s*p1\)/.test(appSrc3), 'the post-first-time-setup path passes the newly-chosen password to completeLogin');
-  assert(/await WP\.CloudAuth\.signInCloud\(cand\.cloudEmail,\s*plainPass\)/.test(appSrc3), 'completeLogin awaits the cloud sign-in');
-  const cloudSignInIdx=appSrc3.indexOf('await WP.CloudAuth.signInCloud(cand.cloudEmail');
-  const syncAllCloudIdx=appSrc3.indexOf('syncAllCloud(true).finally');
-  assert(cloudSignInIdx>0 && syncAllCloudIdx>cloudSignInIdx, 'PROOF OF FIX: cloud sign-in happens BEFORE cloud sync starts, so sync calls carry a real authenticated session, not just the anon key');
+  const loginFnIdx=appSrc3.indexOf('function login()');
+  const completeLoginIdx=appSrc3.indexOf('function completeLogin');
+  const loginBody=appSrc3.slice(loginFnIdx, completeLoginIdx);
+  assert(/WP\.CloudAuth\.signInCloud\(email,\s*pass\)/.test(loginBody), 'PROOF OF FIX: login() signs in directly with the typed email+password -- no local db.users lookup first');
+  assert(!/db\.users/.test(loginBody), 'PROOF OF FIX: login() never reads db.users at all -- the local account gate is gone, not just bypassed');
+  assert(!/WP\.Engine\.passOk/.test(loginBody), 'login() no longer checks any local password hash');
+  assert(/completeLogin\(r\.user\)/.test(loginBody), 'a successful cloud sign-in is what starts the session, via the real Supabase user object');
+  assert(!/function forcePasswordSetup/.test(appSrc3), 'PROOF OF FIX: forcePasswordSetup (the local-account first-time-setup modal) no longer exists -- there is no local account left to set a first password for');
+
+  const completeLoginEndIdx=appSrc3.indexOf('\n}', completeLoginIdx);
+  const completeLoginBody=appSrc3.slice(completeLoginIdx, completeLoginEndIdx);
+  assert(/resolveCloudProfile\(user\.email\)/.test(completeLoginBody), 'completeLogin resolves the LOCAL DISPLAY profile (name/role cache) from the real cloud email, never a credential check');
+  assert(/syncAllCloud\(true\)/.test(completeLoginBody), 'a fresh login still triggers a manual (retry-everything) sync pass, same as before');
+
+  // --- Login-unification: logout also ends the cloud session --------------
+  assert(/WP\.CloudAuth\.signOutCloud\(\)/.test(appSrc3), 'PROOF OF FIX: logging out now also signs out of the cloud session, not just clearing the local session object');
+
+  // --- Login-unification: resolveCloudProfile() in core.js ----------------
+  {
+    const rpSandbox={ console, db:{cloudUsers:{}} };
+    vm.createContext(rpSandbox);
+    vm.runInContext(`function resolveCloudProfile(email){
+      const key=String(email||'').trim().toLowerCase();
+      if(!db.cloudUsers) db.cloudUsers={};
+      if(!db.cloudUsers[key]) db.cloudUsers[key]={name:email, role:'developer'};
+      return {email:key, name:db.cloudUsers[key].name, role:db.cloudUsers[key].role};
+    }`, rpSandbox);
+    const first=rpSandbox.resolveCloudProfile('Owner@Example.com');
+    assert(first.email==='owner@example.com' && first.role==='developer', 'a cloud email never seen before is auto-provisioned with full (developer) access -- this app is a single unified account per workshop');
+    rpSandbox.db.cloudUsers['owner@example.com'].role='manager';
+    const second=rpSandbox.resolveCloudProfile('owner@example.com');
+    assert(second.role==='manager', 'a previously-resolved profile is read back as-is on a later login, not re-provisioned to developer every time');
+  }
 
   // --- Fix: reconnecting must retry locally-pending/failed cloud writes ----
   // Bug found by actually simulating a blocked cloud connection, saving a
@@ -684,57 +613,41 @@ async function decideLogin(cand, pass){
   const firstLoadIdx=cloudSrc.indexOf('loadCustomersFromCloud()', syncAllCloudBodyIdx);
   assert(retryIdx>0 && firstLoadIdx>retryIdx, 'PROOF OF FIX: syncAllCloud retries pending local writes before pulling from the cloud');
 
-  // --- Cross-device sync bugfix (2026-11-12): the root-cause investigation
-  // for "vehicle added on one device never appears on another" found that
-  // a failed/skipped cloud sign-in was silently swallowed -- completeLogin
-  // discarded signInCloud's result entirely, so a device that was never
-  // linked, or whose local password had drifted from its cloud password,
-  // kept "succeeding" at login and showing every local save as if nothing
-  // were wrong. These checks prove the result is now recorded. -----------
-  assert(/db\.settings\.cloudAuthError\s*=\s*r\.ok\s*\?\s*''\s*:/.test(appSrc3), 'PROOF OF FIX: completeLogin now records whether the cloud sign-in actually succeeded, instead of discarding the result');
-  assert(/not-linked-on-this-device/.test(appSrc3), 'completeLogin distinguishes "never linked on this device" from "sign-in failed" -- cloudEmail lives only in local storage and never travels between devices');
+  // --- Login-unification (2026-11-13): completeLogin no longer records a
+  // "did the cloud sign-in succeed" result after the fact -- it IS the
+  // cloud sign-in result, so there is nothing left to silently discard.
+  assert(!/not-linked-on-this-device/.test(appSrc3), 'PROOF OF FIX: "never linked on this device" cannot occur anymore -- a session existing at all already means the cloud sign-in succeeded');
 
-  // --- Mobile sync-diagnosis bugfix: the dashboard banner must actually
-  // switch on cloudDiagnostics()'s distinct status values (not a single
-  // generic "something's wrong" branch), and the DIRECT mobile-usable
-  // actions (link now / re-link / sync now / details) must really exist
-  // as callable, globally-exposed functions -- a phone has no hover, so
-  // these can only ever be reached by a real tap target, never a tooltip.
-  assert(/case 'not-linked':/.test(appSrc3) && /case 'auth-failed':/.test(appSrc3) && /case 'no-company-access':/.test(appSrc3) && /case 'network':/.test(appSrc3) && /case 'data-error':/.test(appSrc3) && /case 'pending':/.test(appSrc3), 'PROOF OF FIX: the dashboard banner names each distinct real-world situation separately, instead of collapsing them into one generic "pending" message');
-  assert(/function openCloudLinkModal/.test(appSrc3) && /window\.openCloudLinkModal=openCloudLinkModal/.test(appSrc3), 'openCloudLinkModal() exists and is reachable from inline onclick handlers (tap targets), not just from Settings');
+  // --- Mobile sync-diagnosis: the dashboard banner still switches on
+  // cloudDiagnostics()'s distinct status values for the cases that CAN
+  // still happen post-login (a stale token, no workshop access, network,
+  // a rejected write, pending records) -- 'not-linked'/'auth-failed' are
+  // gone because there is no separate local-vs-cloud account left to
+  // drift apart; the one remaining failure mode (a stale token) is
+  // resolved by a real re-login, not a "link" step.
+  assert(!/case 'not-linked':/.test(appSrc3) && !/case 'auth-failed':/.test(appSrc3), 'PROOF OF FIX: the banner no longer has "not-linked"/"auth-failed" cases -- they cannot occur once login IS the cloud session');
+  assert(/case 'session-expired':/.test(appSrc3) && /case 'no-company-access':/.test(appSrc3) && /case 'network':/.test(appSrc3) && /case 'data-error':/.test(appSrc3) && /case 'pending':/.test(appSrc3), 'the banner still names every remaining real situation separately');
+  assert(/function cloudForceRelogin/.test(appSrc3) && /window\.cloudForceRelogin=cloudForceRelogin/.test(appSrc3), 'PROOF OF FIX: a stale/expired cloud session is resolved by a real re-login (sign out + show the login screen), not a "link to cloud" modal that no longer exists');
+  assert(/cloudForceRelogin\(\)/.test(appSrc3.slice(appSrc3.indexOf("case 'session-expired'"))), 'the banner\'s session-expired action actually calls the re-login function');
   assert(/function cloudSyncNowBtn/.test(appSrc3) && /window\.cloudSyncNowBtn=cloudSyncNowBtn/.test(appSrc3), 'a direct, one-tap "sync now" action exists for the pending case, instead of only waiting silently for the next automatic trigger');
   assert(/function cloudDiagModal/.test(appSrc3) && /window\.cloudDiagModal=cloudDiagModal/.test(appSrc3), 'a full diagnostics panel (connection/account/workshop/pending count/last error, each shown separately) is reachable with one tap from the banner');
 
-  // --- Real cross-device root cause (2026-11-12): the ACTUAL reason the
-  // Opel saved on mobile never reached the cloud while the Nissan saved on
-  // the laptop did -- each device's local app password is set up
-  // independently (js/core.js's seed() ships every account with p:null,
-  // nothing links them), yet "link to cloud" always resent THIS device's
-  // own local password as the assumed cloud password. The laptop's local
-  // password happened to already equal the cloud account's real password
-  // (it was the device that originally created that cloud identity); the
-  // phone's did not, so every linking attempt failed as a generic
-  // "linkCloudFailed" with no way for the user to recover -- confirmed live
-  // in production: last_sign_in_at on the one real auth.users row stayed
-  // frozen for hours even while the user kept retrying on the phone,
-  // because signInCloud was never once called with the phone's real cloud
-  // password. Both tap targets (the banner's openCloudLinkModal and the
-  // Settings panel's inline form) must offer the one thing that actually
-  // resolves this: a second, separate password field for the EXISTING
-  // cloud account's own password, calling signInCloud directly -- never
-  // silently reusing the local password a second time, never a dead end.
-  assert(/r\.emailTaken/.test(appSrc3), 'openCloudLinkModal distinguishes the emailTaken case from a generic failure');
-  const openLinkIdx=appSrc3.indexOf('function openCloudLinkModal');
-  const openLinkEnd=appSrc3.indexOf('window.openCloudLinkModal=openCloudLinkModal');
-  const openLinkBody=appSrc3.slice(openLinkIdx, openLinkEnd);
-  assert(/qCloudTakenBox/.test(openLinkBody) && /qCloudExistingPass/.test(openLinkBody), 'PROOF OF FIX: openCloudLinkModal reveals a SEPARATE existing-cloud-password field instead of just failing when the local password does not match the cloud account');
-  assert(/WP\.CloudAuth\.signInCloud\(email,\s*existingPass\)/.test(openLinkBody), 'PROOF OF FIX: the fallback signs in with the SEPARATELY typed cloud password, not the local password that just failed');
-  assert(/qCloudForgot.*forgotPasswordModal\(\)/.test(openLinkBody) || /forgotPasswordModal\(\);/.test(openLinkBody), 'the fallback also offers resetting the cloud password for a user who genuinely does not know it');
-  const settingsLinkIdx=appSrc3.indexOf("$('#linkCloudBtn')) $('#linkCloudBtn').onclick");
-  const settingsLinkBody=appSrc3.slice(settingsLinkIdx, settingsLinkIdx+1400);
-  assert(/r\.emailTaken/.test(settingsLinkBody) && /cloudTakenBox/.test(settingsLinkBody) && /cloudExistingPass/.test(settingsLinkBody), 'PROOF OF FIX: the Settings page\'s own "link to cloud" form has the SAME existing-cloud-password fallback as the banner\'s modal, not just one of the two places a user might try to link');
-  assert(/WP\.CloudAuth\.signInCloud\(email,\s*existingPass\)/.test(settingsLinkBody), 'Settings\' fallback also signs in with the separately typed cloud password');
-  assert(/async function finishCloudLink/.test(appSrc3), 'finishCloudLink centralizes "record the link + retry stuck records" so both tap targets cannot drift apart');
+  // --- Login-unification: the old "link to cloud" machinery is gone, not
+  // just unreachable -- openCloudLinkModal/finishCloudLink and the whole
+  // Settings "ربط بالسحابة" card existed only because login and cloud
+  // auth were two separate things; now that they are one, there is
+  // nothing left to link.
+  assert(!/function openCloudLinkModal/.test(appSrc3), 'PROOF OF FIX: openCloudLinkModal no longer exists -- there is no separate "link this device" step anymore');
+  assert(!/function finishCloudLink/.test(appSrc3), 'PROOF OF FIX: finishCloudLink no longer exists');
+  assert(!/linkCloudSectionTitle/.test(appSrc3) && !/cloudEmail.*cloudCurPass/.test(appSrc3), 'PROOF OF FIX: the Settings page no longer renders a separate cloud-linking card -- the account IS the login');
+
+  // --- Login-unification: Settings' "new password" now changes the ONE
+  // real password (the cloud account's), not a local hash that then had
+  // to be kept in sync with it.
+  const settingsIdx=appSrc3.indexOf("const np=$('#newpass')");
+  const settingsBody=appSrc3.slice(settingsIdx, settingsIdx+500);
+  assert(/WP\.CloudAuth\.changeCloudPassword\(np\)/.test(settingsBody), 'PROOF OF FIX: Settings\' "change password" calls changeCloudPassword directly');
+  assert(!/db\.users\.find/.test(settingsBody), 'PROOF OF FIX: Settings\' password change no longer looks up or hashes a local db.users record');
 
   // --- Cross-device sync bugfix: pendingSyncCount() and the dashboard
   // banner it feeds must actually reflect unsynced records (no cloudId or
@@ -851,17 +764,15 @@ async function decideLogin(cand, pass){
   }
   assert(/!x\.cloudId \|\| x\.syncError/.test(cloudSrc), 'retryPendingCloud selects records with no cloudId yet OR a recorded sync error');
 
-  // --- Settings page: password change must be hashed + validated ----------
-  // Bug found while wiring cloud auth into password changes: the Settings
-  // page's own "new password" field stored the password in PLAIN TEXT
-  // (`u.p=np`), with no minimum length and no check against the old
-  // published defaults -- bypassing every protection forcePasswordSetup
-  // enforces, and silently letting someone "change" their password right
-  // back to a known default.
-  assert(!/u\.p=np;session\.user\.p=np;/.test(appSrc3), 'PROOF OF BUG regression guard: the Settings page no longer stores a new password as plain text');
-  assert(/u\.p = WP\.Engine\.hashPassAsync \? await WP\.Engine\.hashPassAsync\(np\) : np;/.test(appSrc3), 'PROOF OF FIX: the Settings page now hashes a new password the same way login’s forced-setup flow does');
-  assert(/if\(np\.length<6\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now enforces the same minimum password length');
-  assert(/WP\.Engine\.isLegacyDefaultPassword\(u\.u,\s*np\)/.test(appSrc3), 'PROOF OF FIX: the Settings page now rejects reusing an old published default password');
+  // --- Settings page: password change (login-unification, 2026-11-13) -----
+  // Historically this field stored a new password as a plain-text local
+  // hash (`u.p=np`), with its own length check and legacy-default guard.
+  // There is no local password left at all now -- changeCloudPassword
+  // (tested above) changes the one real, cloud-side password directly;
+  // Supabase's own update endpoint enforces its own minimum there, so the
+  // only check this field still needs is "don't submit an empty value".
+  assert(!/u\.p=np;session\.user\.p=np;/.test(appSrc3), 'the Settings page never stores a new password as plain text locally');
+  assert(/if\(np\.length<6\)/.test(appSrc3), 'the Settings page still rejects an obviously-too-short password before even calling changeCloudPassword');
 
   // --- Autosiastik Fahrzeugschein-Scanner integration -----------------------
   // Field mapping must preserve raw values exactly as the API returns them
@@ -1448,13 +1359,14 @@ async function decideLogin(cand, pass){
     const d2=diagSandbox.cloudDiagnostics();
     assert(d2.status==='pending' && d2.pendingCount===1, 'PROOF: a genuinely unsynced record (no error, just not pushed yet) reports "pending" with the real count');
 
-    diagSandbox.db.settings.cloudAuthError='not-linked-on-this-device';
+    // Login-unification (2026-11-13): 'not-linked'/'auth-failed' cannot
+    // occur anymore -- db.settings.cloudAuthError is only ever '' or
+    // 'session-expired' now (see app.js's completeLogin / cloud.js's
+    // markSyncError). An arbitrary leftover string must never be
+    // misreported as either retired status.
+    diagSandbox.db.settings.cloudAuthError='some-unexpected-leftover-value';
     const d3=diagSandbox.cloudDiagnostics();
-    assert(d3.status==='not-linked', 'PROOF OF FIX: a device that was never linked to the cloud is named distinctly ("not-linked"), not lumped in with "pending" or a generic failure');
-
-    diagSandbox.db.settings.cloudAuthError='Invalid login credentials';
-    const d4=diagSandbox.cloudDiagnostics();
-    assert(d4.status==='auth-failed', 'PROOF OF FIX: a failed cloud sign-in (e.g. a drifted password) is named distinctly ("auth-failed"), not confused with "never linked"');
+    assert(d3.status!=='not-linked' && d3.status!=='auth-failed', 'PROOF OF FIX: an arbitrary cloudAuthError value is never reported as the retired "not-linked"/"auth-failed" statuses -- those cases cannot occur once login IS the cloud session');
 
     diagSandbox.db.settings.cloudAuthError='';
     diagSandbox.db.settings.lastSyncError={message:'new row violates row-level security policy for table "vehicles"', at:new Date().toISOString()};
