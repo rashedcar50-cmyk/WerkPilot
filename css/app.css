@@ -123,6 +123,11 @@ th{background:#efebe3;position:sticky;top:0}
 .ocr-raw{margin:8px 0;border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:#fff}
 .ocr-raw summary{cursor:pointer;font-size:.85rem;font-weight:700;color:var(--muted)}
 .ocr-raw-text{white-space:pre-wrap;font-size:.8rem;max-height:220px;overflow:auto;margin:6px 0 0}
+.field-code{color:var(--muted);font-weight:700;font-size:.8em}
+.field-unit{color:var(--muted);font-weight:400;font-size:.9em}
+.form-grid-details{margin:8px 0;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
+.form-grid-details summary{cursor:pointer;font-weight:700;color:var(--muted)}
+.form-grid-details .form-grid{padding-bottom:8px;margin-top:8px}
 .today-item{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
 .today-item.tap:hover{background:#efebe3;border-radius:10px}
 .bottom-action{margin-top:16px;padding-bottom:24px}
