@@ -160,3 +160,44 @@ create policy "wp_expenses_all" on expenses for all using (true) with check (tru
 
 alter table repairs add column if not exists photos text;
 
+-- ===== v3: Autosiastik Fahrzeugschein-Scanner -- extended vehicle fields =====
+-- Additive only (add column if not exists), safe to re-run, preserves all
+-- existing rows/values. Covers fields that were already mapped locally
+-- since the schein-engine rebuild but never synced to Supabase, plus the
+-- newly-configured BASIC-package fields (2026-11-12). Column names are
+-- WerkPilot's own internal names (snake_case of js/autosiastik.js's
+-- mapScan() keys), not the provider's raw field codes -- see
+-- js/autosiastik.js for exactly which upstream field each one comes from.
+alter table vehicles add column if not exists hsn text;
+alter table vehicles add column if not exists tsn text;
+alter table vehicles add column if not exists kba text;
+alter table vehicles add column if not exists first_registration text;
+alter table vehicles add column if not exists engine_displacement_cm3 text;
+alter table vehicles add column if not exists engine_power_kw text;
+alter table vehicles add column if not exists rated_rpm text;
+alter table vehicles add column if not exists fuel_type text;
+alter table vehicles add column if not exists max_weight text;
+alter table vehicles add column if not exists seats text;
+alter table vehicles add column if not exists vehicle_class text;
+alter table vehicles add column if not exists ocr_source text;
+-- newly-configured BASIC-package fields:
+alter table vehicles add column if not exists next_hu text;
+alter table vehicles add column if not exists tsn_full text;
+alter table vehicles add column if not exists vin_check_digit text;
+alter table vehicles add column if not exists typ1 text;
+alter table vehicles add column if not exists typ2 text;
+alter table vehicles add column if not exists typ3 text;
+alter table vehicles add column if not exists typ4 text;
+alter table vehicles add column if not exists emission_class text;
+alter table vehicles add column if not exists emission_code text;
+alter table vehicles add column if not exists special_notes text;
+alter table vehicles add column if not exists max_weight_national text;
+alter table vehicles add column if not exists unladen_weight text;
+alter table vehicles add column if not exists tire_axle1 text;
+alter table vehicles add column if not exists tire_axle2 text;
+alter table vehicles add column if not exists date_k text;
+-- original provider response (no images), kept separate from the
+-- corrected fields above -- stored as serialized JSON text, matching the
+-- existing jobs/parts/photos columns' convention in this schema.
+alter table vehicles add column if not exists ocr_raw text;
+

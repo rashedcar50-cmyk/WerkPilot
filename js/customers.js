@@ -200,9 +200,34 @@ function vehicleModal(prefill={}){
  <div class="field"><label>${t('paintCode')}</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="z. B. Schwarz Metallic"></div>
  <div class="field"><label>${t('km')}</label><input id="vkm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.km||'')}"></div>
  <div class="field"><label>${t('nextService')}</label><input id="vnext" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.nextServiceKm||'')}"></div>
- </div>`,()=>{
+ </div>
+ <details class="form-grid-details"><summary>${t('scheinExtraFields')}</summary>
+ <div class="form-grid">
+ <div class="field"><label>HU</label><input id="vhu" value="${esc(prefill.nextHu||'')}" placeholder="MM.JJJJ"></div>
+ <div class="field"><label>Feld 2.2</label><input id="vtsnfull" value="${esc(prefill.tsnFull||'')}"></div>
+ <div class="field"><label>Feld 3</label><input id="vvincheck" value="${esc(prefill.vinCheckDigit||'')}"></div>
+ <div class="field"><label>D.2.1</label><input id="vtyp1" value="${esc(prefill.typ1||'')}"></div>
+ <div class="field"><label>D.2.2</label><input id="vtyp2" value="${esc(prefill.typ2||'')}"></div>
+ <div class="field"><label>D.2.3</label><input id="vtyp3" value="${esc(prefill.typ3||'')}"></div>
+ <div class="field"><label>D.2.4</label><input id="vtyp4" value="${esc(prefill.typ4||'')}"></div>
+ <div class="field"><label>Feld 14</label><input id="vemclass" value="${esc(prefill.emissionClass||'')}"></div>
+ <div class="field"><label>Feld 14.1</label><input id="vemcode" value="${esc(prefill.emissionCode||'')}"></div>
+ <div class="field"><label>F.2</label><input id="vweightnat" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.maxWeightNational||'')}"></div>
+ <div class="field"><label>G</label><input id="vunladen" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.unladenWeight||'')}"></div>
+ <div class="field"><label>Feld 15.1</label><input id="vtire1" value="${esc(prefill.tireAxle1||'')}"></div>
+ <div class="field"><label>Feld 15.2</label><input id="vtire2" value="${esc(prefill.tireAxle2||'')}"></div>
+ <div class="field"><label>Feld 6</label><input id="vdatek" value="${esc(prefill.dateK||'')}"></div>
+ <div class="field span2"><label>Feld 22</label><textarea id="vnotes" rows="2">${esc(prefill.specialNotes||'')}</textarea></div>
+ </div>
+ </details>`,()=>{
   if(!$('#cu').value)return toast(t('pickCustomerFirst'));
-  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),firstRegistration:$('#firstreg')?.value.trim()||'',year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ratedRpm:$('#vrpm')?.value||'',maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||''};
+  const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),firstRegistration:$('#firstreg')?.value.trim()||'',year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ratedRpm:$('#vrpm')?.value||'',maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||'',
+   nextHu:$('#vhu')?.value.trim()||'',tsnFull:$('#vtsnfull')?.value.trim()||'',vinCheckDigit:$('#vvincheck')?.value.trim()||'',
+   typ1:$('#vtyp1')?.value.trim()||'',typ2:$('#vtyp2')?.value.trim()||'',typ3:$('#vtyp3')?.value.trim()||'',typ4:$('#vtyp4')?.value.trim()||'',
+   emissionClass:$('#vemclass')?.value.trim()||'',emissionCode:$('#vemcode')?.value.trim()||'',
+   specialNotes:$('#vnotes')?.value.trim()||'',maxWeightNational:$('#vweightnat')?.value||'',unladenWeight:$('#vunladen')?.value||'',
+   tireAxle1:$('#vtire1')?.value.trim()||'',tireAxle2:$('#vtire2')?.value.trim()||'',dateK:$('#vdatek')?.value.trim()||'',
+   ocrRaw:prefill.ocrRaw||''};
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
   else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
  });
@@ -229,7 +254,13 @@ async function scheinFileToCustomerVehicle(file){
     first_registration:clean.first_registration||'', year:clean.year||'',
     engine_displacement_cm3:clean.engine_displacement_cm3||'', engine_power_kw:clean.engine_power_kw||'',
     engine_rated_rpm:clean.engine_rated_rpm||'', fuel_type:clean.fuel_type||'', maxWeight:clean.maxWeight||'',
-    seats:clean.seats||'', color:clean.color||clean.paint||'', vehicleClass:clean.vehicleClass||''
+    seats:clean.seats||'', color:clean.color||clean.paint||'', vehicleClass:clean.vehicleClass||'',
+    nextHu:clean.nextHu||'', tsnFull:clean.tsnFull||'', vinCheckDigit:clean.vinCheckDigit||'',
+    typ1:clean.typ1||'', typ2:clean.typ2||'', typ3:clean.typ3||'', typ4:clean.typ4||'',
+    emissionClass:clean.emissionClass||'', emissionCode:clean.emissionCode||'', specialNotes:clean.specialNotes||'',
+    maxWeightNational:clean.maxWeightNational||'', unladenWeight:clean.unladenWeight||'',
+    tireAxle1:clean.tireAxle1||'', tireAxle2:clean.tireAxle2||'', dateK:clean.dateK||'',
+    ocrRaw: clean.raw ? JSON.stringify(clean.raw) : ''
   };
   const vehicles=companyRows('vehicles'), customers=companyRows('customers');
   const {strong,weak}=WP.ScheinEngine.findVehicleMatch(form.vin, form.license_plate, vehicles);
