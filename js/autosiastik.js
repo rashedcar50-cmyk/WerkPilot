@@ -17,6 +17,18 @@
     catch(e){ return FALLBACK_MAKES; }
   }
 
+  // --- Structured, bilingual, field-anchored warnings --------------------
+  // Every warning this module raises is one of these objects, never a
+  // pre-rendered string in a single language -- the caller (schein-wizard)
+  // picks `.de` or `.ar` at render time based on the CURRENT UI language,
+  // and can show it right next to the field(s) it concerns via `.field`
+  // (a field id, or an array of ids when one warning concerns more than
+  // one input, e.g. a kW/RPM split). This replaces the old approach of
+  // baking German text into a flat array, which could never be shown in
+  // Arabic and had no reliable link back to a specific input.
+  function mkWarn(field, de, ar){ return {field, de, ar}; }
+  function warnFields(w){ return Array.isArray(w.field) ? w.field : [w.field]; }
+
   // --- Brand/model resolution ------------------------------------------
   // The API returns brand/model from TWO independent sources that can
   // disagree:
@@ -59,8 +71,14 @@
       if(rest) model=rest;
     }
 
-    if(brandSource==='catalog') warnings.push('Marke "'+brand+'" stammt aus dem Fahrzeugkatalog (HSN/TSN), nicht direkt aus dem Dokument (Feld D.1 war leer) -- bitte mit dem Fahrzeugschein abgleichen.');
-    else if(brandSource==='derived') warnings.push('Marke "'+brand+'" wurde aus der Modellbezeichnung abgeleitet (D.1 leer, kein Katalogeintrag verfügbar) -- bitte prüfen.');
+    if(brandSource==='catalog') warnings.push(mkWarn('make',
+      'Marke "'+brand+'" stammt aus dem Fahrzeugkatalog (HSN/TSN), nicht direkt aus dem Dokument (Feld D.1 war leer) -- bitte mit dem Fahrzeugschein abgleichen.',
+      'الماركة "'+brand+'" مأخوذة من كتالوج المركبات (HSN/TSN)، وليست من الوثيقة مباشرة (الحقل D.1 كان فارغًا) -- يرجى مطابقتها مع رخصة السيارة.'
+    ));
+    else if(brandSource==='derived') warnings.push(mkWarn('make',
+      'Marke "'+brand+'" wurde aus der Modellbezeichnung abgeleitet (D.1 leer, kein Katalogeintrag verfügbar) -- bitte prüfen.',
+      'الماركة "'+brand+'" استُنتجت من اسم الموديل (D.1 فارغ ولا يوجد مُدخل في الكتالوج) -- يرجى التحقق منها.'
+    ));
 
     return {brand, model, brandSource, modelSource, warnings};
   }
@@ -78,14 +96,17 @@
     if(isNaN(na)||isNaN(nb)) return null;
     return na===nb;
   }
-  function resolveNumericField(label, docVal, catalogVal){
+  function resolveNumericField(field, labelDe, labelAr, docVal, catalogVal){
     docVal=str(docVal); catalogVal=str(catalogVal);
     if(!docVal && !catalogVal) return {value:'', conflict:false};
     if(!docVal) return {value:catalogVal, conflict:false};
     if(!catalogVal) return {value:docVal, conflict:false};
     if(numEq(docVal,catalogVal)===true) return {value:docVal, conflict:false};
     return {value:'', conflict:true, docVal, catalogVal,
-      warning: label+' unklar: Dokument liest "'+docVal+'", Fahrzeugkatalog (HSN/TSN) nennt "'+catalogVal+'" -- bitte im Original-Dokument prüfen und manuell eintragen.'};
+      warning: mkWarn(field,
+        labelDe+' unklar: Dokument liest "'+docVal+'", Fahrzeugkatalog (HSN/TSN) nennt "'+catalogVal+'" -- bitte im Original-Dokument prüfen und manuell eintragen.',
+        labelAr+' غير محسوم: الوثيقة تُظهر "'+docVal+'"، بينما كتالوج المركبات (HSN/TSN) يذكر "'+catalogVal+'" -- يرجى التحقق من المستند الأصلي وإدخال القيمة يدويًا.'
+      )};
   }
 
   // Some certificate templates (and some national variants) print P.2.4 as
@@ -100,14 +121,22 @@
     return {kw:m[1], rpm:m[2], derived:true};
   }
 
+  // Known EU vehicle-category codes printed in Feld J (M1/M2/M3 passenger,
+  // N1/N2/N3 goods, O1-O4 trailers, L1e-L7e powered two/three-wheelers,
+  // T1-T5/C/R/S agricultural & forestry). A value that matches none of
+  // these is flagged for review -- NOT rejected or blanked, since a real
+  // document could print a national code this list doesn't cover; this is
+  // a plausibility hint, not a hard validation.
+  const VEHICLE_CLASS_RE=/^(M[123]|N[123]|O[1234]|L[1-7]e|T[1-5]|C|R|S|G)$/i;
+
   // Maps the upstream ScanResponseDe fields onto WerkPilot's internal
   // vehicle/customer field names. Values are kept exactly as returned
   // (hsn/tsn/plate/vin are strings in the API, so leading zeros survive);
   // nothing here invents a value for a field the API returned null/empty.
-  // Collects `_derivationWarnings` for every place a value was derived
-  // (split/matched) rather than read directly from its own API field, so
-  // the caller can flag it for review instead of presenting it as a plain
-  // fact.
+  // Collects `_derivationWarnings` for every place a value was derived,
+  // conflicting, or implausible -- each a structured {field, de, ar}
+  // object (see mkWarn above) so the caller can show it, in the user's
+  // own UI language, right next to the specific field it concerns.
   function mapScan(d){
     d=d||{};
     const plate = str(d.registrationNumber) || (d.plate && str(d.plate.formatted)) || '';
@@ -118,25 +147,64 @@
     const address = [address1, address2].filter(Boolean).join(', ') || str(d.address).replace(/\n+/g,', ');
     const firstReg = str(d.ez_string) || str(d.ez);
     const year = (firstReg.match(/(19|20)\d{2}/)||[])[0] || '';
-    const hsn = str(d.hsn), tsn = str(d.tsn);
+    // HSN/TSN/VSN: per the provider's own schema, the HSN (hsn) and TSN
+    // (tsn) are each their own field, and TSN is documented as exactly the
+    // first 3 characters of Feld 2.2, with VSN as characters 4-8 of the
+    // same field -- tsn/vsn/field_2_2 are three different views of the
+    // SAME underlying key, not three independent readings that could
+    // conflict. All three are kept, each honestly labeled by what it is.
+    const hsn = str(d.hsn), tsn = str(d.tsn), vsn = str(d.vsn);
     const derivationWarnings=[];
 
     const bm=resolveBrandModel(d.d1, d.d3, d.maker, d.model);
     derivationWarnings.push(...bm.warnings);
 
     const pr=splitPowerRpm(d.p2_p4);
-    if(pr.derived) derivationWarnings.push('Leistung aus "'+str(d.p2_p4)+'" aufgeteilt in '+pr.kw+' kW und Nenndrehzahl '+pr.rpm+' U/min -- bitte prüfen.');
+    if(pr.derived) derivationWarnings.push(mkWarn(['engine_power_kw','engine_rated_rpm'],
+      'Leistung aus "'+str(d.p2_p4)+'" aufgeteilt in '+pr.kw+' kW und Nenndrehzahl '+pr.rpm+' U/min -- bitte prüfen.',
+      'القدرة اشتُقت من "'+str(d.p2_p4)+'" وقُسّمت إلى '+pr.kw+' kW وسرعة دوران اسمية '+pr.rpm+' U/min -- يرجى التحقق.'
+    ));
     // Cross-check the (possibly just-split) kW against the catalog's own
     // power_kw -- same conflict-or-confirm treatment as Hubraum below.
-    const kwCheck=resolveNumericField('Leistung (kW)', pr.kw, d.power_kw);
+    const kwCheck=resolveNumericField('engine_power_kw', 'Leistung (kW)', 'القدرة (kW)', pr.kw, d.power_kw);
     if(kwCheck.conflict) derivationWarnings.push(kwCheck.warning);
 
-    if(year) derivationWarnings.push('Baujahr '+year+' wurde aus der Erstzulassung ('+firstReg+') abgeleitet, nicht bestätigt -- Erstzulassung ist nicht zwingend das Herstellungsjahr.');
+    if(year) derivationWarnings.push(mkWarn('year',
+      'Baujahr '+year+' wurde aus der Erstzulassung ('+firstReg+') abgeleitet, nicht bestätigt -- Erstzulassung ist nicht zwingend das Herstellungsjahr.',
+      'سنة التصنيع '+year+' مُستَنتَجة من تاريخ أول تسجيل ('+firstReg+') وغير مؤكدة -- تاريخ أول التسجيل ليس بالضرورة سنة التصنيع الفعلية.'
+    ));
 
     // Hubraum: p1 is read from THIS document; ccm is looked up from the
     // KBA catalog by HSN/TSN. Never silently prefer either on conflict.
-    const ccmCheck=resolveNumericField('Hubraum (cm³)', d.p1, d.ccm);
+    const ccmCheck=resolveNumericField('engine_displacement_cm3', 'Hubraum (cm³)', 'سعة المحرك (سم³)', d.p1, d.ccm);
     if(ccmCheck.conflict) derivationWarnings.push(ccmCheck.warning);
+
+    // Leermasse (G) vs zulässige Gesamtmasse (F.1): a vehicle's empty/curb
+    // weight can NEVER legally or physically exceed its permissible gross
+    // weight -- this holds for every vehicle, so it is safe to check
+    // generally. F.1 has no catalog twin (it's read only from the
+    // document), so this is a plausibility check, not a same-concept
+    // conflict like Hubraum/Leistung above: the raw G value is kept
+    // exactly as returned (for diagnosis against the real document) and
+    // is never derived/guessed from part of the digits -- only flagged.
+    const f1Num=parseFloat(str(d.f1).replace(',','.'));
+    const gNum=parseFloat(str(d.g).replace(',','.'));
+    if(!isNaN(f1Num) && !isNaN(gNum) && gNum>f1Num){
+      derivationWarnings.push(mkWarn('unladenWeight',
+        'Leermasse (G) "'+str(d.g)+'" kg ist größer als die zulässige Gesamtmasse (F.1) "'+str(d.f1)+'" kg -- technisch nicht möglich, der Wert ist wahrscheinlich fehlerhaft erkannt. Bitte im Original-Dokument prüfen; der Rohwert wird zur Diagnose angezeigt, aber nicht als gültiges Gewicht übernommen.',
+        'الكتلة الفارغة (G) "'+str(d.g)+'" كغم أكبر من الكتلة الإجمالية المسموحة (F.1) "'+str(d.f1)+'" كغم -- هذا غير ممكن تقنيًا، على الأرجح أن القيمة قُرئت بشكل خاطئ من المزوّد. يرجى التحقق من المستند الأصلي؛ القيمة الخام مُعروضة للتشخيص فقط ولا تُعتمد كوزن صالح.'
+      ));
+    }
+
+    // Fahrzeugklasse (J): flag an unrecognized code for review without
+    // blocking or altering it -- some national documents may print a code
+    // outside the common EU list above.
+    if(str(d.j) && !isBlankish(d.j) && !VEHICLE_CLASS_RE.test(str(d.j))){
+      derivationWarnings.push(mkWarn('vehicleClass',
+        'Fahrzeugklasse "'+str(d.j)+'" entspricht keinem bekannten EU-Klassencode (z. B. M1, N1, L3e) -- bitte mit dem Fahrzeugschein abgleichen.',
+        'فئة المركبة "'+str(d.j)+'" لا تطابق أي رمز فئة أوروبي معروف (مثل M1، N1، L3e) -- يرجى مطابقتها مع رخصة السيارة.'
+      ));
+    }
 
     return {
       license_plate: plate, plate,
@@ -152,7 +220,7 @@
       engine_rated_rpm: pr.rpm,
       fuel_type: str(d.p3),
       color: str(d.r), paint: str(d.r),
-      hsn, tsn, kba: (hsn && tsn) ? (hsn+' '+tsn) : '',
+      hsn, tsn, vsn, kba: (hsn && tsn) ? (hsn+' '+tsn) : '',
       // F.1 (technisch zulässige Gesamtmasse) and F.2 (zulässige Gesamtmasse
       // im Zulassungsstaat) are two DIFFERENT certificate fields, not two
       // sources for the same fact -- they must never be merged/OR'd, so
@@ -185,11 +253,26 @@
   function buildWarnings(d, derivationWarnings){
     d=d||{};
     const w=(derivationWarnings||[]).slice();
-    if(d.vin && d.vin_valid===false) w.push('VIN-Prüfziffer unsicher'+(d.vin_validation_msg?(': '+d.vin_validation_msg):''));
-    if(d.hsn && d.hsn_valid===false) w.push('HSN passt nicht zum Fahrzeugkatalog'+(d.hsn_validation_msg?(': '+d.hsn_validation_msg):''));
-    if(d.tsn && d.tsn_valid===false) w.push('TSN passt nicht zum Fahrzeugkatalog'+(d.tsn_validation_msg?(': '+d.tsn_validation_msg):''));
-    if(d.plate && d.plate.valid===false) w.push('Kennzeichenformat nicht sicher erkannt');
-    if(d.field_22_continued) w.push('Feld 22 wird auf einem Beiblatt fortgesetzt (nicht mitgescannt)');
+    if(d.vin && d.vin_valid===false) w.push(mkWarn('vin',
+      'VIN-Prüfziffer unsicher'+(d.vin_validation_msg?(': '+d.vin_validation_msg):''),
+      'رقم تحقق الهيكل (VIN) غير مؤكد'+(d.vin_validation_msg?(': '+d.vin_validation_msg):'')
+    ));
+    if(d.hsn && d.hsn_valid===false) w.push(mkWarn('hsn',
+      'HSN passt nicht zum Fahrzeugkatalog'+(d.hsn_validation_msg?(': '+d.hsn_validation_msg):''),
+      'HSN لا يطابق كتالوج المركبات'+(d.hsn_validation_msg?(': '+d.hsn_validation_msg):'')
+    ));
+    if(d.tsn && d.tsn_valid===false) w.push(mkWarn('tsn',
+      'TSN passt nicht zum Fahrzeugkatalog'+(d.tsn_validation_msg?(': '+d.tsn_validation_msg):''),
+      'TSN لا يطابق كتالوج المركبات'+(d.tsn_validation_msg?(': '+d.tsn_validation_msg):'')
+    ));
+    if(d.plate && d.plate.valid===false) w.push(mkWarn('plate',
+      'Kennzeichenformat nicht sicher erkannt',
+      'تنسيق رقم اللوحة غير مؤكد'
+    ));
+    if(d.field_22_continued) w.push(mkWarn('specialNotes',
+      'Feld 22 wird auf einem Beiblatt fortgesetzt (nicht mitgescannt)',
+      'الحقل 22 يتواصل في صفحة إضافية (لم تُمسح)'
+    ));
     return w;
   }
 
@@ -305,5 +388,5 @@
     return mapped;
   }
 
-  W.Autosiastik={read, mapScan, buildWarnings, buildCutouts, rawTextFields, resolveBrandModel, splitPowerRpm, resolveNumericField, flattenForDisplay, isBlankish};
+  W.Autosiastik={read, mapScan, buildWarnings, buildCutouts, rawTextFields, resolveBrandModel, splitPowerRpm, resolveNumericField, flattenForDisplay, isBlankish, warnFields};
 })(window.WP=window.WP||{});
