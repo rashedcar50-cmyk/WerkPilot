@@ -661,10 +661,16 @@ async function decideLogin(cand, pass){
   const mappedEmpty=Auto.mapScan({registrationNumber:null, vin:null, hsn:null, d1:null});
   assert(mappedEmpty.license_plate==='' && mappedEmpty.vin==='' && mappedEmpty.hsn==='' && mappedEmpty.brand==='','PROOF: missing/null API fields stay empty -- autosiastik never invents a value');
 
+  // Warnings are now structured, bilingual, field-anchored objects
+  // {field, de, ar} -- never a single pre-rendered-language string -- so
+  // the caller can show each one, in the CURRENT UI language, right next
+  // to the specific field it concerns (fixes: warnings staying German
+  // inside an Arabic UI, and warnings only ever appearing in one generic
+  // top-of-screen list disconnected from the field they're about).
   const warn1=Auto.buildWarnings({vin:'X',vin_valid:false,vin_validation_msg:'Prüfziffer falsch',hsn:'0035',hsn_valid:true,plate:{valid:false}});
-  assert(warn1.some(w=>/VIN/.test(w) && /Prüfziffer falsch/.test(w)),'autosiastik surfaces the VIN validation message as a warning');
-  assert(warn1.some(w=>/Kennzeichen/.test(w)),'autosiastik warns when plate.valid is false');
-  assert(!warn1.some(w=>/HSN/.test(w)),'autosiastik does NOT warn about a field whose *_valid flag is true');
+  assert(warn1.some(w=>w.field==='vin' && /Prüfziffer falsch/.test(w.de) && typeof w.ar==='string' && w.ar.length>0),'autosiastik surfaces the VIN validation message, anchored to the vin field, with both a German and an Arabic rendering');
+  assert(warn1.some(w=>w.field==='plate'),'autosiastik warns (anchored to the plate field) when plate.valid is false');
+  assert(!warn1.some(w=>w.field==='hsn'),'autosiastik does NOT warn about a field whose *_valid flag is true');
   assert(Auto.buildWarnings({}).length===0,'autosiastik returns no warnings when nothing is flagged invalid');
 
   const cuts1=Auto.buildCutouts({document_img:'AAAA', vin_img:'BBBB'});
@@ -734,16 +740,23 @@ async function decideLogin(cand, pass){
 
   // Hubraum conflict (p1 vs ccm): the exact real-world case. Neither value
   // is blindly preferred -- the field is left blank and both are surfaced.
-  const ccmConflict=Auto.resolveNumericField('Hubraum (cm³)', '769', '1769');
-  assert(ccmConflict.conflict===true && ccmConflict.value==='', 'PROOF OF FIX: a genuine Hubraum conflict (document "769" vs catalog "1769") is surfaced for review, NOT silently resolved by picking either value');
-  assert(/769/.test(ccmConflict.warning) && /1769/.test(ccmConflict.warning), 'the conflict warning names both candidate values so a human can check the real document');
-  const ccmAgree=Auto.resolveNumericField('Hubraum (cm³)', '1769', '1769');
+  // Signature now takes the semantic field id (for anchoring the warning
+  // to a specific input) plus BOTH a German and an Arabic label, and
+  // returns a structured {field, de, ar} warning object, not a baked
+  // German string -- this is the general fix item 6 asked for, not
+  // anything specific to this one vehicle.
+  const ccmConflict=Auto.resolveNumericField('engine_displacement_cm3', 'Hubraum (cm³)', 'سعة المحرك (سم³)', '769', '1769');
+  assert(ccmConflict.conflict===true && ccmConflict.value==='', 'PROOF OF FIX: a genuine Hubraum conflict (document "769" vs catalog "1769") is surfaced for review, NOT silently resolved by picking either value -- the conflict POLICY, not a value hardcoded for this vehicle');
+  assert(ccmConflict.warning.field==='engine_displacement_cm3', 'the conflict warning is anchored to the specific field it concerns, not left floating in a generic list');
+  assert(/769/.test(ccmConflict.warning.de) && /1769/.test(ccmConflict.warning.de), 'the German rendering names both candidate values so a human can check the real document');
+  assert(/769/.test(ccmConflict.warning.ar) && /1769/.test(ccmConflict.warning.ar), 'the Arabic rendering also names both candidate values -- warnings are never German-only');
+  const ccmAgree=Auto.resolveNumericField('engine_displacement_cm3', 'Hubraum (cm³)', 'سعة المحرك (سم³)', '1769', '1769');
   assert(ccmAgree.conflict===false && ccmAgree.value==='1769', 'when document and catalog agree, the value is used with no conflict noise');
-  const ccmOnlyCatalog=Auto.resolveNumericField('Hubraum (cm³)', '', '1769');
+  const ccmOnlyCatalog=Auto.resolveNumericField('engine_displacement_cm3', 'Hubraum (cm³)', 'سعة المحرك (سم³)', '', '1769');
   assert(ccmOnlyCatalog.conflict===false && ccmOnlyCatalog.value==='1769', 'when only the catalog has a value (document field unread), it is used -- nothing to conflict with');
-  const ccmOnlyDoc=Auto.resolveNumericField('Hubraum (cm³)', '1769', '');
+  const ccmOnlyDoc=Auto.resolveNumericField('engine_displacement_cm3', 'Hubraum (cm³)', 'سعة المحرك (سم³)', '1769', '');
   assert(ccmOnlyDoc.conflict===false && ccmOnlyDoc.value==='1769', 'when only the document has a value, it is used');
-  assert(Auto.resolveNumericField('x','','').conflict===false && Auto.resolveNumericField('x','','').value==='', 'no conflict and no invented value when both sources are empty');
+  assert(Auto.resolveNumericField('x','x','x','','').conflict===false && Auto.resolveNumericField('x','x','x','','').value==='', 'no conflict and no invented value when both sources are empty');
 
   // The user's exact real raw payload (as read from the live "Rohdaten"
   // panel), minus personal fields -- end-to-end through mapScan(). Extended
@@ -755,22 +768,47 @@ async function decideLogin(cand, pass){
   const realNissanRaw={
     d1:'-', d3:'NISSAN ALMERA', maker:'Nissan', model:'Nissan ALMERA FLH 1.8',
     p1:'769', ccm:'1769', p2_p4:'85/5600', power_kw:'85',
-    hsn:'3144', tsn:'031', vin:'SJNFBAN16U0504041', registrationNumber:'RZ AA4763',
+    hsn:'3144', tsn:'031', vsn:'00000-', vin:'SJNFBAN16U0504041', registrationNumber:'RZ AA4763',
     ez_string:'19.05.2004',
     plate:{raw:'RZ AA4763', district_code:'RZ', letters:'AA', digits:4763, formatted:'RZ-AA 4763', compact:'RZAA4763', valid:true},
     hu:'10.2026', field_2_2:'03100000-', field_3:'7',
     d2_1:'N16', d2_2:'-', d2_3:'-', d2_4:null,
     field_14:'EURO 3', field_14_1:'0444', field_22:'ZU 151152AFELGE 15X6J16JJ7',
-    f1:'1735', f2:'1735', g:'2531348', s1:'5', r:'Blau',
+    f1:'1735', f2:'1735', g:'2531348', s1:'5', r:'Blau', j:'01',
     field_15_1:'185/65R15 83S', field_15_2:'185/65R15 83S', field_6:'-'
   };
   const realNissanScan=Auto.mapScan(realNissanRaw);
   assert(realNissanScan.brand==='Nissan', 'PROOF OF FIX: brand resolves to the catalog maker field ("Nissan") for the real reported case, instead of the old text-derivation path');
   assert(realNissanScan.model==='ALMERA', 'model keeps the document\'s own, more specific D.3 text with the brand prefix stripped');
   assert(realNissanScan.engine_displacement_cm3==='', 'PROOF OF FIX: Hubraum is left BLANK (not "769") because the document (769) and catalog (1769) genuinely conflict -- exactly the real bug report');
-  assert(realNissanScan._derivationWarnings.some(w=>/Fahrzeugkatalog/.test(w) && /Marke/.test(w)), 'a warning explains the brand came from the catalog, not the document');
-  assert(realNissanScan._derivationWarnings.some(w=>/Hubraum/.test(w) && /769/.test(w) && /1769/.test(w)), 'a warning names both the document and catalog Hubraum values for manual review');
+  assert(realNissanScan._derivationWarnings.some(w=>w.field==='make' && /Fahrzeugkatalog/.test(w.de) && /Marke/.test(w.de) && /كتالوج/.test(w.ar)), 'a bilingual warning, anchored to the make field, explains the brand came from the catalog, not the document');
+  const ccmW=realNissanScan._derivationWarnings.find(w=>w.field==='engine_displacement_cm3');
+  assert(!!ccmW && /769/.test(ccmW.de) && /1769/.test(ccmW.de) && /769/.test(ccmW.ar) && /1769/.test(ccmW.ar), 'a bilingual warning, anchored to the Hubraum field, names both the document and catalog values for manual review');
   assert(realNissanScan.engine_power_kw==='85' && realNissanScan.engine_rated_rpm==='5600', 'Leistung/Drehzahl split still works and agrees with the catalog power_kw (no conflict in this real case)');
+  // --- Item 2 fix: G (Leermasse) vs F.1 (zul. Gesamtmasse) plausibility.
+  // This document's G (2531348 kg) is wildly larger than its own F.1
+  // (1735 kg) -- physically impossible (curb weight can never exceed
+  // permissible gross weight for ANY vehicle), so this is a GENERAL,
+  // vehicle-agnostic check, not a value hardcoded for this one VIN/plate.
+  // Root cause confirmed by inspecting the raw payload directly: `g` is
+  // used completely unmodified (str(d.g), no concatenation/derivation in
+  // our code) -- so the implausible value originates at the provider,
+  // not from a bug in our field selection or text-merging.
+  assert(realNissanScan.unladenWeight==='2531348', 'PROOF: the raw G value is preserved EXACTLY for diagnosis -- never truncated/guessed from part of the digits');
+  const gW=realNissanScan._derivationWarnings.find(w=>w.field==='unladenWeight');
+  assert(!!gW, 'PROOF OF FIX: G being larger than F.1 now raises a warning (previously: none at all, the real reported bug)');
+  assert(/2531348/.test(gW.de) && /1735/.test(gW.de) && /2531348/.test(gW.ar) && /1735/.test(gW.ar), 'the warning names both the implausible G value and the F.1 it contradicts, in both languages');
+  // --- Item 6 fix: Fahrzeugklasse (J) validation. This document's J="01"
+  // does not match any standard EU vehicle-category code (M1, N1, L3e...)
+  // -- flagged for review, not blocked and not silently accepted as fact.
+  const classW=realNissanScan._derivationWarnings.find(w=>w.field==='vehicleClass');
+  assert(!!classW && /01/.test(classW.de) && /01/.test(classW.ar), 'PROOF OF FIX: an unrecognized vehicle-class code now raises a bilingual, field-anchored warning instead of being silently accepted');
+  // --- Item 3 fix: TSN vs VSN vs the full Feld 2.2 string are three
+  // different, well-defined things, not one ambiguous "HSN/TSN combined"
+  // field -- all three are now exposed, each under its own honest name.
+  assert(realNissanScan.tsn==='031', 'TSN is exactly the first 3 characters of Feld 2.2, per the provider\'s own schema');
+  assert(realNissanScan.vsn==='00000-', 'PROOF OF FIX: VSN (characters 4-8 of Feld 2.2) is now mapped as its own field -- previously dropped entirely');
+  assert(realNissanScan.tsnFull==='03100000-', 'the full raw Feld 2.2 string is kept separately as tsnFull, distinct from both tsn and vsn');
   // --- BASIC-package field reconfiguration (2026-11-12): this document's
   // seats/color were NOT returned by the account's prior field settings;
   // the user's instruction was explicit NOT to assume they remain
@@ -804,11 +842,26 @@ async function decideLogin(cand, pass){
   assert(nissanScan.engine_power_kw==='85' && nissanScan.engine_rated_rpm==='5600', 'mapScan applies the power/RPM split end-to-end, keeping both values (neither is silently dropped)');
   assert(nissanScan.engine_displacement_cm3==='1769', 'with no conflicting catalog ccm, mapScan preserves Hubraum exactly as the document/provider returned it (1769)');
   assert(nissanScan.maxWeight==='1735' && nissanScan.seats==='5', 'mapScan still passes through f1/s1 when the provider actually returns them -- confirms the pipeline has no bug dropping these fields');
-  assert(nissanScan._derivationWarnings.some(w=>/Marke/.test(w)) && nissanScan._derivationWarnings.some(w=>/Leistung/.test(w)) && nissanScan._derivationWarnings.some(w=>/Baujahr/.test(w)), 'every derived (non-literal) value is flagged in _derivationWarnings for review, not presented as a plain confirmed fact');
+  assert(nissanScan._derivationWarnings.some(w=>w.field==='make') && nissanScan._derivationWarnings.some(w=>Array.isArray(w.field)&&w.field.includes('engine_power_kw')) && nissanScan._derivationWarnings.some(w=>w.field==='year'), 'every derived (non-literal) value is flagged in _derivationWarnings for review, not presented as a plain confirmed fact');
+  assert(nissanScan._derivationWarnings.some(w=>w.field==='vehicleClass'), 'j="01" (not a recognized EU class code) is flagged here too -- a general check, triggers for any vehicle with this value, not specific to one VIN/plate');
+  // No G at all in this fixture -- the plausibility check must not invent
+  // a warning when there is nothing to compare.
+  assert(!nissanScan._derivationWarnings.some(w=>w.field==='unladenWeight'), 'no G-vs-F.1 warning is raised when the provider sent no G value at all');
+
+  // A recognized EU vehicle-class code must never be flagged.
+  const recognizedClass=Auto.mapScan({j:'M1'});
+  assert(!recognizedClass._derivationWarnings.some(w=>w.field==='vehicleClass'), 'a recognized vehicle-class code (M1) never raises the unrecognized-class warning');
+
+  // G vs F.1: a PLAUSIBLE curb weight (less than the permissible gross
+  // weight) must never be flagged -- this is a real check, not a blanket
+  // "G is always suspicious" rule.
+  const plausibleWeight=Auto.mapScan({f1:'1800', g:'1200'});
+  assert(!plausibleWeight._derivationWarnings.some(w=>w.field==='unladenWeight'), 'a plausible Leermasse (less than F.1) never raises the implausibility warning');
+  assert(plausibleWeight.unladenWeight==='1200' && plausibleWeight.maxWeight==='1800', 'both values are still mapped through normally when they are consistent');
 
   const plainFormatScan=Auto.mapScan({d1:'VOLKSWAGEN', d3:'Golf', p2_p4:'66', ez_string:'01.01.2020'});
   assert(plainFormatScan.brand==='VOLKSWAGEN' && plainFormatScan.engine_power_kw==='66' && !plainFormatScan.engine_rated_rpm, 'a newer-style document (plain D.1 + single kW value) is handled correctly too -- same code path supports both old and new certificate formats');
-  assert(!plainFormatScan._derivationWarnings.some(w=>/Marke/.test(w)) && !plainFormatScan._derivationWarnings.some(w=>/Leistung/.test(w)), 'no derivation warning is raised for fields that were NOT derived (D.1 already present, power already a single value)');
+  assert(!plainFormatScan._derivationWarnings.some(w=>w.field==='make') && !plainFormatScan._derivationWarnings.some(w=>Array.isArray(w.field)&&w.field.includes('engine_power_kw')), 'no derivation warning is raised for fields that were NOT derived (D.1 already present, power already a single value)');
 
   // --- Nested-object fields (e.g. `plate`) must render as readable text,
   // never "[object Object]" -------------------------------------------------
@@ -1005,6 +1058,7 @@ async function decideLogin(cand, pass){
     const rawSnapshot={hu:'10.2026', d2_1:'N16', field_14:'EURO 3'};
     const form={
       owner_name:'Erweiterte Felder Kunde', license_plate:'B-EF 1', vin:'VIN-EXTENDED-FIELDS-01', brand:'NISSAN', model:'ALMERA',
+      hsn:'3144', tsn:'031', vsn:'00000-',
       nextHu:'10.2026', tsnFull:'03100000-', vinCheckDigit:'7',
       typ1:'N16', typ2:'-', typ3:'-', typ4:'',
       emissionClass:'EURO 3', emissionCode:'0444', specialNotes:'ZU 151152AFELGE 15X6J16JJ7',
@@ -1020,6 +1074,7 @@ async function decideLogin(cand, pass){
     assert(vehicle.specialNotes==='ZU 151152AFELGE 15X6J16JJ7', 'PROOF: Feld 22 reaches the saved record');
     assert(vehicle.maxWeightNational==='1735' && vehicle.unladenWeight==='2531348', 'PROOF: F.2 and G reach the saved record, each under its own key (never merged with F.1/maxWeight)');
     assert(vehicle.tireAxle1==='185/65R15 83S' && vehicle.tireAxle2==='185/65R15 83S' && vehicle.dateK==='-', 'PROOF: Feld 15.1/15.2/6 reach the saved record');
+    assert(vehicle.vsn==='00000-', 'PROOF OF FIX: VSN reaches the saved record too (new field, previously not captured anywhere)');
     assert(vehicle.ocrRaw===JSON.stringify(rawSnapshot), 'PROOF: the original raw provider response is stored on its own field (ocrRaw), kept separate from the corrected values above');
 
     // Re-saving (e.g. a manual correction with no fresh scan) must not
@@ -1029,6 +1084,28 @@ async function decideLogin(cand, pass){
     const {vehicle:vehicle2}=await sb.WP.ScheinWizard.executeSave({form:form2, vehicleDecision:{mode:'update', id:vehicle.id}, customerDecision:{mode:'existing', id:vehicle.customerId}});
     assert(vehicle2.vinCheckDigit==='9', 'the manual correction is applied');
     assert(vehicle2.ocrRaw===JSON.stringify(rawSnapshot), 'PROOF: a save with no new scan (empty ocrRaw) never erases the previously-stored original raw response');
+  }
+
+  // 6) Item 7 requirement: a manual correction made in the review step for
+  //    a field mapScan() had left BLANK due to a conflict (e.g. Hubraum)
+  //    must reach the saved record as the user's corrected value, not
+  //    revert to blank or to either of the raw conflicting candidates --
+  //    executeSave() only ever persists whatever `form` it is given, so
+  //    this proves the save layer itself never re-derives/overwrites a
+  //    field from the raw scan after the user has edited it.
+  {
+    const {sb,db}=makeSaveSandbox();
+    const form={
+      owner_name:'Korrektur Kunde', license_plate:'K-OR 1', vin:'VIN-MANUAL-CORRECTION-01', brand:'OPEL', model:'Corsa',
+      // mapScan would have left this '' (769 vs 1769 conflict) -- the user
+      // checked the physical document and typed the correct value in.
+      engine_displacement_cm3:'1769'
+    };
+    const {vehicle}=await sb.WP.ScheinWizard.executeSave({form, vehicleDecision:{mode:'create'}, customerDecision:{mode:'new'}});
+    assert(vehicle.engine_displacement_cm3==='1769', 'PROOF: a manual correction entered over a blanked conflict field is saved as the user\'s value, not reset to blank or to either raw candidate');
+    // Reopening in an independent session (fresh find) must still show it.
+    const reread=db.vehicles.find(v=>v.id===vehicle.id);
+    assert(reread.engine_displacement_cm3==='1769', 'PROOF: the corrected value survives being read back (simulates reopening the vehicle record)');
   }
 
   // --- Cloud sync: the new fields must reach Supabase, not stay
@@ -1051,7 +1128,7 @@ async function decideLogin(cand, pass){
           select(){ return Promise.resolve({data:[{
             id:777, company_id:'de', customer_id:null, plate:'B-EF 1', vin:'VIN-EXTENDED-FIELDS-01',
             make:'NISSAN', model:'ALMERA', year:'2004', engine:'', paint:'Blau', km:0, next_service_km:0, photo:'',
-            hsn:'3144', tsn:'031', kba:'3144 031', first_registration:'19.05.2004',
+            hsn:'3144', tsn:'031', vsn:'00000-', kba:'3144 031', first_registration:'19.05.2004',
             engine_displacement_cm3:'', engine_power_kw:'85', rated_rpm:'5600', fuel_type:'Benzin',
             max_weight:'1735', seats:'5', vehicle_class:'01', ocr_source:'autosiastik',
             next_hu:'10.2026', tsn_full:'03100000-', vin_check_digit:'7',
@@ -1068,7 +1145,7 @@ async function decideLogin(cand, pass){
     vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), cloudSandbox);
 
     const vForUpsert={id:'v-t1', companyId:'de', customerId:'', plate:'B-EF 1', vin:'VIN-EXTENDED-FIELDS-01', make:'NISSAN', model:'ALMERA', year:'2004', paint:'Blau',
-      hsn:'3144', tsn:'031', kba:'3144 031', firstRegistration:'19.05.2004', engine_power_kw:'85', ratedRpm:'5600', fuel_type:'Benzin',
+      hsn:'3144', tsn:'031', vsn:'00000-', kba:'3144 031', firstRegistration:'19.05.2004', engine_power_kw:'85', ratedRpm:'5600', fuel_type:'Benzin',
       maxWeight:'1735', seats:'5', vehicleClass:'01', ocrSource:'autosiastik',
       nextHu:'10.2026', tsnFull:'03100000-', vinCheckDigit:'7', typ1:'N16', typ2:'-', typ3:'-', typ4:'',
       emissionClass:'EURO 3', emissionCode:'0444', specialNotes:'ZU 151152AFELGE 15X6J16JJ7',
@@ -1084,6 +1161,7 @@ async function decideLogin(cand, pass){
     assert(row.max_weight_national==='1735' && row.unladen_weight==='2531348', 'PROOF: F.2 and G reach Supabase under their own columns, never merged with max_weight (F.1)');
     assert(row.ocr_raw===JSON.stringify({hu:'10.2026'}), 'PROOF: the original raw response is synced to its own column, separate from the corrected fields');
     assert(row.hsn==='3144' && row.engine_power_kw==='85' && row.max_weight==='1735' && row.seats==='5' && row.vehicle_class==='01', 'PROOF OF FIX (known limitation closed): the Phase-4 fields that were previously local-only (hsn/engine_power_kw/maxWeight/seats/vehicleClass) are now ALSO synced to Supabase');
+    assert(row.vsn==='00000-', 'PROOF: VSN (this phase\'s new field) is also included in the Supabase row, not just hsn/tsn');
 
     await cloudSandbox.loadVehiclesFromCloud();
     const reloaded=(cloudSandbox._merged||[])[0];
@@ -1093,6 +1171,7 @@ async function decideLogin(cand, pass){
     assert(reloaded.maxWeightNational==='1735' && reloaded.unladenWeight==='2531348', 'PROOF: F.2/G survive the round trip under their own keys');
     assert(reloaded.ocrRaw===JSON.stringify({hu:'10.2026'}), 'PROOF: the original raw response survives the round trip too, still separate from the corrected fields');
     assert(reloaded.seats==='5' && reloaded.vehicleClass==='01' && reloaded.maxWeight==='1735', 'PROOF: the previously local-only Phase-4 fields now also survive a cloud round trip');
+    assert(reloaded.vsn==='00000-', 'PROOF: VSN survives the save -> cloud -> reload round trip too');
   }
 
   // --- Static check: every scan entry point goes through the SAME wizard,
@@ -1119,7 +1198,7 @@ async function decideLogin(cand, pass){
   // are all visible and correctable before matching/saving, not silently
   // missing from the form entirely. ------------------------------------
   const wizardSrc=fs.readFileSync(path.join(root,'js/schein-wizard.js'),'utf8');
-  ["'w_rpm'","'w_weight'","'w_seats'","'w_firstreg'","'w_year'","'w_hsn'","'w_tsn'","'w_cc'","'w_kw'","'w_fuel'","'w_color'","'w_class'",
+  ["'w_rpm'","'w_weight'","'w_seats'","'w_firstreg'","'w_year'","'w_hsn'","'w_tsn'","'w_vsn'","'w_cc'","'w_kw'","'w_fuel'","'w_color'","'w_class'",
    "'w_hu'","'w_tsnfull'","'w_vincheck'","'w_typ1'","'w_typ2'","'w_typ3'","'w_typ4'","'w_emclass'","'w_emcode'","'w_notes'","'w_weightnat'","'w_unladen'","'w_tire1'","'w_tire2'","'w_datek'"].forEach(k=>{
     assert(wizardSrc.includes(k), `the wizard's review step has an editable field for ${k} -- it must be correctable, not just displayed read-only`);
   });
@@ -1128,14 +1207,44 @@ async function decideLogin(cand, pass){
   // power/kW must stay separate from RPM, and firstRegistration separate
   // from year -- all already true structurally, this guards against a
   // future regression merging them back together.
-  assert(/maxWeight\s*:\s*str\(d\.f1\)\s*,/.test(fs.readFileSync(path.join(root,'js/autosiastik.js'),'utf8')), 'PROOF: maxWeight (F.1) is mapped alone, no longer OR\'d with F.2 -- the two certificate fields are kept separate');
+  const autoSrcStatic=fs.readFileSync(path.join(root,'js/autosiastik.js'),'utf8');
+  assert(/maxWeight\s*:\s*str\(d\.f1\)\s*,/.test(autoSrcStatic), 'PROOF: maxWeight (F.1) is mapped alone, no longer OR\'d with F.2 -- the two certificate fields are kept separate');
 
   // --- renderReview()/collectForm()/executeSave() must carry the new
   // fields end-to-end (form -> saved vehicle record), not just display
   // them in a diagnostic panel.
-  ['nextHu','tsnFull','vinCheckDigit','typ1','typ2','typ3','typ4','emissionClass','emissionCode','specialNotes','maxWeightNational','unladenWeight','tireAxle1','tireAxle2','dateK','ocrRaw'].forEach(k=>{
+  ['nextHu','tsnFull','vinCheckDigit','typ1','typ2','typ3','typ4','emissionClass','emissionCode','specialNotes','maxWeightNational','unladenWeight','tireAxle1','tireAxle2','dateK','ocrRaw','vsn'].forEach(k=>{
     assert(wizardSrc.includes(k+':'), `collectForm()/executeSave() carries ${k} from the review form into the saved record`);
   });
+
+  // --- Item 3 fix (regression guard): the old field mislabeled "HSN/TSN
+  // zusammen" (shown "031" under a label implying HSN+TSN combined, when
+  // it was really just the TSN value alone) must be completely gone --
+  // not just unused -- and TSN/VSN must be two separate, honestly-named
+  // fields instead.
+  assert(!/HSN\/TSN zusammen|HSN\/TSN معًا/.test(wizardSrc), 'PROOF OF FIX: the mislabeled "HSN/TSN combined" field (which actually only ever showed the bare TSN) no longer exists anywhere in the wizard');
+  assert(/de:'TSN', ar:'TSN'/.test(wizardSrc) && /de:'VSN', ar:'VSN'/.test(wizardSrc), 'TSN and VSN are now two separate, correctly-labeled fields (TSN = first 3 chars of Feld 2.2, VSN = chars 4-8), not one ambiguous combined field');
+
+  // --- Item 6 fix: warnings must be shown NEAR their field, in the
+  // CURRENT UI language -- not a single hardcoded-German list at the top.
+  assert(/function warningsForKey/.test(wizardSrc), 'the wizard resolves warnings per field key, localized at render time');
+  assert(/lang==='ar' \? w\.ar : w\.de/.test(wizardSrc), 'PROOF OF FIX: warning text is picked in the CURRENT UI language (w.ar for Arabic, w.de for German) -- never a single hardcoded language regardless of the UI');
+  assert(/warnings:warningsForKey\(ai, f\.key\)/.test(wizardSrc), 'every rendered field looks up and displays its own warnings inline, next to that specific input');
+
+  // --- Item 3 fix: technical/code values must render LTR even inside an
+  // Arabic (RTL) page, so neutral characters like "-" are never visually
+  // reordered (the exact reported bug: Feld 2.2 "03100000-" appearing
+  // reversed in the Arabic UI).
+  assert(/dir="ltr" class="field-ltr"/.test(wizardSrc), 'PROOF OF FIX: code/numeric fields force LTR rendering regardless of the page\'s own RTL direction');
+  const cssSrcStatic=fs.readFileSync(path.join(root,'css/app.css'),'utf8');
+  assert(/\.field-ltr\{direction:ltr!important;unicode-bidi:isolate/.test(cssSrcStatic), 'the .field-ltr class actually forces LTR + bidi isolation in CSS, matching the attribute the wizard applies');
+
+  // --- Item 1/2/6 fix: the Leermasse (G) vs zul. Gesamtmasse (F.1)
+  // plausibility check and the Fahrzeugklasse (J) code check both exist,
+  // generally (not keyed to any specific plate/VIN).
+  assert(/gNum>f1Num/.test(autoSrcStatic), 'PROOF OF FIX: a general G-vs-F.1 plausibility check now exists (previously: none at all)');
+  assert(!/RZ[- ]?AA ?4763|SJNFBAN16U0504041/.test(autoSrcStatic), 'PROOF: the G-vs-F.1 and vehicle-class checks are NOT keyed to this specific plate/VIN anywhere in js/autosiastik.js -- only test fixtures reference the real case');
+  assert(/VEHICLE_CLASS_RE/.test(autoSrcStatic), 'PROOF OF FIX: Fahrzeugklasse (J) is now validated against known EU category codes, generally');
 
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');

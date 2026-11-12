@@ -108,6 +108,7 @@ th{background:#efebe3;position:sticky;top:0}
 .okbox{background:#e7f6ec;border:1px solid #9dcfb0;color:#14532d;border-radius:12px;padding:10px 12px;margin:8px 0}
 .ocr-warnings{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column;gap:4px}
 .ocr-warn{background:#fdf1e2;border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:6px 10px;font-size:.85rem}
+.ocr-warn-inline{margin-top:4px;padding:4px 8px;font-size:.78rem}
 .ocr-cutouts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .ocr-cutout{max-width:140px;max-height:60px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff}
 .ocr-source{font-weight:800;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.95rem}
@@ -125,6 +126,7 @@ th{background:#efebe3;position:sticky;top:0}
 .ocr-raw-text{white-space:pre-wrap;font-size:.8rem;max-height:220px;overflow:auto;margin:6px 0 0}
 .field-code{color:var(--muted);font-weight:700;font-size:.8em}
 .field-unit{color:var(--muted);font-weight:400;font-size:.9em}
+.field-ltr{direction:ltr!important;unicode-bidi:isolate;text-align:left;font-family:ui-sans-serif,system-ui,"Segoe UI",Arial,sans-serif}
 .form-grid-details{margin:8px 0;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
 .form-grid-details summary{cursor:pointer;font-weight:700;color:var(--muted)}
 .form-grid-details .form-grid{padding-bottom:8px;margin-top:8px}

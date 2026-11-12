@@ -204,6 +204,7 @@ function vehicleModal(prefill={}){
  <details class="form-grid-details"><summary>${t('scheinExtraFields')}</summary>
  <div class="form-grid">
  <div class="field"><label>HU</label><input id="vhu" value="${esc(prefill.nextHu||'')}" placeholder="MM.JJJJ"></div>
+ <div class="field"><label>VSN</label><input id="vvsn" value="${esc(prefill.vsn||'')}"></div>
  <div class="field"><label>Feld 2.2</label><input id="vtsnfull" value="${esc(prefill.tsnFull||'')}"></div>
  <div class="field"><label>Feld 3</label><input id="vvincheck" value="${esc(prefill.vinCheckDigit||'')}"></div>
  <div class="field"><label>D.2.1</label><input id="vtyp1" value="${esc(prefill.typ1||'')}"></div>
@@ -222,7 +223,7 @@ function vehicleModal(prefill={}){
  </details>`,()=>{
   if(!$('#cu').value)return toast(t('pickCustomerFirst'));
   const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),firstRegistration:$('#firstreg')?.value.trim()||'',year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ratedRpm:$('#vrpm')?.value||'',maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||'',
-   nextHu:$('#vhu')?.value.trim()||'',tsnFull:$('#vtsnfull')?.value.trim()||'',vinCheckDigit:$('#vvincheck')?.value.trim()||'',
+   nextHu:$('#vhu')?.value.trim()||'',vsn:$('#vvsn')?.value.trim().toUpperCase()||'',tsnFull:$('#vtsnfull')?.value.trim()||'',vinCheckDigit:$('#vvincheck')?.value.trim()||'',
    typ1:$('#vtyp1')?.value.trim()||'',typ2:$('#vtyp2')?.value.trim()||'',typ3:$('#vtyp3')?.value.trim()||'',typ4:$('#vtyp4')?.value.trim()||'',
    emissionClass:$('#vemclass')?.value.trim()||'',emissionCode:$('#vemcode')?.value.trim()||'',
    specialNotes:$('#vnotes')?.value.trim()||'',maxWeightNational:$('#vweightnat')?.value||'',unladenWeight:$('#vunladen')?.value||'',
@@ -250,7 +251,7 @@ async function scheinFileToCustomerVehicle(file){
   const form={
     owner_name:clean.owner_name||clean.holder||'', address:clean.address||'',
     license_plate:clean.license_plate||clean.plate||'', vin:(clean.vin||'').toUpperCase(),
-    hsn:clean.hsn||'', tsn:clean.tsn||'', brand:clean.brand||clean.make||'', model:clean.model||'',
+    hsn:clean.hsn||'', tsn:clean.tsn||'', vsn:clean.vsn||'', brand:clean.brand||clean.make||'', model:clean.model||'',
     first_registration:clean.first_registration||'', year:clean.year||'',
     engine_displacement_cm3:clean.engine_displacement_cm3||'', engine_power_kw:clean.engine_power_kw||'',
     engine_rated_rpm:clean.engine_rated_rpm||'', fuel_type:clean.fuel_type||'', maxWeight:clean.maxWeight||'',

@@ -201,3 +201,11 @@ alter table vehicles add column if not exists date_k text;
 -- existing jobs/parts/photos columns' convention in this schema.
 alter table vehicles add column if not exists ocr_raw text;
 
+-- ===== v4: VSN (Feld 2.2, Zeichen 4-8) -- found missing during the
+-- Fahrzeugschein read-path bugfix pass (2026-11-12). Per the provider's
+-- own schema, TSN is exactly the first 3 characters of Feld 2.2 and VSN
+-- is characters 4-8 of the SAME field -- both are kept, each honestly
+-- labeled, instead of only TSN being exposed and the rest of Feld 2.2
+-- only visible as one undifferentiated raw string.
+alter table vehicles add column if not exists vsn text;
+

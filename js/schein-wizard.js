@@ -16,10 +16,17 @@
     const codeHtml=opts.code?`<span class="field-code">${esc_(opts.code)}</span> `:'';
     const unitHtml=opts.unit?` <span class="field-unit">(${esc_(opts.unit)})</span>`:'';
     const fullLabel=codeHtml+esc_(label)+unitHtml;
+    // Technical/code values (VIN, HSN/TSN, plate, dates, numbers...) are
+    // always Latin-script -- force LTR + bidi isolation so they render
+    // correctly inside an Arabic (RTL) page instead of having neutral
+    // characters like "-" visually reordered by the page's own direction
+    // (the exact bug reported: Feld 2.2 "03100000-" appearing reversed).
+    const ltrAttr=opts.ltr?' dir="ltr" class="field-ltr"':'';
     const control=opts.textarea
-      ? `<textarea id="${id}" rows="2"${ph}>${esc_(value||'')}</textarea>`
-      : `<input id="${id}" value="${esc_(value||'')}"${ph}>`;
-    return `<div class="${cls}"><label>${fullLabel}</label>${control}</div>`;
+      ? `<textarea id="${id}" rows="2"${ph}${ltrAttr}>${esc_(value||'')}</textarea>`
+      : `<input id="${id}" value="${esc_(value||'')}"${ph}${ltrAttr}>`;
+    const warn=(opts.warnings||[]).map(w=>`<div class="ocr-warn ocr-warn-inline">⚠️ ${esc_(w)}</div>`).join('');
+    return `<div class="${cls}"><label>${fullLabel}</label>${control}${warn}</div>`;
   }
 
   // Current UI language -- same convention used throughout the app
@@ -38,50 +45,82 @@
     const mw=L_('manuell eintragen','أدخل يدويًا');
     return [
       { titleDe:'Fahrzeugdaten – Seite 1', titleAr:'بيانات المركبة – الصفحة 1', fields:[
-        {id:'w_plate', code:'A', de:'Kennzeichen', ar:'رقم اللوحة', value: ai.license_plate||ai.plate||''},
-        {id:'w_hu', code:'HU', de:'Nächste Hauptuntersuchung (HU)', ar:'تاريخ الفحص الفني القادم (HU)', value: ai.nextHu||''}
+        {id:'w_plate', key:'plate', code:'A', de:'Kennzeichen', ar:'رقم اللوحة', value: ai.license_plate||ai.plate||'', ltr:true},
+        {id:'w_hu', code:'HU', de:'Nächste Hauptuntersuchung (HU)', ar:'تاريخ الفحص الفني القادم (HU)', value: ai.nextHu||'', ltr:true}
       ]},
       { titleDe:'Fahrzeugdaten – Seite 2', titleAr:'بيانات المركبة – الصفحة 2', fields:[
-        {id:'w_firstreg', code:'B', de:'Erstzulassung', ar:'تاريخ أول تسجيل', value: ai.first_registration||''},
-        {id:'w_hsn', code:'2.1', de:'HSN', ar:'HSN', value: ai.hsn||''},
-        {id:'w_tsnfull', code:'2.2', de:'Schlüsselnummer (Feld 2.2)', ar:'رمز المفتاح (الحقل 2.2)', value: ai.tsnFull||''},
-        {id:'w_vin', code:'E', de:'FIN / VIN', ar:'رقم الهيكل (VIN)', value: ai.vin||''},
-        {id:'w_class', code:'J', de:'Fahrzeugklasse', ar:'فئة المركبة', value: ai.vehicleClass||''},
-        {id:'w_vincheck', code:'3', de:'Prüfziffer zur VIN', ar:'رقم تحقق الهيكل (VIN)', value: ai.vinCheckDigit||''},
-        {id:'w_make', code:'D.1', de:'Marke', ar:'الماركة', value: ai.brand||ai.make||''},
-        {id:'w_typ1', code:'D.2.1', de:'Typ/Variante/Version', ar:'الطراز/المتغير/الإصدار', value: ai.typ1||''},
-        {id:'w_typ2', code:'D.2.2', de:'Typ/Variante/Version', ar:'الطراز/المتغير/الإصدار', value: ai.typ2||''},
-        {id:'w_typ3', code:'D.2.3', de:'Typ/Variante/Version', ar:'الطراز/المتغير/الإصدار', value: ai.typ3||''},
-        {id:'w_typ4', code:'D.2.4', de:'Typ/Variante/Version', ar:'الطراز/المتغير/الإصدار', value: ai.typ4||''},
+        {id:'w_firstreg', code:'B', de:'Erstzulassung', ar:'تاريخ أول تسجيل', value: ai.first_registration||'', ltr:true},
+        {id:'w_year', key:'year', code:'', de:'Baujahr (abgeleitet aus B, nicht bestätigt)', ar:'سنة التصنيع (مُستَنتَجة من B، غير مؤكدة)', value: ai.year||'', ltr:true},
+        {id:'w_hsn', key:'hsn', code:'2.1', de:'HSN', ar:'HSN', value: ai.hsn||'', ltr:true},
+        {id:'w_tsn', key:'tsn', code:'2.2 (1-3)', de:'TSN', ar:'TSN', value: ai.tsn||'', ltr:true},
+        {id:'w_vsn', code:'2.2 (4-8)', de:'VSN', ar:'VSN', value: ai.vsn||'', ltr:true},
+        {id:'w_tsnfull', code:'2.2', de:'Feld 2.2 komplett (HSN-Schlüssel + VSN)', ar:'الحقل 2.2 كاملًا (رمز HSN + VSN)', value: ai.tsnFull||'', ltr:true},
+        {id:'w_vin', key:'vin', code:'E', de:'FIN / VIN', ar:'رقم الهيكل (VIN)', value: ai.vin||'', ltr:true},
+        {id:'w_class', key:'vehicleClass', code:'J', de:'Fahrzeugklasse', ar:'فئة المركبة', value: ai.vehicleClass||'', ltr:true},
+        {id:'w_vincheck', code:'3', de:'Prüfziffer zur VIN', ar:'رقم تحقق الهيكل (VIN)', value: ai.vinCheckDigit||'', ltr:true},
+        {id:'w_make', key:'make', code:'D.1', de:'Marke', ar:'الماركة', value: ai.brand||ai.make||''},
+        {id:'w_typ1', code:'D.2.1', de:'Typ/Variante/Version', ar:'الطراز/المتغير/الإصدار', value: ai.typ1||'', ltr:true},
+        {id:'w_typ2', code:'D.2.2', de:'Typ/Variante/Version', ar:'الطراز/المتغير/الإصدار', value: ai.typ2||'', ltr:true},
+        {id:'w_typ3', code:'D.2.3', de:'Typ/Variante/Version', ar:'الطراز/المتغير/الإصدار', value: ai.typ3||'', ltr:true},
+        {id:'w_typ4', code:'D.2.4', de:'Typ/Variante/Version', ar:'الطراز/المتغير/الإصدار', value: ai.typ4||'', ltr:true},
         {id:'w_model', code:'D.3', de:'Modell', ar:'الموديل', value: ai.model||''},
-        {id:'w_cc', code:'P.1', de:'Hubraum', ar:'سعة المحرك', unit:'cm³', value: ai.engine_displacement_cm3||''},
+        {id:'w_cc', key:'engine_displacement_cm3', code:'P.1', de:'Hubraum', ar:'سعة المحرك', unit:'cm³', value: ai.engine_displacement_cm3||'', ltr:true},
         {id:'w_fuel', code:'P.3', de:'Kraftstoff', ar:'نوع الوقود', value: ai.fuel_type||''},
-        {id:'w_emclass', code:'14', de:'Nationale Emissionsklasse', ar:'فئة الانبعاثات الوطنية', value: ai.emissionClass||''},
-        {id:'w_emcode', code:'14.1', de:'Code zu V.9/P.9', ar:'رمز متعلق بـ V.9/P.9', value: ai.emissionCode||''},
-        {id:'w_notes', code:'22', de:'Sondereintragungen', ar:'ملاحظات / قيود خاصة', value: ai.specialNotes||'', wide:true, textarea:true}
+        {id:'w_emclass', code:'14', de:'Nationale Emissionsklasse', ar:'فئة الانبعاثات الوطنية', value: ai.emissionClass||'', ltr:true},
+        {id:'w_emcode', code:'14.1', de:'Code zu V.9/P.9', ar:'رمز متعلق بـ V.9/P.9', value: ai.emissionCode||'', ltr:true},
+        {id:'w_notes', key:'specialNotes', code:'22', de:'Sondereintragungen', ar:'ملاحظات / قيود خاصة', value: ai.specialNotes||'', wide:true, textarea:true, ltr:true}
       ]},
       { titleDe:'Fahrzeugdaten – Seite 3', titleAr:'بيانات المركبة – الصفحة 3', fields:[
-        {id:'w_kw', code:'P.2', de:'Leistung', ar:'القدرة', unit:'kW', value: ai.engine_power_kw||''},
-        {id:'w_rpm', code:'P.4', de:'Nenndrehzahl', ar:'سرعة الدوران الاسمية', unit:'U/min', value: ai.engine_rated_rpm||''},
-        {id:'w_weight', code:'F.1', de:'Zul. Gesamtmasse', ar:'الكتلة الإجمالية المسموحة', unit:'kg', value: ai.maxWeight||'', placeholder:mw},
-        {id:'w_weightnat', code:'F.2', de:'Zul. Gesamtmasse im Zulassungsstaat', ar:'الكتلة الإجمالية المسموحة (دولة التسجيل)', unit:'kg', value: ai.maxWeightNational||''},
-        {id:'w_unladen', code:'G', de:'Leermasse', ar:'الكتلة الفارغة', unit:'kg', value: ai.unladenWeight||''},
-        {id:'w_seats', code:'S.1', de:'Sitze', ar:'عدد المقاعد', value: ai.seats||'', placeholder:mw},
+        {id:'w_kw', key:'engine_power_kw', code:'P.2', de:'Leistung', ar:'القدرة', unit:'kW', value: ai.engine_power_kw||'', ltr:true},
+        {id:'w_rpm', key:'engine_rated_rpm', code:'P.4', de:'Nenndrehzahl', ar:'سرعة الدوران الاسمية', unit:'U/min', value: ai.engine_rated_rpm||'', ltr:true},
+        {id:'w_weight', code:'F.1', de:'Zul. Gesamtmasse', ar:'الكتلة الإجمالية المسموحة', unit:'kg', value: ai.maxWeight||'', placeholder:mw, ltr:true},
+        {id:'w_weightnat', code:'F.2', de:'Zul. Gesamtmasse im Zulassungsstaat', ar:'الكتلة الإجمالية المسموحة (دولة التسجيل)', unit:'kg', value: ai.maxWeightNational||'', ltr:true},
+        {id:'w_unladen', key:'unladenWeight', code:'G', de:'Leermasse', ar:'الكتلة الفارغة', unit:'kg', value: ai.unladenWeight||'', ltr:true},
+        {id:'w_seats', code:'S.1', de:'Sitze', ar:'عدد المقاعد', value: ai.seats||'', placeholder:mw, ltr:true},
         {id:'w_color', code:'R', de:'Farbe', ar:'اللون', value: ai.color||ai.paint||''},
-        {id:'w_tire1', code:'15.1', de:'Bereifung Achse 1', ar:'مقاس الإطارات – المحور 1', value: ai.tireAxle1||''},
-        {id:'w_tire2', code:'15.2', de:'Bereifung Achse 2', ar:'مقاس الإطارات – المحور 2', value: ai.tireAxle2||''},
-        {id:'w_datek', code:'6', de:'Datum zu K', ar:'تاريخ متعلق بـ K', value: ai.dateK||''}
+        {id:'w_tire1', code:'15.1', de:'Bereifung Achse 1', ar:'مقاس الإطارات – المحور 1', value: ai.tireAxle1||'', ltr:true},
+        {id:'w_tire2', code:'15.2', de:'Bereifung Achse 2', ar:'مقاس الإطارات – المحور 2', value: ai.tireAxle2||'', ltr:true},
+        {id:'w_datek', code:'6', de:'Datum zu K', ar:'تاريخ متعلق بـ K', value: ai.dateK||'', ltr:true}
       ]}
     ];
   }
   function L_(de, ar){ return uiLang_()==='ar' ? ar : de; }
+
+  // Returns the localized (current UI language) text of every warning
+  // attached to a given SEMANTIC field key (the mapScan()/Autosiastik
+  // output key the warning names, e.g. 'engine_displacement_cm3' -- not
+  // the DOM input id) -- shown as a small inline note right under that
+  // field's own input, never as one generic list in whichever language
+  // happened to be hardcoded.
+  function warningsForKey(ai, key){
+    if(!key) return [];
+    const lang=uiLang_();
+    return (ai.validationWarnings||[])
+      .filter(w=> (Array.isArray(w.field)?w.field:[w.field]).includes(key))
+      .map(w=> lang==='ar' ? w.ar : w.de);
+  }
   function renderFieldGroups(ai){
     const lang=uiLang_();
     return vehicleFieldGroups(ai).map(g=>{
       const title=lang==='ar'?g.titleAr:g.titleDe;
-      const rows=g.fields.map(f=>fieldRow(f.id, lang==='ar'?f.ar:f.de, f.value, {code:f.code, unit:f.unit, wide:f.wide, textarea:f.textarea, placeholder:f.placeholder})).join('');
+      const rows=g.fields.map(f=>fieldRow(f.id, lang==='ar'?f.ar:f.de, f.value, {code:f.code, unit:f.unit, wide:f.wide, textarea:f.textarea, placeholder:f.placeholder, ltr:f.ltr, warnings:warningsForKey(ai, f.key)})).join('');
       return `<div class="field span2"><b>${esc_(title)}</b></div>${rows}`;
     }).join('');
+  }
+  // Any warning whose field key isn't attached to one of the rendered
+  // inputs above (should be rare after the fields above were wired up,
+  // but a safety net so a future new warning type is never silently
+  // dropped instead of shown somewhere) falls back to a generic list.
+  function leftoverWarningsHtml(ai){
+    const lang=uiLang_();
+    const knownKeys=new Set();
+    vehicleFieldGroups(ai).forEach(g=>g.fields.forEach(f=>{ if(f.key) knownKeys.add(f.key); }));
+    const leftovers=(ai.validationWarnings||[]).filter(w=>{
+      const fields=Array.isArray(w.field)?w.field:[w.field];
+      return !fields.some(f=>knownKeys.has(f));
+    });
+    if(!leftovers.length) return '';
+    return `<ul class="ocr-warnings">${leftovers.map(w=>`<li class="ocr-warn">⚠️ ${esc_(lang==='ar'?w.ar:w.de)}</li>`).join('')}</ul>`;
   }
 
   function sourceBadgeHtml(ai){
@@ -93,11 +132,6 @@
       html+=`<div class="ocr-warn">⚠️ ${tr('autosiastikErrPrefix','Autosiastik-Fehler (Fallback genutzt)')}: ${esc_(WP._autosiastikError)}</div>`;
     }
     return html;
-  }
-  function warningsHtml(ai){
-    const w=ai.validationWarnings||[];
-    if(!w.length) return '';
-    return `<ul class="ocr-warnings">${w.map(x=>`<li class="ocr-warn">⚠️ ${esc_(x)}</li>`).join('')}</ul>`;
   }
   function cutoutsHtml(ai){
     const c=ai.cutouts; if(!c) return '';
@@ -187,7 +221,7 @@
       const ai=state.ai||{};
       modal(tr('reviewStepTitle','Daten prüfen und korrigieren'), `
         ${sourceBadgeHtml(ai)}
-        ${warningsHtml(ai)}
+        ${leftoverWarningsHtml(ai)}
         <div class="form-grid">
           <div class="field span2"><b>${tr('ownerSectionTitle','Halter laut Fahrzeugschein (Vorschlag für den Kunden)')}</b></div>
           ${fieldRow('w_owner', tr('customer','Kunde'), ai.owner_name||ai.holder||'')}
@@ -196,8 +230,6 @@
         <div class="hint">${tr('fieldGroupHint','Gruppierung nach Seite 1/2/3 des aktuell konfigurierten Scan-Berichts -- keine grafische Nachbildung des Originaldokuments.')}</div>
         <div class="form-grid">
           ${renderFieldGroups(ai)}
-          ${fieldRow('w_year', L_('Baujahr (abgeleitet)','سنة التصنيع (مُستَنتَجة)'), ai.year||'')}
-          ${fieldRow('w_tsn', L_('HSN/TSN zusammen','HSN/TSN معًا'), ai.tsn||'')}
         </div>
         ${cutoutsHtml(ai)}
         ${rawPanelHtml(ai)}
@@ -210,7 +242,7 @@
       return {
         owner_name:v('#w_owner'), address:v('#w_addr'),
         license_plate:v('#w_plate'), vin:v('#w_vin').toUpperCase(),
-        hsn:v('#w_hsn'), tsn:v('#w_tsn'),
+        hsn:v('#w_hsn'), tsn:v('#w_tsn'), vsn:v('#w_vsn'),
         brand:v('#w_make'), model:v('#w_model'),
         first_registration:v('#w_firstreg'), year:v('#w_year'),
         engine_displacement_cm3:v('#w_cc'), engine_power_kw:v('#w_kw'), engine_rated_rpm:v('#w_rpm'),
@@ -372,7 +404,7 @@
     const fields={
       customerId: customer.id,
       plate:(form.license_plate||'').trim(), vin:vinNow,
-      hsn:(form.hsn||'').trim(), tsn:(form.tsn||'').trim().toUpperCase(),
+      hsn:(form.hsn||'').trim(), tsn:(form.tsn||'').trim().toUpperCase(), vsn:(form.vsn||'').trim().toUpperCase(),
       kba:((form.hsn||'').trim()+' '+(form.tsn||'').trim().toUpperCase()).trim(),
       make:(form.brand||'').trim(), model:(form.model||'').trim(),
       firstRegistration:(form.first_registration||'').trim(), year:(form.year||'').trim(),

@@ -179,7 +179,7 @@ async function loadVehiclesFromCloud(){
       customerId:localIdForCloudId('customers', r.customer_id), plate:r.plate||'', vin:r.vin||'',
       make:r.make||'', model:r.model||'', year:r.year||'', engine:r.engine||'',
       paint:r.paint||'', km:r.km||0, nextServiceKm:r.next_service_km||0, photo:r.photo||'',
-      hsn:r.hsn||'', tsn:r.tsn||'', kba:r.kba||'', firstRegistration:r.first_registration||'',
+      hsn:r.hsn||'', tsn:r.tsn||'', vsn:r.vsn||'', kba:r.kba||'', firstRegistration:r.first_registration||'',
       engine_displacement_cm3:r.engine_displacement_cm3||'', engine_power_kw:r.engine_power_kw||'',
       ratedRpm:r.rated_rpm||'', fuel_type:r.fuel_type||'', maxWeight:r.max_weight||'',
       seats:r.seats||'', vehicleClass:r.vehicle_class||'', ocrSource:r.ocr_source||'',
@@ -199,7 +199,7 @@ async function upsertVehicleCloud(v){
     const customerCloudId = await resolveCloudId('customers', v.customerId, upsertCustomerCloud);
     const yearNum = v.year!=null && String(v.year).trim()!=='' ? (parseInt(v.year,10)||null) : null;
     const row={company_id:v.companyId||'de',customer_id:customerCloudId,plate:v.plate||'',vin:v.vin||'',make:v.make||'',model:v.model||'',year:yearNum,engine:v.engine||'',paint:v.paint||'',km:Number(v.km||0),next_service_km:Number(v.nextServiceKm||0),photo:(v.photo&&v.photo.length<180000)?v.photo:'',
-      hsn:v.hsn||'', tsn:v.tsn||'', kba:v.kba||'', first_registration:v.firstRegistration||'',
+      hsn:v.hsn||'', tsn:v.tsn||'', vsn:v.vsn||'', kba:v.kba||'', first_registration:v.firstRegistration||'',
       engine_displacement_cm3:v.engine_displacement_cm3||'', engine_power_kw:v.engine_power_kw||'',
       rated_rpm:v.ratedRpm||'', fuel_type:v.fuel_type||'', max_weight:v.maxWeight||'',
       seats:v.seats||'', vehicle_class:v.vehicleClass||'', ocr_source:v.ocrSource||'',
