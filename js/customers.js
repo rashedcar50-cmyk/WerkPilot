@@ -1,10 +1,22 @@
 /* Customers + vehicles + Schein bind */
+// Cross-device sync bugfix (2026-11-12): a record that hasn't actually
+// reached the cloud yet (no cloudId) or is sitting on a recorded push
+// error (syncError) now shows a small, honest "pending" marker in the
+// list instead of looking identical to one that's fully synced -- the
+// exact gap that let two different devices silently diverge for days
+// with no visible sign anything was wrong.
+function syncBadge(row){
+  if(!row) return '';
+  if(row.syncError) return ` <span class="status warn" title="${esc(row.syncError)}">⏳ ${esc(t('cloudPendingTitle'))}</span>`;
+  if(!row.cloudId) return ` <span class="status warn">⏳ ${esc(t('cloudPendingTitle'))}</span>`;
+  return '';
+}
 function customers(){
  const rows=companyRows('customers');
  $('#content').innerHTML=head(t('customers'),canEdit()?`<button class="btn ok" id="scanCust">📷 ${t('scanSchein')}</button><button class="btn primary" id="add">${t('newCustomer')}</button>`:'')+
  listShareBar('customers')+
  table([t('name'),t('phone'),t('taxId'),t('address'),t('cars'),t('action')],rows.map(c=>[
-  esc(c.companyName? (c.companyName+' · '+(c.contact||c.name||'')) : (c.name||'-')),
+  esc(c.companyName? (c.companyName+' · '+(c.contact||c.name||'')) : (c.name||'-'))+syncBadge(c),
   esc(c.phone||'-'),esc(c.taxId||c.ustId||'-'),esc(c.address||'-'),
   db.vehicles.filter(v=>v.customerId===c.id).length,
   canEdit()?`<button class="btn small" onclick="editCustomer('${c.id}')">${t('edit')}</button>
@@ -153,7 +165,7 @@ function vehicles(){
  listShareBar('vehicles')+
  table([t('photo'),t('customer'),t('plate'),'VIN',t('make'),t('model'),t('year'),t('action')],rows.map(v=>[
    carThumb(v),
-   esc(customerName(v.customerId)),esc(v.plate||'-'),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
+   esc(customerName(v.customerId)),esc(v.plate||'-')+syncBadge(v),esc(v.vin||'-'),esc(v.make||'-'),esc(v.model||'-'),esc(v.year||'-'),
    canEdit()?`<button class="btn small" onclick="editVehicle('${v.id}')">${t('edit')}</button> <button class="btn small" onclick="addVehiclePhoto('${v.id}')">${t('photo')}</button>`:'—'
  ]), 'vehicles');
  if(canEdit()){

@@ -59,12 +59,37 @@
   // stays admin-only); a freshly linked account has no company access
   // until the owner provisions it (see provision-user.js) -- this only
   // creates the login identity itself.
+  //
+  // Cross-device sync bugfix (2026-11-12): the "already exists" fallback
+  // described above was only ever a comment -- signUp() on an email that
+  // already has a cloud identity just returns an error, and nothing ever
+  // tried signing in instead. In practice this meant: if a device's local
+  // password ever diverged from the cloud identity's real password (the
+  // two are only ever kept in sync by syncCloudPassword(), which itself
+  // silently no-ops if that device has no live cloud session at the
+  // moment the local password changes -- e.g. it was offline), every
+  // future login's signInCloud() would keep failing forever, with no
+  // visible error and no way to recover short of resetting the cloud
+  // password out-of-band. Re-running "link to cloud" in Settings with the
+  // CURRENT local password now also repairs exactly this case: if signUp
+  // reports the identity already exists, it retries as a normal sign-in
+  // with the same (just-typed) password -- if that succeeds, the account
+  // was already linked and working, just needed re-authenticating; if it
+  // also fails, the real problem (a genuinely different password) is
+  // returned instead of the confusing "already registered" message.
   async function linkAccountToCloud(email, password){
     const sb = client();
     if(!sb || !email) return {ok:false, skipped:true};
     try{
       const {data, error} = await sb.auth.signUp({email, password});
-      if(error) return {ok:false, error};
+      if(error){
+        if(/already registered|already been registered|user_already_exists/i.test(error.message||'')){
+          const retry = await signInCloud(email, password);
+          if(retry.ok) return {ok:true, user:retry.user, reauthenticated:true};
+          return {ok:false, error: retry.error||error};
+        }
+        return {ok:false, error};
+      }
       return {ok:true, user:data.user, needsEmailConfirm: !data.session};
     }catch(e){ return {ok:false, error:e}; }
   }

@@ -28,9 +28,23 @@ function localIdForCloudId(table, cloudId){
   const row = (db[table]||[]).find(x=>x.cloudId===n || x.cloudId===cloudId);
   return row ? row.id : '';
 }
-function markSyncOk(x){ if(x){ x.syncError=''; x.syncPending=false; } }
+// Cross-device sync bugfix (2026-11-12): a pending-sync badge that only
+// ever updates on the NEXT full page load is barely better than no
+// badge -- upsert*Cloud() calls are deliberately fire-and-forget (the UI
+// doesn't block on the network), so the badge needs to catch up once the
+// background call actually resolves. Debounced so a batch of parallel
+// retries (e.g. retryPendingCloud() resolving many records at once)
+// triggers one re-render, not one per record.
+let _syncRerenderTimer=null;
+function scheduleSyncRerender(){
+  if(typeof session==='undefined' || !session || typeof render!=='function') return;
+  if(!['customers','vehicles','dashboard'].includes(session.page)) return;
+  clearTimeout(_syncRerenderTimer);
+  _syncRerenderTimer=setTimeout(()=>{ try{ render(); }catch(e){} }, 300);
+}
+function markSyncOk(x){ if(x){ x.syncError=''; x.syncPending=false; scheduleSyncRerender(); } }
 function markSyncError(x, message){
-  if(x){ x.syncError=message||'sync failed'; x.syncPending=false; save(); }
+  if(x){ x.syncError=message||'sync failed'; x.syncPending=false; save(); scheduleSyncRerender(); }
   if(db && db.settings){ db.settings.lastSyncError={message, at:new Date().toISOString()}; }
 }
 
@@ -213,9 +227,34 @@ async function upsertVehicleCloud(v){
       const {error}=await sb.from('vehicles').update(row).eq('id',v.cloudId);
       if(error){ console.warn('upsertVehicle',error.message); markSyncError(v,error.message); } else markSyncOk(v);
     } else {
-      const {data,error}=await sb.from('vehicles').insert(row).select('id').single();
-      if(!error&&data?.id){ v.cloudId=data.id; markSyncOk(v); save(); }
-      else if(error){ console.warn('upsertVehicle',error.message); markSyncError(v,error.message); }
+      // Cross-device dedup bugfix (2026-11-12): a vehicle with no LOCAL
+      // cloudId does not mean no CLOUD row exists for it -- the exact
+      // bug found live in production: the three demo-seed vehicles
+      // (shipped identically on every fresh install, see js/core.js)
+      // ended up as six rows in the cloud, because each separate device
+      // that ever synced them had its own never-yet-set cloudId and
+      // blindly inserted its own copy. VIN is a real-world unique
+      // identifier (unlike a name), so it's safe to look an existing
+      // cloud row up by it first and adopt/update that one instead of
+      // inserting a duplicate -- this is the same natural-key principle
+      // mergeByCompany() already applies on the PULL side (js/core.js),
+      // extended here to the PUSH side where it was missing.
+      let existingId=null;
+      if(v.vin){
+        try{
+          const {data:existing}=await cloudCompanyFilter(sb.from('vehicles').select('id').eq('vin', v.vin)).limit(1).maybeSingle();
+          if(existing && existing.id) existingId=existing.id;
+        }catch(e){ console.warn('upsertVehicle vin-lookup', e); }
+      }
+      if(existingId){
+        const {error}=await sb.from('vehicles').update(row).eq('id',existingId);
+        if(error){ console.warn('upsertVehicle',error.message); markSyncError(v,error.message); }
+        else{ v.cloudId=existingId; markSyncOk(v); save(); }
+      } else {
+        const {data,error}=await sb.from('vehicles').insert(row).select('id').single();
+        if(!error&&data?.id){ v.cloudId=data.id; markSyncOk(v); save(); }
+        else if(error){ console.warn('upsertVehicle',error.message); markSyncError(v,error.message); }
+      }
     }
   }catch(e){console.warn(e); markSyncError(v,e.message)}
 }
@@ -374,26 +413,47 @@ async function loadExpensesFromCloud(){
    Fixed by retrying every record (in the current company) that has
    no cloudId yet or still carries a syncError, using the exact same
    upsert function a normal save would call, before the usual pull. */
-async function retryPendingCloud(){
-  const companyId = session && session.company && session.company.id;
-  if(!companyId) return;
-  const configs = [
+function cloudSyncTables(){
+  return [
     ['customers', upsertCustomerCloud], ['vehicles', upsertVehicleCloud],
     ['purchases', upsertPurchaseCloud], ['inventory', upsertInventoryCloud],
     ['expenses', upsertExpenseCloud], ['repairs', upsertRepairCloud],
     ['appointments', upsertAppointmentCloud], ['invoices', upsertInvoiceCloud]
   ];
-  for(const [table, fn] of configs){
+}
+async function retryPendingCloud(){
+  const companyId = session && session.company && session.company.id;
+  if(!companyId) return;
+  for(const [table, fn] of cloudSyncTables()){
     const pending = (db[table]||[]).filter(x => x.companyId===companyId && (!x.cloudId || x.syncError));
     await Promise.all(pending.map(rec => fn(rec).catch(e => console.warn('retryPendingCloud', table, e))));
   }
 }
+// Cross-device sync bugfix (2026-11-12): how many of THIS company's
+// records have never reached the cloud (no cloudId yet) or are sitting
+// on a recorded error (syncError) -- the dashboard surfaces this count
+// so "saved" never silently means "saved locally only" with no visible
+// trace. Read-only; never changes anything.
+function pendingSyncCount(){
+  const companyId = session && session.company && session.company.id;
+  if(!companyId) return 0;
+  let n=0;
+  for(const [table] of cloudSyncTables()){
+    n += (db[table]||[]).filter(x => x.companyId===companyId && (!x.cloudId || x.syncError)).length;
+  }
+  return n;
+}
+let _cloudSyncInFlight=null;
 function syncAllCloud(){
+  // Never run two full sync passes at once (e.g. the 'online' handler
+  // and a visibility-change refresh firing close together) -- share the
+  // one in-flight promise instead of racing duplicate pushes.
+  if(_cloudSyncInFlight) return _cloudSyncInFlight;
   /* Customers and vehicles must land first -- repairs, appointments
      and invoices resolve their relations against db.customers /
      db.vehicles while loading, so those two load sequentially before
      everything else (which has no inter-dependencies among itself). */
-  return retryPendingCloud()
+  _cloudSyncInFlight = retryPendingCloud()
     .then(()=>loadCustomersFromCloud())
     .then(()=>loadVehiclesFromCloud())
     .then(()=>Promise.all([
@@ -404,5 +464,32 @@ function syncAllCloud(){
       if(db && db.settings) db.settings.lastCloudSync=new Date().toISOString();
       save();
       return ok;
+    })
+    .finally(()=>{ _cloudSyncInFlight=null; });
+  return _cloudSyncInFlight;
+}
+// Cross-device sync bugfix (2026-11-12): previously the ONLY things that
+// ever triggered a sync pass were login and switching the active
+// company -- a tab left open for a long shift never saw what a
+// colleague on another device added, and a save made while offline only
+// got pushed again on the NEXT full login, not as soon as the network
+// actually came back. Three triggers now cover "fetch on open" (already
+// true via login), "fetch on return to the app", and "push the moment
+// connectivity returns": `online`, the tab becoming visible again, and a
+// light periodic refresh while the tab stays open and visible. All three
+// share the same in-flight guard above, so they can never pile up.
+if(typeof window!=='undefined' && typeof window.addEventListener==='function'){
+  window.addEventListener('online', ()=>{ if(typeof session!=='undefined' && session) syncAllCloud().then(()=>{ if(typeof render==='function') render(); }); });
+  if(typeof document!=='undefined' && typeof document.addEventListener==='function'){
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState==='visible' && typeof session!=='undefined' && session){
+        syncAllCloud().then(()=>{ if(typeof render==='function') render(); });
+      }
     });
+  }
+  setInterval(()=>{
+    if(typeof session!=='undefined' && session && typeof document!=='undefined' && document.visibilityState==='visible'){
+      syncAllCloud().then(()=>{ if(typeof render==='function') render(); });
+    }
+  }, 5*60*1000);
 }
