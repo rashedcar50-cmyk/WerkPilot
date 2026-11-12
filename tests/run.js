@@ -682,6 +682,17 @@ async function decideLogin(cand, pass){
   assert(/db\.settings\.cloudAuthError\s*=\s*r\.ok\s*\?\s*''\s*:/.test(appSrc3), 'PROOF OF FIX: completeLogin now records whether the cloud sign-in actually succeeded, instead of discarding the result');
   assert(/not-linked-on-this-device/.test(appSrc3), 'completeLogin distinguishes "never linked on this device" from "sign-in failed" -- cloudEmail lives only in local storage and never travels between devices');
 
+  // --- Mobile sync-diagnosis bugfix: the dashboard banner must actually
+  // switch on cloudDiagnostics()'s distinct status values (not a single
+  // generic "something's wrong" branch), and the DIRECT mobile-usable
+  // actions (link now / re-link / sync now / details) must really exist
+  // as callable, globally-exposed functions -- a phone has no hover, so
+  // these can only ever be reached by a real tap target, never a tooltip.
+  assert(/case 'not-linked':/.test(appSrc3) && /case 'auth-failed':/.test(appSrc3) && /case 'no-company-access':/.test(appSrc3) && /case 'network':/.test(appSrc3) && /case 'data-error':/.test(appSrc3) && /case 'pending':/.test(appSrc3), 'PROOF OF FIX: the dashboard banner names each distinct real-world situation separately, instead of collapsing them into one generic "pending" message');
+  assert(/function openCloudLinkModal/.test(appSrc3) && /window\.openCloudLinkModal=openCloudLinkModal/.test(appSrc3), 'openCloudLinkModal() exists and is reachable from inline onclick handlers (tap targets), not just from Settings');
+  assert(/function cloudSyncNowBtn/.test(appSrc3) && /window\.cloudSyncNowBtn=cloudSyncNowBtn/.test(appSrc3), 'a direct, one-tap "sync now" action exists for the pending case, instead of only waiting silently for the next automatic trigger');
+  assert(/function cloudDiagModal/.test(appSrc3) && /window\.cloudDiagModal=cloudDiagModal/.test(appSrc3), 'a full diagnostics panel (connection/account/workshop/pending count/last error, each shown separately) is reachable with one tap from the banner');
+
   // --- Cross-device sync bugfix: pendingSyncCount() and the dashboard
   // banner it feeds must actually reflect unsynced records (no cloudId or
   // a recorded syncError), scoped to the current company. -----------------
@@ -1303,7 +1314,13 @@ async function decideLogin(cand, pass){
         return {
           update(row){ capturedRows.push({table,op:'update',row}); return {eq:()=>Promise.resolve({error:null})}; },
           insert(row){ capturedRows.push({table,op:'insert',row}); return {select:()=>({single:()=>Promise.resolve({data:{id:777},error:null})})}; },
-          select(){ return Promise.resolve({data:[{
+          // Chainable AND directly awaitable: loadVehiclesFromCloud() awaits
+          // this directly (select('*'), no further chaining), while
+          // upsertVehicleCloud()'s VIN-dedup lookup chains .eq().limit()
+          // .maybeSingle() off it -- this mock supports both shapes so one
+          // fixture can exercise both code paths.
+          select(){
+            const payload={data:[{
             id:777, company_id:'de', customer_id:null, plate:'B-EF 1', vin:'VIN-EXTENDED-FIELDS-01',
             make:'NISSAN', model:'ALMERA', year:'2004', engine:'', paint:'Blau', km:0, next_service_km:0, photo:'',
             hsn:'3144', tsn:'031', vsn:'00000-', kba:'3144 031', first_registration:'19.05.2004',
@@ -1315,7 +1332,10 @@ async function decideLogin(cand, pass){
             max_weight_national:'1735', unladen_weight:'2531348',
             tire_axle1:'185/65R15 83S', tire_axle2:'185/65R15 83S', date_k:'-',
             ocr_raw:JSON.stringify({hu:'10.2026'})
-          }], error:null}); }
+            }], error:null};
+            const chain={ eq:()=>chain, limit:()=>chain, maybeSingle:async()=>({data:null,error:null}), then:(res,rej)=>Promise.resolve(payload).then(res,rej) };
+            return chain;
+          }
         };
       }
     }};
@@ -1350,6 +1370,91 @@ async function decideLogin(cand, pass){
     assert(reloaded.ocrRaw===JSON.stringify({hu:'10.2026'}), 'PROOF: the original raw response survives the round trip too, still separate from the corrected fields');
     assert(reloaded.seats==='5' && reloaded.vehicleClass==='01' && reloaded.maxWeight==='1735', 'PROOF: the previously local-only Phase-4 fields now also survive a cloud round trip');
     assert(reloaded.vsn==='00000-', 'PROOF: VSN survives the save -> cloud -> reload round trip too');
+  }
+
+  // =========================================================================
+  // Mobile sync-diagnosis bugfix (2026-11-12): a bare "pending" badge on
+  // every row never said WHY, and couldn't distinguish "never linked on
+  // this device" from "signed in but no access to this workshop" from a
+  // real network problem from a genuine server-side data error -- all of
+  // which need a different action. Verifies classifySyncError()/
+  // cloudDiagnostics() name each case correctly, and that the per-record
+  // badge/detail panel reflects THAT record alone, never a page-wide
+  // status applied uniformly to every row.
+  // =========================================================================
+  {
+    const diagSandbox={ console, db:{customers:[],vehicles:[],purchases:[],inventory:[],expenses:[],repairs:[],appointments:[],invoices:[],settings:{}}, session:{company:{id:'de'}}, save:()=>{}, cloudCompanyFilter:q=>q, upsertCustomerCloud:()=>{}, upsertVehicleCloud:()=>{}, upsertPurchaseCloud:()=>{}, upsertInventoryCloud:()=>{}, upsertExpenseCloud:()=>{}, upsertRepairCloud:()=>{}, upsertAppointmentCloud:()=>{}, upsertInvoiceCloud:()=>{}, navigator:{onLine:true} };
+    diagSandbox.window={};
+    vm.createContext(diagSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), diagSandbox);
+
+    // --- classifySyncError: each real-world error family must map to its
+    // OWN category, not a generic bucket.
+    assert(diagSandbox.classifySyncError('new row violates row-level security policy for table "vehicles"')==='company', 'PROOF: an RLS-violation message is classified as a company/workshop-access problem');
+    assert(diagSandbox.classifySyncError('Invalid login credentials')==='auth', 'PROOF: a Supabase Auth sign-in error is classified as an auth problem, distinct from an RLS violation');
+    assert(diagSandbox.classifySyncError('Failed to fetch')==='network', 'PROOF: a network-level failure is classified separately from both auth and company-access problems');
+    assert(diagSandbox.classifySyncError('date/time field value out of range: "19.05.2004"')==='data', 'PROOF: the exact real data-format error from this session is classified as a data problem, not confused with auth/RLS/network');
+    assert(diagSandbox.classifySyncError('')===null && diagSandbox.classifySyncError(null)===null, 'no error at all classifies as null, never a false category');
+
+    // --- cloudDiagnostics: each distinct real-world situation must name
+    // the ACTUAL blocker, not a single generic "something is wrong".
+    const d1=diagSandbox.cloudDiagnostics();
+    assert(d1.status==='ok' && d1.pendingCount===0, 'PROOF: with nothing pending and no error recorded, diagnostics reports "ok", not a perpetual pending state');
+
+    diagSandbox.db.vehicles.push({id:'v1', companyId:'de', cloudId:null, syncError:''});
+    const d2=diagSandbox.cloudDiagnostics();
+    assert(d2.status==='pending' && d2.pendingCount===1, 'PROOF: a genuinely unsynced record (no error, just not pushed yet) reports "pending" with the real count');
+
+    diagSandbox.db.settings.cloudAuthError='not-linked-on-this-device';
+    const d3=diagSandbox.cloudDiagnostics();
+    assert(d3.status==='not-linked', 'PROOF OF FIX: a device that was never linked to the cloud is named distinctly ("not-linked"), not lumped in with "pending" or a generic failure');
+
+    diagSandbox.db.settings.cloudAuthError='Invalid login credentials';
+    const d4=diagSandbox.cloudDiagnostics();
+    assert(d4.status==='auth-failed', 'PROOF OF FIX: a failed cloud sign-in (e.g. a drifted password) is named distinctly ("auth-failed"), not confused with "never linked"');
+
+    diagSandbox.db.settings.cloudAuthError='';
+    diagSandbox.db.settings.lastSyncError={message:'new row violates row-level security policy for table "vehicles"', at:new Date().toISOString()};
+    const d5=diagSandbox.cloudDiagnostics();
+    assert(d5.status==='no-company-access', 'PROOF OF FIX: a device that IS signed in (no auth error) but whose pushes are rejected by RLS is named distinctly ("no-company-access") -- the "signed in but not a member of this workshop" case the user explicitly asked to be able to tell apart from a plain auth failure');
+
+    diagSandbox.db.settings.lastSyncError={message:'Failed to fetch', at:new Date().toISOString()};
+    const d6=diagSandbox.cloudDiagnostics();
+    assert(d6.status==='network', 'PROOF: a real network failure is named distinctly ("network"), not confused with a workshop-access problem');
+
+    diagSandbox.db.settings.lastSyncError={message:'date/time field value out of range: "19.05.2004"', at:new Date().toISOString()};
+    const d7=diagSandbox.cloudDiagnostics();
+    assert(d7.status==='data-error', 'PROOF: the exact real data-format bug found this session is named distinctly ("data-error"), not confused with auth/RLS/network');
+
+    diagSandbox.navigator.onLine=false;
+    const d8=diagSandbox.cloudDiagnostics();
+    assert(d8.status==='offline', 'offline is detected and takes priority over a stale recorded error from before the connection dropped');
+  }
+
+  // --- Per-record badge: proves the indicator reflects EACH record's own
+  // state, never one page-wide status painted onto every row alike -- the
+  // exact concern raised after the mobile report ("لا تضع الحالة العامة
+  // نفسها على جميع الصفوف"). Also proves seed/demo vehicles correctly
+  // enter the pending state like any other unsynced local record (not an
+  // error, not something that gets force-uploaded or deleted just for
+  // being seed data). ------------------------------------------------
+  {
+    const custSrcForBadge=fs.readFileSync(path.join(root,'js/customers.js'),'utf8');
+    const badgeSandbox={ t:(k)=>k, esc:(s)=>String(s==null?'':s), window:{}, db:{vehicles:[],customers:[]} };
+    vm.createContext(badgeSandbox);
+    vm.runInContext(custSrcForBadge, badgeSandbox);
+    const synced={id:'v1', cloudId:72, syncError:''};
+    const neverSynced={id:'v2', cloudId:null, syncError:''}; // e.g. a fresh demo-seed vehicle before its first successful sync
+    const failed={id:'v3', cloudId:null, syncError:'date/time field value out of range: "19.05.2004"'};
+    const bSynced=badgeSandbox.syncBadge(synced,'vehicles');
+    const bNeverSynced=badgeSandbox.syncBadge(neverSynced,'vehicles');
+    const bFailed=badgeSandbox.syncBadge(failed,'vehicles');
+    assert(bSynced==='', 'PROOF: a record that is actually synced (has a cloudId, no error) shows NO badge at all -- never flagged as pending just because some OTHER record on the page is');
+    assert(bNeverSynced!=='' && bNeverSynced.includes("'v2'"), 'PROOF: an unsynced record (e.g. seed/demo data before its first sync) shows the pending badge, keyed to ITS OWN id -- entering the pending state is correct here, not an error, and nothing force-uploads or deletes it just for being seed data');
+    assert(bFailed!=='' && bFailed.includes("'v3'"), 'a record with a recorded push error shows the pending badge too, keyed to its own id');
+    assert(bNeverSynced!==bFailed, 'PROOF: two different unsynced records get badges referencing their OWN distinct ids, not one shared/interchangeable status');
+    assert(/⏳/.test(bNeverSynced) && !/cloudPendingTitle/.test(bNeverSynced), 'PROOF OF FIX: the badge itself is icon-only (compact for mobile), not the full "pending sync" phrase spelled out inline on every row');
+    assert(/onclick="event\.stopPropagation\(\);showSyncDetail\('vehicles','v2'\)"/.test(bNeverSynced), 'PROOF: tapping the badge opens the per-record detail panel for THIS exact record (table+id), not a generic page-wide message');
   }
 
   // --- Static check: every scan entry point goes through the SAME wizard,

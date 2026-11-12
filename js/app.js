@@ -663,25 +663,80 @@ window.goBack=function(){
   render();
 };
 
-// Cross-device sync bugfix (2026-11-12): makes "this device hasn't
-// actually reached the cloud" visible instead of silent. Three distinct
-// states, each needing a different user action:
-//   - cloudAuthError==='not-linked-on-this-device' -> this account was
-//     never linked to the cloud on THIS device (linking lives only in
-//     this device's own local storage, never syncs) -- go link it.
-//   - any other truthy cloudAuthError -> the cloud sign-in itself failed
-//     (wrong/stale password) -- go re-link with the current password.
-//   - pendingSyncCount()>0 with no auth error -> auth is fine, some
-//     records just haven't pushed yet (will retry automatically).
+// Mobile sync-diagnosis bugfix (2026-11-12): a bare "pending" badge
+// never said WHY, and every device/state looked the same. Reads
+// cloud.js's cloudDiagnostics() (one structured snapshot: online/
+// link/auth/company/pending/last-error, each its own signal) and shows
+// a short, specific line plus a DIRECT action button -- never just "go
+// check Settings" -- so a phone, with no hover/tooltip, still gets a
+// one-tap path instead of a silent, perpetual wait.
 function cloudSyncBannerHtml(){
-  if(typeof db==='undefined' || !db.settings) return '';
-  const err=db.settings.cloudAuthError;
-  if(err==='not-linked-on-this-device') return `<div class="alert tap" onclick="goPage('settings')"><b>${t('cloudNotLinkedTitle')}:</b> ${t('cloudNotLinkedBody')}</div>`;
-  if(err) return `<div class="alert tap" onclick="goPage('settings')"><b>${t('cloudAuthFailTitle')}:</b> ${esc(err)}</div>`;
-  const pending=(typeof pendingSyncCount==='function')?pendingSyncCount():0;
-  if(pending>0) return `<div class="alert tap" onclick="goPage('settings')"><b>${t('cloudPendingTitle')}:</b> ${pending}</div>`;
-  return '';
+  if(typeof db==='undefined' || !db.settings || typeof cloudDiagnostics!=='function') return '';
+  const d=cloudDiagnostics();
+  const detailsBtn=`<button class="btn small" onclick="event.stopPropagation();cloudDiagModal();">${t('cloudDetailsBtn')}</button>`;
+  const row=(title,body,actionHtml)=>`<div class="alert"><b>${title}</b>${body?(': '+body):''} ${actionHtml||''} ${detailsBtn}</div>`;
+  switch(d.status){
+    case 'offline': return row(t('cloudOffline'), '', '');
+    case 'not-linked': return row(t('cloudNotLinkedTitle'), t('cloudNotLinkedBody'), `<button class="btn small primary" onclick="event.stopPropagation();openCloudLinkModal();">${t('cloudLinkNowBtn')}</button>`);
+    case 'auth-failed': return row(t('cloudAuthFailTitle'), esc(db.settings.cloudAuthError||''), `<button class="btn small primary" onclick="event.stopPropagation();openCloudLinkModal();">${t('cloudRelinkBtn')}</button>`);
+    case 'no-company-access': return row(t('cloudNoCompanyAccessTitle'), t('cloudNoCompanyAccessBody'), '');
+    case 'network': return row(t('cloudNetworkTitle'), t('cloudNetworkBody'), '');
+    case 'data-error': return row(t('cloudDataErrorTitle'), esc((d.lastError&&d.lastError.message)||''), '');
+    case 'pending': return row(t('cloudPendingTitle'), String(d.pendingCount), `<button class="btn small primary" onclick="event.stopPropagation();cloudSyncNowBtn(this);">${t('cloudSyncNowBtn')}</button>`);
+    default: return '';
+  }
 }
+// Shared by the dashboard banner, Settings, and the mobile per-record
+// detail modal -- a mobile-usable, DIRECT action (not a navigation) that
+// links (or re-links/self-heals a drifted password for) THIS device's
+// cloud identity, reusing the exact same verified-local-password ->
+// linkAccountToCloud() path Settings already uses.
+function openCloudLinkModal(){
+  modal(t('linkCloudSectionTitle'), `
+    <p class="muted" style="font-size:.85rem">${t('linkCloudEmailHint')}</p>
+    <div class="form-grid">
+      <div class="field"><label>${t('linkCloudEmailLabel')}</label><input id="qCloudEmail" type="email" autocomplete="email" value="${esc((db.users.find(x=>x.u===session.user.u)||{}).cloudEmail||'')}" placeholder="name@example.com"></div>
+      <div class="field"><label>${t('linkCloudCurrentPass')}</label><input id="qCloudPass" type="password" autocomplete="current-password"></div>
+    </div>
+    <div id="qCloudMsg" class="muted"></div>
+  `, async()=>{
+    const email=$('#qCloudEmail').value.trim(), curPass=$('#qCloudPass').value;
+    const msg=$('#qCloudMsg');
+    const u=db.users.find(x=>x.u===session.user.u);
+    if(!email || !curPass){ msg.textContent=t('linkCloudFailed'); return; }
+    if(!u || !(await WP.Engine.passOk(u.p, curPass))){ msg.textContent=t('loginBad'); return; }
+    msg.textContent='...';
+    const r=await WP.CloudAuth.linkAccountToCloud(email, curPass);
+    if(r.ok){
+      u.cloudEmail=email; db.settings.cloudAuthError=''; save(true);
+      await syncAllCloud();
+      closeModal(); render(); toast(t('linkCloudOk'));
+    } else { msg.textContent=t('linkCloudFailed'); }
+  }, t('linkCloudBtn'));
+}
+window.openCloudLinkModal=openCloudLinkModal;
+// One-tap manual sync -- useful the moment a phone regains connectivity
+// and the user doesn't want to wait for the next automatic trigger.
+async function cloudSyncNowBtn(btn){
+  if(btn){ btn.disabled=true; btn.textContent=t('cloudSyncingNow'); }
+  try{ await syncAllCloud(); toast(t('cloudSyncDone')); render(); }
+  catch(e){ console.warn(e); }
+}
+window.cloudSyncNowBtn=cloudSyncNowBtn;
+// Full, plain-language diagnostic panel -- every signal cloudDiagnostics()
+// tracks, shown separately (never collapsed into one generic status),
+// with no key/token/password ever displayed.
+function cloudDiagModal(){
+  const d=(typeof cloudDiagnostics==='function')?cloudDiagnostics():{};
+  modal(t('cloudDiagTitle'), `
+    <div class="okbox"><b>${t('cloudDiagConnection')}:</b> ${d.online?t('cloudOnline'):t('cloudOffline')}</div>
+    <div class="okbox"><b>${t('cloudDiagAccount')}:</b> ${d.status==='not-linked'?t('cloudNotLinkedTitle'):(d.status==='auth-failed'?t('cloudAuthFailTitle'):t('cloudStatusOk'))}</div>
+    <div class="okbox"><b>${t('cloudDiagWorkshop')}:</b> ${esc(d.companyId||'-')}${d.status==='no-company-access'?(' -- '+t('cloudNoCompanyAccessBody')):''}</div>
+    <div class="okbox"><b>${t('cloudDiagPending')}:</b> ${d.pendingCount}</div>
+    <div class="okbox"><b>${t('cloudDiagLastError')}:</b> ${d.lastError?esc(d.lastError.message)+' ('+esc(d.lastError.at||'')+')':t('cloudDiagNone')}</div>
+  `, null, t('closeBtn'));
+}
+window.cloudDiagModal=cloudDiagModal;
 function dashboard(){
  const inv=companyRows('invoices'),exp=companyRows('expenses'),rep=openRepairs(),veh=companyRows('vehicles');
  const sales=inv.reduce((a,x)=>a+Number(x.total||0),0),costs=exp.reduce((a,x)=>a+Number(x.amount||0),0);

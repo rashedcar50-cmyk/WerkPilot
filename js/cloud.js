@@ -464,6 +464,50 @@ async function retryPendingCloud(){
     await Promise.all(pending.map(rec => fn(rec).catch(e => console.warn('retryPendingCloud', table, e))));
   }
 }
+// Mobile sync-diagnosis bugfix (2026-11-12): a bare "pending" badge on
+// every row told the user THAT something was wrong but never WHY, and
+// never distinguished "never linked on this device" from "signed in but
+// this identity has no access to this workshop" from "a genuine network
+// problem" from "a server-side data error" -- all of which need a
+// different action, and none of which the user could previously tell
+// apart. Classifies the last recorded error's TEXT (Postgres/PostgREST
+// error messages -- never a secret, key, or token) into a category.
+function classifySyncError(message){
+  if(!message) return null;
+  const m=String(message).toLowerCase();
+  if(m.includes('row-level security') || m.includes('rls')) return 'company';
+  if(m.includes('invalid login credentials') || m.includes('jwt') || m.includes('refresh_token') || m.includes('session') || m.includes('user_not_found')) return 'auth';
+  if(m.includes('failed to fetch') || m.includes('network') || m.includes('timeout') || m.includes('timed out')) return 'network';
+  if(m.includes('date/time') || m.includes('invalid input syntax') || m.includes('column') || m.includes('constraint') || m.includes('violates')) return 'data';
+  return 'unknown';
+}
+// One structured snapshot of "why isn't this device's data in the
+// cloud" -- online/config/link/auth/company/pending/last-error, each a
+// SEPARATE signal (never collapsed into one generic status), so the UI
+// can name the actual blocker instead of a silent/perpetual spinner.
+// Read-only; never changes anything, never exposes a key/token/password.
+function cloudDiagnostics(){
+  const companyId = session && session.company && session.company.id;
+  const pending = pendingSyncCount();
+  const lastErr = db && db.settings && db.settings.lastSyncError;
+  const lastErrCategory = lastErr ? classifySyncError(lastErr.message) : null;
+  const authError = db && db.settings && db.settings.cloudAuthError;
+  let status;
+  if(typeof navigator!=='undefined' && navigator.onLine===false) status='offline';
+  else if(authError==='not-linked-on-this-device') status='not-linked';
+  else if(authError) status='auth-failed';
+  else if(lastErrCategory==='company') status='no-company-access';
+  else if(lastErrCategory==='network') status='network';
+  else if(lastErrCategory==='data') status='data-error';
+  else if(pending>0) status='pending';
+  else status='ok';
+  return {
+    status, online: typeof navigator!=='undefined' ? navigator.onLine!==false : true,
+    companyId: companyId||null, pendingCount: pending,
+    lastError: lastErr ? {message:lastErr.message, category:lastErrCategory, at:lastErr.at} : null,
+    checkedAt: new Date().toISOString()
+  };
+}
 // Cross-device sync bugfix (2026-11-12): how many of THIS company's
 // records have never reached the cloud (no cloudId yet) or are sitting
 // on a recorded error (syncError) -- the dashboard surfaces this count
