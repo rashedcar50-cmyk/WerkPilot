@@ -699,6 +699,51 @@ async function decideLogin(cand, pass){
     assert(pendSandbox.pendingSyncCount()===2, 'PROOF: pendingSyncCount counts a never-synced record (v2, no cloudId) and a record with a recorded error (v3), scoped to the current company -- v1 (synced) and v4 (other company) are excluded');
   }
 
+  // --- Real bug found on the owner's own laptop (2026-11-12), AFTER the
+  // auth/RLS/dedup fixes above: the Nissan Almera's cloud save was
+  // rejected with "date/time field value out of range: \"19.05.2004\"".
+  // Root cause: production's vehicles.first_registration is a genuine
+  // Postgres `date` column (confirmed via information_schema, a
+  // pre-existing richer column per fix-report-11's schema audit), but
+  // firstRegistration is always a German DD.MM.YYYY string (from
+  // Autosiastik's ez_string or manual entry) -- sent unconverted, "19"
+  // as a month is invalid. Nothing to do with auth/RLS/dedup -- a plain
+  // data-format bug, only reachable once a save actually gets past
+  // authentication and RLS (which is exactly why the Docker two-session
+  // test above, using plain test dates, never exercised it). -----------
+  {
+    const dateSandbox={ console };
+    vm.createContext(dateSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), dateSandbox);
+    assert(dateSandbox.toIsoDateOrNull('19.05.2004')==='2004-05-19', 'PROOF OF FIX: a German DD.MM.YYYY date is converted to the ISO format a real `date` column requires');
+    assert(dateSandbox.toIsoDateOrNull('2004-05-19')==='2004-05-19', 'an already-ISO date passes through unchanged');
+    assert(dateSandbox.toIsoDateOrNull('')===null, 'an empty firstRegistration becomes null, never an invalid empty-string date');
+    assert(dateSandbox.toIsoDateOrNull('not a date')===null, 'unparseable text becomes null -- never guessed, never sent as literal garbage to a typed column');
+    assert(dateSandbox.toIsoDateOrNull('32.13.2020')===null, 'an out-of-range day/month (32nd day, 13th month) is rejected, not silently miscomputed into some other date');
+    assert(dateSandbox.isoDateToGerman('2004-05-19')==='19.05.2004', 'reading first_registration back from the cloud converts ISO back to the German format this app displays/stores everywhere else');
+    assert(dateSandbox.isoDateToGerman('')==='' && dateSandbox.isoDateToGerman(null)==='', 'a blank/missing cloud value reads back as an empty string, never a fabricated date');
+  }
+  {
+    // End-to-end through the real upsert row-builder: confirms the ACTUAL
+    // field sent to Supabase for a Nissan-like record is the converted
+    // ISO date, not the raw German string that caused the real failure.
+    const calls=[];
+    const dateSandbox2={ console, db:{vehicles:[],customers:[]}, session:{company:{id:'de'}}, save:()=>{}, cloudCompanyFilter:q=>q, markSyncOk:()=>{}, markSyncError:()=>{} };
+    dateSandbox2.window={ supabaseClient:{
+      from(table){
+        return {
+          select(){ return { eq:()=>({ limit:()=>({ maybeSingle:async()=>({data:null, error:null}) }) }) }; },
+          insert(row){ calls.push(row); return {select:()=>({single:async()=>({data:{id:1},error:null})})}; }
+        };
+      }
+    }};
+    vm.createContext(dateSandbox2);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/cloud.js'),'utf8'), dateSandbox2);
+    const nissanLike={id:'v-date-test', companyId:'de', customerId:'', vin:'DATEFIXTEST0000001', plate:'RZ AA4763', make:'Nissan', model:'ALMERA', firstRegistration:'19.05.2004'};
+    await dateSandbox2.upsertVehicleCloud(nissanLike);
+    assert(calls.length===1 && calls[0].first_registration==='2004-05-19', 'PROOF OF FIX: the exact real-world failing case (firstRegistration "19.05.2004") now reaches Supabase as a valid ISO date, not the raw string that produced the real "date/time field value out of range" error');
+  }
+
   // --- Cross-device sync bugfix: the actual duplicate found live in
   // production -- the three demo-seed vehicles (shipped identically on
   // every fresh install) ended up as SIX rows in the cloud, because every

@@ -42,6 +42,41 @@ function scheduleSyncRerender(){
   clearTimeout(_syncRerenderTimer);
   _syncRerenderTimer=setTimeout(()=>{ try{ render(); }catch(e){} }, 300);
 }
+// Bugfix (2026-11-12): found by inspecting a REAL sync failure recorded
+// on the owner's own laptop -- the Nissan Almera's save was rejected
+// with "date/time field value out of range: \"19.05.2004\"". Root cause:
+// production's vehicles.first_registration column is a real Postgres
+// `date` column (one of the richer pre-existing columns alongside the
+// simple set this app writes, per the schema audit in
+// reports/fix-report-11-cloud-sync-full.md), but firstRegistration is
+// always stored/displayed as a German-format string (DD.MM.YYYY, e.g.
+// from Autosiastik's own ez_string or from manual entry) -- sent
+// unconverted, "19" as a month is invalid to Postgres's date parser. Has
+// nothing to do with auth/RLS -- a plain data-format bug that made every
+// scanned vehicle's save fail at the database, after authentication and
+// RLS had already passed. Converts DD.MM.YYYY -> YYYY-MM-DD; passes an
+// already-ISO value through; anything else (blank, unparseable, an
+// out-of-range day/month) becomes null -- never guessed, never sent as
+// literal text to a typed date column.
+function toIsoDateOrNull(s){
+  s=String(s||'').trim();
+  if(!s) return null;
+  let m=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if(m){
+    const day=+m[1], month=+m[2], year=+m[3];
+    if(month>=1 && month<=12 && day>=1 && day<=31) return year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    return null;
+  }
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return null;
+}
+// Reverse of the above, for reading first_registration back from the
+// cloud's real `date` column (PostgREST returns ISO "YYYY-MM-DD") into
+// the German DD.MM.YYYY string this app stores/displays everywhere else.
+function isoDateToGerman(s){
+  const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3]+'.'+m[2]+'.'+m[1]) : '';
+}
 function markSyncOk(x){ if(x){ x.syncError=''; x.syncPending=false; scheduleSyncRerender(); } }
 function markSyncError(x, message){
   if(x){ x.syncError=message||'sync failed'; x.syncPending=false; save(); scheduleSyncRerender(); }
@@ -193,7 +228,7 @@ async function loadVehiclesFromCloud(){
       customerId:localIdForCloudId('customers', r.customer_id), plate:r.plate||'', vin:r.vin||'',
       make:r.make||'', model:r.model||'', year:r.year||'', engine:r.engine||'',
       paint:r.paint||'', km:r.km||0, nextServiceKm:r.next_service_km||0, photo:r.photo||'',
-      hsn:r.hsn||'', tsn:r.tsn||'', vsn:r.vsn||'', kba:r.kba||'', firstRegistration:r.first_registration||'',
+      hsn:r.hsn||'', tsn:r.tsn||'', vsn:r.vsn||'', kba:r.kba||'', firstRegistration:isoDateToGerman(r.first_registration),
       engine_displacement_cm3:r.engine_displacement_cm3||'', engine_power_kw:r.engine_power_kw||'',
       ratedRpm:r.rated_rpm||'', fuel_type:r.fuel_type||'', maxWeight:r.max_weight||'',
       seats:r.seats||'', vehicleClass:r.vehicle_class||'', ocrSource:r.ocr_source||'',
@@ -213,7 +248,7 @@ async function upsertVehicleCloud(v){
     const customerCloudId = await resolveCloudId('customers', v.customerId, upsertCustomerCloud);
     const yearNum = v.year!=null && String(v.year).trim()!=='' ? (parseInt(v.year,10)||null) : null;
     const row={company_id:v.companyId||'de',customer_id:customerCloudId,plate:v.plate||'',vin:v.vin||'',make:v.make||'',model:v.model||'',year:yearNum,engine:v.engine||'',paint:v.paint||'',km:Number(v.km||0),next_service_km:Number(v.nextServiceKm||0),photo:(v.photo&&v.photo.length<180000)?v.photo:'',
-      hsn:v.hsn||'', tsn:v.tsn||'', vsn:v.vsn||'', kba:v.kba||'', first_registration:v.firstRegistration||'',
+      hsn:v.hsn||'', tsn:v.tsn||'', vsn:v.vsn||'', kba:v.kba||'', first_registration:toIsoDateOrNull(v.firstRegistration),
       engine_displacement_cm3:v.engine_displacement_cm3||'', engine_power_kw:v.engine_power_kw||'',
       rated_rpm:v.ratedRpm||'', fuel_type:v.fuel_type||'', max_weight:v.maxWeight||'',
       seats:v.seats||'', vehicle_class:v.vehicleClass||'', ocr_source:v.ocrSource||'',
