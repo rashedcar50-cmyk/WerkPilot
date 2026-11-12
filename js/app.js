@@ -117,7 +117,10 @@ function completeLogin(cand, plainPass){
     }
     db.settings.cloudAuthCheckedAt = new Date().toISOString();
     save();
-    syncAllCloud().finally(async ()=>{
+    // manual:true -- a fresh login is itself a deliberate re-authentication;
+    // retry even records previously stuck on a company/auth error instead
+    // of leaving them skipped until an extra explicit "sync now" tap.
+    syncAllCloud(true).finally(async ()=>{
       WP.run("afterLogin", session);
       if(/share=1/.test(location.search) || await consumeSharedWhatsApp()){
         session.page='customers';
@@ -280,7 +283,7 @@ function bindShellEvents(){
  if($('#backBtn')) $('#backBtn').onclick=()=>{ closeMobileMenus(); goBack(); };
  const lo=$('#logout');
  if(lo) lo.onclick=()=>{audit('logout');session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
- if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud().finally(()=>render(true))};
+ if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud(true).finally(()=>render(true))};
  if($('#addWorkshop')) $('#addWorkshop').onclick=()=>{ closeMobileMenus(); newWorkshopModal(); };
  if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{closeMobileMenus();db.settings.uiLang=e.target.value;save(true);applyUiLang();render(true);};
  if($('#menu')) $('#menu').onclick=()=>{
@@ -678,6 +681,7 @@ function cloudSyncBannerHtml(){
   switch(d.status){
     case 'offline': return row(t('cloudOffline'), '', '');
     case 'not-linked': return row(t('cloudNotLinkedTitle'), t('cloudNotLinkedBody'), `<button class="btn small primary" onclick="event.stopPropagation();openCloudLinkModal();">${t('cloudLinkNowBtn')}</button>`);
+    case 'session-expired': return row(t('cloudSessionExpiredTitle'), t('cloudSessionExpiredBody'), `<button class="btn small primary" onclick="event.stopPropagation();openCloudLinkModal();">${t('cloudRelinkBtn')}</button>`);
     case 'auth-failed': return row(t('cloudAuthFailTitle'), esc(db.settings.cloudAuthError||''), `<button class="btn small primary" onclick="event.stopPropagation();openCloudLinkModal();">${t('cloudRelinkBtn')}</button>`);
     case 'no-company-access': return row(t('cloudNoCompanyAccessTitle'), t('cloudNoCompanyAccessBody'), '');
     case 'network': return row(t('cloudNetworkTitle'), t('cloudNetworkBody'), '');
@@ -709,7 +713,11 @@ function openCloudLinkModal(){
     const r=await WP.CloudAuth.linkAccountToCloud(email, curPass);
     if(r.ok){
       u.cloudEmail=email; db.settings.cloudAuthError=''; save(true);
-      await syncAllCloud();
+      // manual:true -- the whole point of re-linking is to retry records
+      // that were stuck on a company/auth error, not just newly-pending
+      // ones; the automatic triggers deliberately skip those (see
+      // retryPendingCloud), so only this explicit action retries them.
+      await syncAllCloud(true);
       closeModal(); render(); toast(t('linkCloudOk'));
     } else { msg.textContent=t('linkCloudFailed'); }
   }, t('linkCloudBtn'));
@@ -717,9 +725,10 @@ function openCloudLinkModal(){
 window.openCloudLinkModal=openCloudLinkModal;
 // One-tap manual sync -- useful the moment a phone regains connectivity
 // and the user doesn't want to wait for the next automatic trigger.
+// manual:true so it also retries anything stuck on a company/auth error.
 async function cloudSyncNowBtn(btn){
   if(btn){ btn.disabled=true; btn.textContent=t('cloudSyncingNow'); }
-  try{ await syncAllCloud(); toast(t('cloudSyncDone')); render(); }
+  try{ await syncAllCloud(true); toast(t('cloudSyncDone')); render(); }
   catch(e){ console.warn(e); }
 }
 window.cloudSyncNowBtn=cloudSyncNowBtn;
@@ -730,7 +739,7 @@ function cloudDiagModal(){
   const d=(typeof cloudDiagnostics==='function')?cloudDiagnostics():{};
   modal(t('cloudDiagTitle'), `
     <div class="okbox"><b>${t('cloudDiagConnection')}:</b> ${d.online?t('cloudOnline'):t('cloudOffline')}</div>
-    <div class="okbox"><b>${t('cloudDiagAccount')}:</b> ${d.status==='not-linked'?t('cloudNotLinkedTitle'):(d.status==='auth-failed'?t('cloudAuthFailTitle'):t('cloudStatusOk'))}</div>
+    <div class="okbox"><b>${t('cloudDiagAccount')}:</b> ${d.status==='not-linked'?t('cloudNotLinkedTitle'):(d.status==='session-expired'?t('cloudSessionExpiredTitle'):(d.status==='auth-failed'?t('cloudAuthFailTitle'):t('cloudStatusOk')))}</div>
     <div class="okbox"><b>${t('cloudDiagWorkshop')}:</b> ${esc(d.companyId||'-')}${d.status==='no-company-access'?(' -- '+t('cloudNoCompanyAccessBody')):''}</div>
     <div class="okbox"><b>${t('cloudDiagPending')}:</b> ${d.pendingCount}</div>
     <div class="okbox"><b>${t('cloudDiagLastError')}:</b> ${d.lastError?esc(d.lastError.message)+' ('+esc(d.lastError.at||'')+')':t('cloudDiagNone')}</div>
@@ -1756,7 +1765,7 @@ function settings(){
  };
  $('#syncCloud').onclick=async()=>{
   toast(t('syncing'));
-  await syncAllCloud();
+  await syncAllCloud(true); // explicit user action -- also retries anything stuck on a company/auth error
   render();
   toast(t('synced'));
  };
