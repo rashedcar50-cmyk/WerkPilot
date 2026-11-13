@@ -414,12 +414,33 @@ function patchWorkshop(fields){
   else if(fields && fields.workshopName && !co.name) co.name=fields.workshopName;
   save();
 }
+// Repeated-conflict bugfix (2026-11-13): found by actually inspecting a
+// real account's db.conflicts after ~36h of use -- ONE invoice logged 24
+// separate "local wins" conflicts against the SAME cloud row, every sync
+// cycle, forever. Root cause: when "local wins" here, that only updated
+// the LOCAL in-memory copy -- it never told the cloud about it. So the
+// cloud row stayed stale forever, every next pull saw the exact same
+// mismatch again, and logged the exact same conflict again, in an
+// infinite loop that never actually converges. Automatic retries never
+// catch this either, since retryPendingCloud() only ever re-pushes a
+// record with no cloudId yet or a recorded syncError -- a record that
+// already synced once successfully, then drifted locally ahead of the
+// cloud, has neither. mergeByCompany() now returns every record whose
+// conflict resolved with "local" as the winner, so the caller (each
+// load*FromCloud() in cloud.js) can push that winning version back to
+// the cloud immediately -- the conflict then actually resolves, instead
+// of re-detecting itself forever.
 function mergeByCompany(key, rows){
   if(!Array.isArray(db[key])) db[key]=[];
-  (rows||[]).forEach(incoming=>upsertRow(key, incoming));
+  const localWon=[];
+  (rows||[]).forEach(incoming=>{
+    const winner=upsertRow(key, incoming);
+    if(winner) localWon.push(winner);
+  });
+  return localWon;
 }
 function upsertRow(key, incoming){
-  if(!incoming) return;
+  if(!incoming) return null;
   const list=db[key];
   const cid=incoming.companyId||session?.company?.id;
   const idx=list.findIndex(l=>{
@@ -430,20 +451,23 @@ function upsertRow(key, incoming){
     if(incoming.sku && l.sku && incoming.sku===l.sku && (l.companyId||cid)===(incoming.companyId||cid)) return true;
     return l.id===incoming.id;
   });
-  if(idx<0){ list.push(incoming); return; }
+  if(idx<0){ list.push(incoming); return null; }
   const local=list[idx];
   const lt=Date.parse(local.updatedAt||local.date||0)||0;
   const rt=Date.parse(incoming.updatedAt||incoming.date||0)||0;
+  let localWon=false;
   if(lt && rt && Math.abs(lt-rt)>500 && JSON.stringify(local)!==JSON.stringify(incoming)){
     db.conflicts=db.conflicts||[];
     db.conflicts.unshift({ts:new Date().toISOString(), key, id:local.id, winner: lt>rt?'local':'cloud'});
     db.conflicts=db.conflicts.slice(0,80);
+    localWon=lt>rt;
   }
   if(lt>rt){
     list[idx]=Object.assign({}, incoming, local, {cloudId:local.cloudId||incoming.cloudId, id:local.id});
   } else {
     list[idx]=Object.assign({}, local, incoming, {id:local.id, cloudId:local.cloudId||incoming.cloudId});
   }
+  return localWon ? list[idx] : null;
 }
 function cloudCompanyFilter(query){
   const cid=session?.company?.id;

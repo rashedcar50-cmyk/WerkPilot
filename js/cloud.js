@@ -78,6 +78,19 @@ function isoDateToGerman(s){
   return m ? (m[3]+'.'+m[2]+'.'+m[1]) : '';
 }
 function markSyncOk(x){ if(x){ x.syncError=''; x.syncPending=false; scheduleSyncRerender(); } }
+// Repeated-conflict bugfix, part 2 (2026-11-13): fixing mergeByCompany()
+// to re-push a "local wins" record (above) still wasn't enough on its
+// own for the four tables whose conflict check tracks a real `updatedAt`
+// (invoices/purchases/appointments/expenses -- confirmed live: production's
+// invoices.updated_at is a plain column with no auto-touch-on-update
+// trigger, so it only ever gets set once, at insert). A push that never
+// sends updated_at leaves the cloud row's timestamp frozen at its
+// original value forever -- so even a successful, correct repush still
+// looks "older than local" on the very next pull, and the SAME conflict
+// fires again, endlessly, even though the content now genuinely matches.
+// Returns the single timestamp both sides must end up sharing: the
+// record's own pending edit time if it has one, else right now.
+function syncTimestamp(x){ return x.updatedAt || new Date().toISOString(); }
 function markSyncError(x, message){
   if(x){ x.syncError=message||'sync failed'; x.syncPending=false; save(); scheduleSyncRerender(); }
   if(db && db.settings){ db.settings.lastSyncError={message, at:new Date().toISOString()}; }
@@ -107,6 +120,18 @@ function markSyncError(x, message){
   }
 }
 
+// Repeated-conflict bugfix (2026-11-13): mergeByCompany() now returns
+// every record whose pull-time conflict resolved with "local" as the
+// winner -- that resolution only ever changed the in-memory copy, so
+// without this, the cloud row stayed stale forever and the SAME conflict
+// re-logged on every single future sync pass (found live: one real
+// invoice logged 24 identical "local wins" conflicts over ~36h because
+// nothing ever told the cloud about the resolution). Re-pushing the
+// winning version here is what actually makes the conflict resolve
+// instead of just re-detecting itself endlessly.
+function repushLocalWinners(records, upsertFn){
+  (records||[]).forEach(rec=>{ try{ upsertFn(rec); }catch(e){ console.warn('repushLocalWinners', e); } });
+}
 async function loadPurchasesFromCloud(){
   try{
     const sb = window.supabaseClient;
@@ -116,7 +141,7 @@ async function loadPurchasesFromCloud(){
     const { data, error } = await q;
     if(error){ console.warn('loadPurchases', error.message); return false; }
     if(!Array.isArray(data)) return false;
-    mergeByCompany('purchases', data.map(r => ({
+    const localWon = mergeByCompany('purchases', data.map(r => ({
       updatedAt:r.updated_at||r.purchase_date||'',
       id: 'p_cloud_' + r.id,
       cloudId: r.id,
@@ -134,6 +159,7 @@ async function loadPurchasesFromCloud(){
       notes: r.notes || '',
       receipt_url: r.receipt_url || ''
     })));
+    repushLocalWinners(localWon, upsertPurchaseCloud);
     return true;
   }catch(e){ console.warn(e); return false; }
 }
@@ -142,6 +168,7 @@ async function upsertPurchaseCloud(p){
   try{
     const sb = window.supabaseClient;
     if(!sb) return;
+    const syncedAt = syncTimestamp(p);
     const row = {
       company_id: p.companyId || session?.company?.id || 'de',
       supplier: p.supplier || '',
@@ -155,7 +182,8 @@ async function upsertPurchaseCloud(p){
       purchase_date: p.date || new Date().toISOString().slice(0,10),
       payment_status: p.payment_status || 'pending',
       notes: p.notes || '',
-      receipt_url: p.receipt_url || ''
+      receipt_url: p.receipt_url || '',
+      updated_at: syncedAt
     };
     let error;
     if(p.cloudId){
@@ -171,7 +199,7 @@ async function upsertPurchaseCloud(p){
       }
     }
     if(error){ console.warn('upsertPurchase', error.message); markSyncError(p, error.message); }
-    else markSyncOk(p);
+    else { p.updatedAt=syncedAt; markSyncOk(p); }
   }catch(e){ console.warn(e); markSyncError(p, e.message); }
 }
 
@@ -196,7 +224,7 @@ async function loadCustomersFromCloud(){
       id:'c_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||session?.company?.id||'de',
       name:r.name||'', phone:r.phone||'', email:r.email||'', address:r.address||''
     })).filter(x=>x.name);
-    if(mapped.length){ mergeByCompany('customers', mapped); return true; }
+    if(mapped.length){ repushLocalWinners(mergeByCompany('customers', mapped), upsertCustomerCloud); return true; }
   }catch(e){console.warn(e)}
   return false;
 }
@@ -223,7 +251,7 @@ async function loadInventoryFromCloud(){
       id:'inv_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||session?.company?.id||'de',
       sku:r.sku||'', name:r.name||'', qty:Number(r.qty||0), buy:Number(r.buy||0), sell:Number(r.sell||0)
     })).filter(x=>x.name||x.sku);
-    if(mapped.length){ mergeByCompany('inventory', mapped); return true; }
+    if(mapped.length){ repushLocalWinners(mergeByCompany('inventory', mapped), upsertInventoryCloud); return true; }
   }catch(e){console.warn(e)}
   return false;
 }
@@ -247,7 +275,7 @@ async function loadVehiclesFromCloud(){
     const sb=window.supabaseClient; if(!sb) return false;
     const {data,error}=await cloudCompanyFilter(sb.from('vehicles').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    mergeByCompany('vehicles', data.map(r=>({
+    const localWon = mergeByCompany('vehicles', data.map(r=>({
       id:'v_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
       customerId:localIdForCloudId('customers', r.customer_id), plate:r.plate||'', vin:r.vin||'',
       make:r.make||'', model:r.model||'', year:r.year||'', engine:r.engine||'',
@@ -263,6 +291,7 @@ async function loadVehiclesFromCloud(){
       tireAxle1:r.tire_axle1||'', tireAxle2:r.tire_axle2||'', dateK:r.date_k||'',
       ocrRaw: r.ocr_raw ? (typeof r.ocr_raw==='string'?r.ocr_raw:JSON.stringify(r.ocr_raw)) : ''
     })));
+    repushLocalWinners(localWon, upsertVehicleCloud);
     return true;
   }catch(e){console.warn(e);return false}
 }
@@ -322,7 +351,7 @@ async function loadRepairsFromCloud(){
     const sb=window.supabaseClient; if(!sb) return false;
     const {data,error}=await cloudCompanyFilter(sb.from('repairs').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    mergeByCompany('repairs', data.map(r=>({
+    const localWon = mergeByCompany('repairs', data.map(r=>({
       id:'r_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
       vehicleId: localIdForCloudId('vehicles', r.vehicle_id) || r.vehicle_id || '',
       description:r.description||'', complaint:r.complaint||'', tech:r.tech||'', hours:r.hours||0,
@@ -331,6 +360,7 @@ async function loadRepairsFromCloud(){
       parts: r.parts? (typeof r.parts==='string'? JSON.parse(r.parts||'[]'):r.parts):[],
       photos: r.photos? (typeof r.photos==='string'? JSON.parse(r.photos||'[]'):r.photos):[]
     })));
+    repushLocalWinners(localWon, upsertRepairCloud);
     return true;
   }catch(e){console.warn(e);return false}
 }
@@ -354,7 +384,7 @@ async function loadAppointmentsFromCloud(){
     const sb=window.supabaseClient; if(!sb) return false;
     const {data,error}=await cloudCompanyFilter(sb.from('appointments').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    mergeByCompany('appointments', data.map(r=>{
+    const localWon = mergeByCompany('appointments', data.map(r=>{
       const meta=r.metadata||{};
       const dt=r.start_at?new Date(r.start_at):null;
       return {
@@ -365,6 +395,7 @@ async function loadAppointmentsFromCloud(){
         updatedAt:r.updated_at||''
       };
     }));
+    repushLocalWinners(localWon, upsertAppointmentCloud);
     return true;
   }catch(e){console.warn(e);return false}
 }
@@ -376,13 +407,14 @@ async function upsertAppointmentCloud(a){
     const startAt = new Date((a.date||new Date().toISOString().slice(0,10))+'T'+(a.time||'00:00')+':00').toISOString();
     const vehicleLocal=(db.vehicles||[]).find(x=>x.id===a.vehicleId);
     const title = a.note || (vehicleLocal?(vehicleLocal.plate||vehicleLocal.make||'Termin'):'Termin');
-    const row={company_id:a.companyId||'de',customer_id:customerCloudId,vehicle_id:vehicleCloudId,title,status:a.status||'confirmed',start_at:startAt,notes:a.note||'',metadata:{tech:a.tech||'',time:a.time||''}};
+    const syncedAt = syncTimestamp(a);
+    const row={company_id:a.companyId||'de',customer_id:customerCloudId,vehicle_id:vehicleCloudId,title,status:a.status||'confirmed',start_at:startAt,notes:a.note||'',metadata:{tech:a.tech||'',time:a.time||''},updated_at:syncedAt};
     if(a.cloudId){
       const {error}=await sb.from('appointments').update(row).eq('id',a.cloudId);
-      if(error){ console.warn('upsertAppointment',error.message); markSyncError(a,error.message); } else markSyncOk(a);
+      if(error){ console.warn('upsertAppointment',error.message); markSyncError(a,error.message); } else { a.updatedAt=syncedAt; markSyncOk(a); }
     } else {
       const {data,error}=await sb.from('appointments').insert(row).select('id').single();
-      if(!error&&data?.id){ a.cloudId=data.id; markSyncOk(a); save(); }
+      if(!error&&data?.id){ a.cloudId=data.id; a.updatedAt=syncedAt; markSyncOk(a); save(); }
       else if(error){ console.warn('upsertAppointment',error.message); markSyncError(a,error.message); }
     }
   }catch(e){console.warn(e); markSyncError(a,e.message)}
@@ -392,7 +424,7 @@ async function loadInvoicesFromCloud(){
     const sb=window.supabaseClient; if(!sb) return false;
     const {data,error}=await cloudCompanyFilter(sb.from('invoices').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    mergeByCompany('invoices', data.map(r=>{
+    const localWon = mergeByCompany('invoices', data.map(r=>{
       const meta=r.metadata||{};
       const paid = r.status==='paid' || (Number(r.total_amount||0)>0 && Number(r.paid_amount||0)>=Number(r.total_amount||0));
       return {
@@ -405,6 +437,7 @@ async function loadInvoicesFromCloud(){
         date:r.issue_date||'', updatedAt:r.updated_at||r.issue_date||'', lines: meta.lines||[]
       };
     }));
+    repushLocalWinners(localWon, upsertInvoiceCloud);
     return true;
   }catch(e){console.warn(e);return false}
 }
@@ -416,20 +449,22 @@ async function upsertInvoiceCloud(inv){
     const customerLocalId = inv.customerId || vehicle?.customerId;
     const customerCloudId = await resolveCloudId('customers', customerLocalId, upsertCustomerCloud);
     const net = Number(inv.net||0), total = Number(inv.total||0);
+    const syncedAt = syncTimestamp(inv);
     const row={
       company_id:inv.companyId||'de', customer_id:customerCloudId, vehicle_id:vehicleCloudId,
       invoice_number:inv.number||'', status:inv.paid?'paid':'open',
       issue_date:inv.date||new Date().toISOString().slice(0,10),
       subtotal:net, tax_amount:Math.max(total-net,0), total_amount:total,
       paid_amount: inv.paid?total:0,
-      metadata:{type:inv.type||'Rechnung', parts:Number(inv.parts||0), labor:Number(inv.labor||0), discount:Number(inv.discount||0), taxPercent:Number(inv.tax||19), payment:inv.payment||'', repairLocalId:inv.repairId||'', lines:inv.lines||[]}
+      metadata:{type:inv.type||'Rechnung', parts:Number(inv.parts||0), labor:Number(inv.labor||0), discount:Number(inv.discount||0), taxPercent:Number(inv.tax||19), payment:inv.payment||'', repairLocalId:inv.repairId||'', lines:inv.lines||[]},
+      updated_at: syncedAt
     };
     if(inv.cloudId){
       const {error}=await sb.from('invoices').update(row).eq('id',inv.cloudId);
-      if(error){ console.warn('upsertInvoice',error.message); markSyncError(inv,error.message); } else markSyncOk(inv);
+      if(error){ console.warn('upsertInvoice',error.message); markSyncError(inv,error.message); } else { inv.updatedAt=syncedAt; markSyncOk(inv); }
     } else {
       const {data,error}=await sb.from('invoices').insert(row).select('id').single();
-      if(!error&&data?.id){ inv.cloudId=data.id; markSyncOk(inv); save(); }
+      if(!error&&data?.id){ inv.cloudId=data.id; inv.updatedAt=syncedAt; markSyncOk(inv); save(); }
       else if(error){ console.warn('upsertInvoice',error.message); markSyncError(inv,error.message); }
     }
   }catch(e){console.warn(e); markSyncError(inv,e.message)}
@@ -437,13 +472,14 @@ async function upsertInvoiceCloud(inv){
 async function upsertExpenseCloud(x){
   try{
     const sb=window.supabaseClient; if(!sb) return;
-    const row={company_id:x.companyId||'de',category:x.category||'',description:x.note||x.description||'',expense_date:x.date||new Date().toISOString().slice(0,10),net_amount:Number(x.amount||0),tax_amount:0,total_amount:Number(x.amount||0),notes:x.note||''};
+    const syncedAt = syncTimestamp(x);
+    const row={company_id:x.companyId||'de',category:x.category||'',description:x.note||x.description||'',expense_date:x.date||new Date().toISOString().slice(0,10),net_amount:Number(x.amount||0),tax_amount:0,total_amount:Number(x.amount||0),notes:x.note||'',updated_at:syncedAt};
     if(x.cloudId){
       const {error}=await sb.from('expenses').update(row).eq('id',x.cloudId);
-      if(error){ console.warn('upsertExpense',error.message); markSyncError(x,error.message); } else markSyncOk(x);
+      if(error){ console.warn('upsertExpense',error.message); markSyncError(x,error.message); } else { x.updatedAt=syncedAt; markSyncOk(x); }
     } else {
       const {data,error}=await sb.from('expenses').insert(row).select('id').single();
-      if(!error&&data?.id){ x.cloudId=data.id; markSyncOk(x); save(); }
+      if(!error&&data?.id){ x.cloudId=data.id; x.updatedAt=syncedAt; markSyncOk(x); save(); }
       else if(error){ console.warn('upsertExpense',error.message); markSyncError(x,error.message); }
     }
   }catch(e){console.warn(e); markSyncError(x,e.message)}
@@ -453,11 +489,12 @@ async function loadExpensesFromCloud(){
     const sb=window.supabaseClient; if(!sb) return false;
     const {data,error}=await cloudCompanyFilter(sb.from('expenses').select('*'));
     if(error||!Array.isArray(data)||!data.length) return false;
-    mergeByCompany('expenses', data.map(r=>({
+    const localWon = mergeByCompany('expenses', data.map(r=>({
       id:'ex_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
       category:r.category||'', note:r.notes||r.description||'', date:r.expense_date||'',
       amount:Number(r.total_amount||0), updatedAt:r.updated_at||''
     })));
+    repushLocalWinners(localWon, upsertExpenseCloud);
     return true;
   }catch(e){console.warn(e);return false}
 }
