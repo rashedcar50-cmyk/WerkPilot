@@ -613,6 +613,60 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const firstLoadIdx=cloudSrc.indexOf('loadCustomersFromCloud()', syncAllCloudBodyIdx);
   assert(retryIdx>0 && firstLoadIdx>retryIdx, 'PROOF OF FIX: syncAllCloud retries pending local writes before pulling from the cloud');
 
+  // --- Repeated-conflict bugfix (2026-11-13) --------------------------------
+  // Found by inspecting a real account's db.conflicts after ~36h of actual
+  // use: ONE invoice logged 24 separate "local wins" conflicts against the
+  // same cloud row, forever. Root cause #1: when "local wins" in
+  // upsertRow(), that only ever updated the local in-memory copy -- it
+  // never told the cloud, so the mismatch (and the conflict) re-detected
+  // itself on literally every future sync pass. Root cause #2: even once
+  // the winning version IS re-pushed, production's invoices/purchases/
+  // appointments/expenses tables have no auto-touch-on-update trigger, so
+  // a push that doesn't explicitly send updated_at leaves the cloud
+  // timestamp frozen -- the next pull would see "local newer than cloud"
+  // forever even though the real content now matches.
+  {
+    const coreSrc2=fs.readFileSync(path.join(root,'js/core.js'),'utf8');
+    assert(/function mergeByCompany\(key, rows\)\{/.test(coreSrc2) && /const localWon=\[\]/.test(coreSrc2), 'mergeByCompany() now collects conflicts that resolved with local as the winner');
+    assert(/return localWon \? list\[idx\] : null;/.test(coreSrc2), 'PROOF OF FIX: upsertRow() returns the winning merged record when local wins (and only then), so the caller can act on it');
+
+    assert(/function repushLocalWinners\(records, upsertFn\)/.test(cloudSrc), 'repushLocalWinners() exists');
+    assert((cloudSrc.match(/repushLocalWinners\(/g)||[]).length>=9, 'PROOF OF FIX: repushLocalWinners is actually called from each of the 8 load*FromCloud() functions (plus its own definition) -- not just invoices/purchases, the tables the bug was found in');
+    ['loadPurchasesFromCloud','loadCustomersFromCloud','loadInventoryFromCloud','loadVehiclesFromCloud','loadRepairsFromCloud','loadAppointmentsFromCloud','loadInvoicesFromCloud','loadExpensesFromCloud'].forEach(fn=>{
+      const idx=cloudSrc.indexOf('async function '+fn);
+      const end=cloudSrc.indexOf('\nasync function ', idx+10);
+      const body=cloudSrc.slice(idx, end>0?end:idx+1500);
+      assert(/repushLocalWinners\(/.test(body), fn+' wires up repushLocalWinners on its pull path');
+    });
+
+    assert(/function syncTimestamp\(x\)/.test(cloudSrc), 'syncTimestamp() exists -- the one shared timestamp both sides must end up sharing after a push');
+    ['upsertPurchaseCloud','upsertInvoiceCloud','upsertAppointmentCloud','upsertExpenseCloud'].forEach(fn=>{
+      const idx=cloudSrc.indexOf('async function '+fn);
+      const end=cloudSrc.indexOf('\n}', idx);
+      const body=cloudSrc.slice(idx, end);
+      assert(/syncTimestamp\(/.test(body), fn+' computes a syncTimestamp before building its push row');
+      assert(/updated_at:\s*syncedAt/.test(body), fn+' PROOF OF FIX: explicitly sends updated_at on every push, instead of relying on a DB trigger that production does not actually have');
+      assert(/\.updatedAt\s*=\s*syncedAt/.test(body), fn+' PROOF OF FIX: stamps the LOCAL record with the same timestamp just pushed, so local and cloud agree immediately -- no gap for the next pull to misread as a new conflict');
+    });
+  }
+
+  // Functional proof of upsertRow()'s new return contract, independent of
+  // cloud.js: a brand-new record returns null (nothing to repush), a
+  // "cloud wins" merge returns null (cloud is already right), and a
+  // "local wins" merge returns the merged record itself.
+  {
+    const rowSandbox={ console, window:{addEventListener:()=>{}}, localStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}}, document:{createElement:()=>({}), querySelectorAll:()=>[]} };
+    vm.createContext(rowSandbox);
+    vm.runInContext(fs.readFileSync(path.join(root,'js/core.js'),'utf8'), rowSandbox);
+    vm.runInContext(`db={invoices:[]}; session={company:{id:'de'}}; this.db=db; this.session=session;`, rowSandbox);
+    const insertResult=rowSandbox.upsertRow('invoices', {id:'i1', number:'N1', companyId:'de', updatedAt:'2026-01-01T00:00:00.000Z', total:10});
+    assert(insertResult===null, 'a brand-new record (no existing match) returns null -- nothing to repush, it was just inserted');
+    const cloudWinsResult=rowSandbox.upsertRow('invoices', {id:'i1cloud', number:'N1', companyId:'de', updatedAt:'2026-01-02T00:00:00.000Z', total:20});
+    assert(cloudWinsResult===null, 'when the INCOMING (cloud) record is newer, upsertRow returns null -- the cloud is already correct, nothing to push back');
+    const localWinsResult=rowSandbox.upsertRow('invoices', {id:'i1cloud2', number:'N1', companyId:'de', updatedAt:'2026-01-01T12:00:00.000Z', total:30});
+    assert(localWinsResult && localWinsResult.total===20, 'PROOF OF FIX: when LOCAL is newer than this incoming (stale) cloud copy, upsertRow returns the winning local-dominant record so the caller can push it back');
+  }
+
   // --- Login-unification (2026-11-13): completeLogin no longer records a
   // "did the cloud sign-in succeed" result after the fact -- it IS the
   // cloud sign-in result, so there is nothing left to silently discard.
