@@ -178,15 +178,22 @@ function invoiceModel(x){
   due.setDate(due.getDate()+Number(w.paymentDays||0));
   return {w,cust,veh,filled,teile,leist,net,vat,vat19s,vat7s,total,kd,beleg,leistDate:deDate(x.serviceDate||x.date),dueDate:deDate(due),auftrag,repair,x};
 }
+// The last column shows the tax AMOUNT of the line (line sum x rate), not
+// the bare rate. If every line has the same rate, the rate stands once in
+// the column head ("MwSt. 19 %"); with mixed rates each cell names its own.
+function lineVat(l){ return Math.round(Number(l.sum||0)*Number(l.tax||0))/100; }
 function posTable(filled){
+  const rates=[...new Set(filled.map(l=>Number(l.tax||0)))];
+  const one=rates.length===1;
+  const pct=r=>String(r).replace('.',',')+' %';
   return `<table class="pos-tbl">
-    <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th style="white-space:nowrap">E-Preis</th><th>Summe</th><th style="white-space:nowrap">MwSt. %</th></tr></thead>
+    <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th style="white-space:nowrap">E-Preis</th><th>Summe</th><th style="white-space:nowrap">MwSt.${one?' '+pct(rates[0]):''}</th></tr></thead>
     <tbody>${filled.map(l=>`<tr>
       <td>${l.pos}</td><td>${esc(l.sku)}</td><td>${esc(l.name)}</td>
       <td>${deMoney(l.qty)}</td>
       <td>${deMoney(l.price)}</td>
       <td>${deMoney(l.sum)}</td>
-      <td>${l.tax}</td>
+      <td style="white-space:nowrap">${deMoney(lineVat(l))}${one?'':' ('+pct(Number(l.tax||0))+')'}</td>
     </tr>`).join('')}</tbody></table>`;
 }
 function totBlock(m){
