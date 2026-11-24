@@ -176,6 +176,13 @@ window.passwordResetScreen=passwordResetScreen;
 function boot(){
   if(window.WP && WP.CloudAuth && WP.CloudAuth.isRecoveryLink()){ return passwordResetScreen(); }
   login();
+  // Still signed in on this browser (server-checked)? Then open the app
+  // without asking for the password again. "Logout" ends this.
+  if(window.WP && WP.CloudAuth && WP.CloudAuth.restoreCloudSession){
+    WP.CloudAuth.restoreCloudSession().then(r=>{
+      if(r && r.ok && !session && document.getElementById('loginBtn')) completeLogin(r.user);
+    }).catch(()=>{});
+  }
 }
 window.boot=boot;
 
