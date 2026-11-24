@@ -1901,7 +1901,7 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
 // ---- The workshop that was open last is reopened after login (1.35.0) ----
 {
   const ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
-  assert(/db\.companies\.find\(c=>c\.id===db\.settings\.lastCompanyId\)\|\|db\.companies\[0\]/.test(ap) && (ap.match(/db\.settings\.lastCompanyId=/g)||[]).length>=2, 'login reopens the last workshop; switching and creating remember it');
+  assert(/vis\.find\(c=>c\.id===db\.settings\.lastCompanyId\)\|\|vis\[0\]/.test(ap) && (ap.match(/db\.settings\.lastCompanyId=/g)||[]).length>=2, 'login reopens the last workshop; switching and creating remember it');
 }
 // ---- Session restore (1.36.0) ----
 {
@@ -1968,6 +1968,38 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const lab=sb.WP.Teiltool.engineLabel({engine:'1.4 TSI',kw:90,ps:122,fuel:'Benzin',body:'Schrägheck',from:'2008-10',to:'2012-11',engineCodes:'CAXA'});
   assert(lab==='1.4 TSI · 90 kW / 122 PS · Benzin · Schrägheck · 2008-10 – 2012-11 · CAXA', 'engine choices show power, fuel, body and production years');
   (async()=>{ assert(await sb.WP.Teiltool.models('1;drop')===null && await sb.WP.Teiltool.makes()===null, 'bad ids are not sent; an offline catalogue fails soft'); })();
+}
+// ---- Workshop onboarding: memberships decide what a login sees (1.41.0) ----
+{
+  const co=fs.readFileSync(path.join(root,'js/core.js'),'utf8'), ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), au=fs.readFileSync(path.join(root,'js/auth.js'),'utf8');
+  const fnA=co.match(/function applyCloudMemberships\(profile, rows, meta, companies\)\{[\s\S]*?\n\}/)[0];
+  const fnR=co.match(/function roleForCompany\(profile, cid\)\{[\s\S]*?\n\}/)[0];
+  const fnV=co.match(/function visibleCompanies\(\)\{[\s\S]*?\n\}/)[0];
+  const mk=(dbCompanies)=>{ const db={companies:dbCompanies}; const f=new Function('db','WORKSHOP_KEYS','session',fnA+fnR+fnV+'; return {apply:applyCloudMemberships, role:roleForCompany, vis:(s)=>{ session=s; return visibleCompanies(); }, db};'); return f(db,['workshopBrand','workshopName','workshopIban','workshopTaxId','workshopAddress','workshopAccountHolder'],null); };
+  const tabah=[{id:'de',name:'TABAH AUTO',profile:{workshopIban:'DE00 SECRET',workshopTaxId:'DE123'}},{id:'es',name:'Demo'}];
+  // a new external workshop logs in on a fresh device
+  const A=mk(JSON.parse(JSON.stringify(tabah)));
+  const p=A.apply({email:'w@x.de',role:'developer'},[{company_id:'ws_1',role:'manager',active:true},{company_id:'ws_old',role:'manager',active:false}],{workshops:{ws_1:{name:'Werkstatt Müller'}}},[]);
+  assert(p.cloudScoped===true && p.companies.join()==='ws_1', 'only ACTIVE memberships count');
+  const made=A.db.companies.find(c=>c.id==='ws_1');
+  assert(made && made.name==='Werkstatt Müller' && made.profile.workshopBrand==='Werkstatt Müller' && made.profile.workshopIban==='' && made.profile.workshopTaxId==='', 'PROOF: a new workshop starts with its own name and EMPTY bank/tax data, never another company\'s');
+  assert(A.vis({user:p}).map(c=>c.id).join()==='ws_1', 'PROOF: the workshop sees only itself, not TABAH AUTO or demo data on the device');
+  assert(A.role(p,'ws_1')==='manager', 'the workshop owner is manager, not developer, whatever the device default says');
+  // the platform owner
+  const B=mk(JSON.parse(JSON.stringify(tabah)).concat([{id:'ws_local',name:'local test'}]));
+  const o=B.apply({email:'o@x.de',role:'developer'},[{company_id:'de',role:'developer',active:true}],{},[]);
+  assert(B.vis({user:o}).map(c=>c.id).join()==='de' && B.role(o,'de')==='developer' && B.db.companies.length===3, 'the owner sees the workshops he is a member of; nothing local is deleted');
+  // no memberships readable (offline): behaviour as before
+  const C=mk(JSON.parse(JSON.stringify(tabah)));
+  const n=C.apply({email:'o@x.de',role:'developer'},[],{},[]);
+  assert(!n.cloudScoped && C.vis({user:n}).length===2, 'without membership data the list is unchanged');
+  assert(/isDev\(\)\?`<button class="ico-btn" id="addWorkshop"/.test(ap), 'only the platform owner gets the add-workshop button');
+  assert(/functions\.invoke\('workshop-admin'/.test(ap) && /from\('company_memberships'\)\.select\('company_id,role,active'\)/.test(au), 'the app registers workshops through the server function and reads memberships');
+  assert(/if\(window\._wpLoginBusy \|\| session\) return;/.test(ap), 'login button and session restore cannot both complete the login');
+  const fx=fs.readFileSync(path.join(root,'supabase/functions/workshop-admin/index.ts'),'utf8');
+  assert(/\.eq\('role', 'developer'\)/.test(fx) && /\.eq\('company_id', HOME_COMPANY\)/.test(fx) && /return reply\(403/.test(fx), 'server: only the platform owner may create workshops');
+  assert(/email_in_use/.test(fx) && /deleteUser\(made\.user\.id\)/.test(fx) && (fx.match(/from\('companies'\)\.delete\(\)/g)||[]).length===2, 'server: no existing login is reused; failed steps are undone');
+  assert(/role: 'manager'/.test(fx) && !/console\.log\([^)]*email/.test(fx) && !/SERVICE_ROLE_KEY[^)]*reply/.test(fx), 'server: the new login manages only its workshop; nothing personal is logged');
 }
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');

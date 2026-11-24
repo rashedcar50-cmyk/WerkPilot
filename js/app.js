@@ -71,12 +71,26 @@ function login(){
 // The one place a session is actually granted, now fed only by a real,
 // just-verified Supabase user (see login() above) -- never a local
 // record whose password could silently drift from the cloud's.
-function completeLogin(user){
+async function completeLogin(user){
+  // Login button and session restore can both arrive here; only one runs.
+  if(window._wpLoginBusy || session) return;
+  window._wpLoginBusy=true; setTimeout(()=>{ window._wpLoginBusy=false; },8000);
   const startPage=(location.search.match(/[?&]page=([a-z]+)/)||[])[1]||'dashboard';
   const profile=resolveCloudProfile(user.email);
+  // Which workshops does this login belong to? (see applyCloudMemberships)
+  try{
+    if(window.WP && WP.CloudAuth && WP.CloudAuth.loadMemberships){
+      const m=await Promise.race([WP.CloudAuth.loadMemberships(), new Promise(r=>setTimeout(()=>r(null),6000))]);
+      if(m) applyCloudMemberships(profile, m.rows, user.user_metadata, m.companies);
+    }
+  }catch(e){}
   // Reopen the workshop that was open last (e.g. when the Teiltool cart
   // opens the app in a new tab), not always the first one.
-  session={user:profile, company:db.companies.find(c=>c.id===db.settings.lastCompanyId)||db.companies[0], page:startPage};
+  session={user:profile, company:null, page:startPage};
+  const vis=visibleCompanies();
+  session.company=vis.find(c=>c.id===db.settings.lastCompanyId)||vis[0]||db.companies[0];
+  profile.role=roleForCompany(profile, session.company.id);
+  window._wpLoginBusy=false;
   audit('login');
   db.settings.cloudAuthError='';
   db.settings.cloudAuthCheckedAt=new Date().toISOString();
@@ -222,7 +236,7 @@ function bindShellEvents(){
  if($('#backBtn')) $('#backBtn').onclick=()=>{ closeMobileMenus(); goBack(); };
  const lo=$('#logout');
  if(lo) lo.onclick=async ()=>{audit('logout'); try{ await WP.CloudAuth.signOutCloud(); }catch(e){} session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
- if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);db.settings.lastCompanyId=session.company&&session.company.id;save();session.page='dashboard';syncAllCloud(true).finally(()=>render(true))};
+ if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);session.user.role=roleForCompany(session.user,session.company.id);db.settings.lastCompanyId=session.company&&session.company.id;save();session.page='dashboard';syncAllCloud(true).finally(()=>render(true))};
  if($('#addWorkshop')) $('#addWorkshop').onclick=()=>{ closeMobileMenus(); newWorkshopModal(); };
  if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{closeMobileMenus();db.settings.uiLang=e.target.value;save(true);applyUiLang();render(true);};
  if($('#menu')) $('#menu').onclick=()=>{
@@ -300,7 +314,7 @@ function render(force){
     <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(typeof companyLabel==='function'?companyLabel(c):(c.name||'TABAH AUTO'))} · ${c.country}</option>`).join('')}</select>
     <input class="searchbox" id="qsearch" placeholder="${t('search')}">
     <select id="uiLangTop" title="${t('language')}">${langOptions(db.settings.uiLang||'de')}</select>
-    ${canEdit()?`<button class="ico-btn" id="addWorkshop" type="button" title="${t('newWorkshop')}">＋</button>`:''}
+    ${isDev()?`<button class="ico-btn" id="addWorkshop" type="button" title="${t('newWorkshop')}">＋</button>`:''}
    </div>
    <button class="ico-btn" id="shopBtnTop" type="button" title="Handwerkzeuge">🛒</button>
    <button class="ico-btn mob-only" id="moreBtn" type="button" aria-label="More">⋯</button>
@@ -1524,9 +1538,26 @@ function newWorkshopModal(){
     <div class="field"><label>${t('country')}</label><select id="nwCountry"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="ES">España</option><option value="NL">Nederland</option></select></div>
     <div class="field"><label>${t('currency')}</label><input id="nwCur" value="EUR"></div>
     <div class="field span2"><label>${t('address')}</label><input id="nwAddr"></div>
-  </div>`, ()=>{
+    <div class="field span2"><label>${t('wsEmail')}</label><input id="nwEmail" type="email" dir="ltr" autocomplete="off" placeholder="werkstatt@example.de"><div class="hint">${t('wsEmailHint')}</div></div>
+  </div>`, async ()=>{
     const brand=$('#nwBrand').value.trim(), name=$('#nwName').value.trim();
     if(!brand && !name) return toast(t('enterWsName'));
+    const email=$('#nwEmail').value.trim();
+    if(email){
+      // Real workshop: registered in the cloud with its own login.
+      if(!/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(email)) return toast(t('wsEmailBad'));
+      const btn=$('#msave'); if(btn) btn.disabled=true;
+      let res=null, err='';
+      try{
+        const r=await window.supabaseClient.functions.invoke('workshop-admin',{body:{name:brand||name,email,country:$('#nwCountry').value,currency:$('#nwCur').value.trim()||'EUR'}});
+        res=r.data; if(r.error){ err='offline'; try{ const j=await r.error.context.json(); err=j.error||err; }catch(e){} }
+      }catch(e){ err='offline'; }
+      if(btn) btn.disabled=false;
+      if(!res || !res.companyId) return toast(t(err==='email_in_use'?'wsEmailUsed':err==='forbidden'?'wsNotAllowed':'wsCloudFail'));
+      audit('workshop.create', brand||name);
+      closeModal(); toast(t(res.mailed?'wsInvited':'wsCreatedNoMail'));
+      return;
+    }
     const co={id:id('ws'), name:brand||name, country:$('#nwCountry').value, currency:$('#nwCur').value.trim()||'EUR', docLang:$('#nwCountry').value==='DE'?'de':'de'};
     co.profile=defaultWorkshopProfile(co, db.settings);
     co.profile.workshopBrand=brand||name;
