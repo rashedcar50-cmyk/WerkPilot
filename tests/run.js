@@ -1808,6 +1808,12 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/wireInvoiceUppercase\(document\.querySelector\('\.hy-desk'\)\)/.test(ed), 'the editor wires the upper-case rule');
   assert(/insertFromPaste/.test(ed) && /function invOriginalSku/.test(ed), 'pasted or known part numbers keep their original spelling');
 }
+// ---- Editor VAT column shows the amount (1.28.0) ----
+{
+  const ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+  assert(/class="c-vat"/.test(ed) && /class="c-tax latnum"[^>]*hidden/.test(ed), 'the VAT column shows the amount; the rate field is opened on demand');
+  assert(/function refreshInvoiceVat/.test(ed) && /Math\.round\(sum\*rate\)\/100/.test(ed), 'line VAT amount = line net x rate');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

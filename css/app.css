@@ -330,7 +330,7 @@ body.nav-open{overflow:hidden;touch-action:none}
 .hy-main{padding:12px 14px;background:#fff;min-width:0}
 .hy-main .table-wrap{margin:0;border:1px solid #d5dce6;border-radius:8px;overflow:auto}
 .hy-desk table.inv-edit{width:100%;border-collapse:collapse;table-layout:fixed;min-width:640px}
-.inv-edit col.w-pos{width:30px}.inv-edit col.w-kind{width:100px}.inv-edit col.w-sku{width:13%}.inv-edit col.w-qty{width:60px}.inv-edit col.w-price{width:84px}.inv-edit col.w-sum{width:86px}.inv-edit col.w-tax{width:52px}.inv-edit col.w-del{width:34px}
+.inv-edit col.w-pos{width:30px}.inv-edit col.w-kind{width:100px}.inv-edit col.w-sku{width:13%}.inv-edit col.w-qty{width:60px}.inv-edit col.w-price{width:84px}.inv-edit col.w-sum{width:86px}.inv-edit col.w-tax{width:82px}.inv-edit col.w-del{width:34px}
 .modal:has(.hy-desk){width:min(1280px,98vw)}
 .hy-desk .inv-edit th{background:#0B2A4A;color:#fff;font-size:11.5px;font-weight:700;padding:7px 6px;text-align:start;white-space:normal;line-height:1.2;vertical-align:bottom;border:0}
 .hy-desk .inv-edit td{padding:3px 4px;border:0;border-top:1px solid #e3e8ef;vertical-align:top;background:#fff}
@@ -391,3 +391,7 @@ body.nav-open{overflow:hidden;touch-action:none}
   .hy-entry{grid-template-columns:1fr 90px}.hy-entry #katySku,.hy-entry #qName,.hy-entry .btn{grid-column:1/-1}
   .hy-entry .btn{height:44px}
 }
+.hy-desk .c-vat{width:100%;min-height:32px;border:1px solid transparent;border-radius:4px;background:transparent;color:#16202c;font:inherit;font-size:14px;font-variant-numeric:tabular-nums;text-align:right;direction:ltr;padding:0 7px;cursor:pointer;line-height:1.15}
+.hy-desk .c-vat::after{content:attr(data-rate);display:block;font-size:10.5px;color:#7a8799}
+.hy-desk .c-vat:hover,.hy-desk .c-vat:focus{border-color:#c5ceda;background:#fff;outline:none}
+.hy-desk .c-vat[hidden],.hy-desk .c-tax[hidden]{display:none}
