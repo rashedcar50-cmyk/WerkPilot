@@ -420,3 +420,35 @@ body.nav-open{overflow:hidden;touch-action:none}
 .kba-row #ttKba{flex:none;white-space:nowrap}
 .tt-kba-out{margin-top:6px}
 .tt-kba-c{margin:3px 4px 0 0}
+
+/* ---- Vehicle form (1.40.0): sections, compact fields, catalogue choice ---- */
+.modal:has(.vf){width:min(900px,98vw)}
+.vf{color:#16202c}
+.vf-sec{border:1px solid #d5dce6;border-radius:10px;background:#fff;padding:12px 14px;margin:0 0 10px}
+.vf-find{background:#f6f8fb}
+.vf-h{font-size:12px;font-weight:800;letter-spacing:.03em;color:#0B2A4A;margin:0 0 8px}
+.vf-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px;align-items:end}
+.vf .field{margin:0;min-width:0}.vf .vf-2{grid-column:span 2}.vf .vf-4{grid-column:1/-1}
+.vf .field label{display:block;font-size:11.5px;font-weight:700;color:#566579;margin:0 0 3px}
+.vf input,.vf select{width:100%;height:36px;padding:0 9px;font-size:14px;border:1px solid #c5ceda;border-radius:5px;background:#fff;color:#16202c;box-shadow:none}
+.vf input:focus,.vf select:focus{outline:2px solid #C45C12;outline-offset:0;border-color:#C45C12}
+.vf select:disabled{background:#eef1f5;color:#8a96a6}
+.vf input[data-cat="1"]{background:#f3f8f3;border-color:#a9c9ad}
+.vf .kba-row{display:grid;grid-template-columns:86px 86px minmax(0,1fr);gap:6px}
+.vf #ttModel,.vf #ttEngine,.vf #ttMake{direction:ltr;text-align:left}
+.vf #ttMake{text-transform:uppercase}
+.vf #ttMake::placeholder{text-transform:none}
+.vf .kba-row #ttKba{height:36px;border-radius:5px;background:#0B2A4A;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vf-or{text-align:center;font-size:11.5px;color:#7a8799;display:flex;align-items:center;gap:10px}
+.vf-or::before,.vf-or::after{content:"";flex:1;border-top:1px solid #d5dce6}
+.vf .tt-kba-out{margin:8px 0 0;font-size:12.5px;min-height:16px}
+.vf-btns{display:flex;gap:6px;flex-wrap:wrap}.vf-btns .btn{background:#fff;color:#0B2A4A;border:1px solid #c5ceda;border-radius:5px}
+.vf .vf-more{margin:0 0 10px;border-radius:10px;border-color:#d5dce6}.vf .vf-more .vf-grid{margin-top:10px}
+.vf+.form-grid-details{border-radius:10px;border-color:#d5dce6;margin-bottom:90px}
+.vf+.form-grid-details .form-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+.vf+.form-grid-details input,.vf+.form-grid-details textarea{padding:8px 9px;border-radius:5px;font-size:14px}
+@media(max-width:700px){
+  .vf-grid,.vf+.form-grid-details .form-grid{grid-template-columns:1fr 1fr}
+  .vf input,.vf select,.vf .kba-row #ttKba{height:44px;font-size:16px}
+  .vf .kba-row{grid-template-columns:1fr 1fr}.vf .kba-row #ttKba{grid-column:1/-1}
+}

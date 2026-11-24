@@ -1953,6 +1953,22 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const pr=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
   assert(/const brand=String\(w\.brand\|\|w\.name\|\|''\)\.trim\(\);/.test(pr) && !/w\.workshopBrand\|\|w\.workshopName/.test(pr.split('function buildWorkshopRechnung')[1].slice(0,900)), 'the letterhead reads brand/name as workshopInfo() provides them');
 }
+// ---- Vehicle form: catalogue choice, compact sections (1.40.0) ----
+{
+  const cu=fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), br=fs.readFileSync(path.join(root,'js/teiltool-bridge.js'),'utf8'), i18=fs.readFileSync(path.join(root,'i18n.js'),'utf8');
+  const form=cu.slice(cu.indexOf("modal(t('addVehicle')"), cu.indexOf("scheinExtraFields"));
+  ['cu','pl','vkm','hsn','tsn','ttKba','vin','ttMake','ttModel','ttEngine','ttCatId','mk','mo','firstreg','yr','cc','kw','fuel','en','pa','vnext','vrpm','vmaxw','vseats','vklass','partslinkBtn','distriBtn'].forEach(id=>assert(form.includes('id="'+id+'"'), 'vehicle form keeps field #'+id));
+  assert(/catalogVehicleId:\$\('#ttCatId'\)/.test(cu), 'the catalogue vehicle id is stored with the vehicle');
+  assert(!/bindKbaEnter\('#hsn','#tsn',\{[^}]*year:/.test(cu), 'the year is no longer guessed from the KBA table');
+  assert(/el\.value && el\.dataset\.cat!=='1'/.test(br) && /e\.isTrusted\) delete el\.dataset\.cat/.test(br), 'catalogue data never overwrites typed values silently');
+  assert(!/catSet\(f\.(yr|year|firstreg)/.test(br) && /vfBuilt/.test(br), 'production years are shown as a hint, not written into year or first registration');
+  assert((i18.match(/firstReg:'/g)||[]).length>=3 && (i18.match(/vfFind:'/g)||[]).length===3, 'new labels exist in en/de/ar');
+  const sb={window:{}, document:{addEventListener(){}, getElementById(){return null;}}, AbortController, setTimeout, clearTimeout, JSON, Math, Number, String, Object, Array, Promise, encodeURIComponent, fetch:async()=>({ok:false,status:0,json:async()=>null})};
+  sb.window=sb; vm.createContext(sb); vm.runInContext(br,sb);
+  const lab=sb.WP.Teiltool.engineLabel({engine:'1.4 TSI',kw:90,ps:122,fuel:'Benzin',body:'Schrägheck',from:'2008-10',to:'2012-11',engineCodes:'CAXA'});
+  assert(lab==='1.4 TSI · 90 kW / 122 PS · Benzin · Schrägheck · 2008-10 – 2012-11 · CAXA', 'engine choices show power, fuel, body and production years');
+  (async()=>{ assert(await sb.WP.Teiltool.models('1;drop')===null && await sb.WP.Teiltool.makes()===null, 'bad ids are not sent; an offline catalogue fails soft'); })();
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
