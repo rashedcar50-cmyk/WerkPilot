@@ -1917,6 +1917,17 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/sb\.auth\.getUser\(\)/.test(au.split('restoreCloudSession')[1]), 'restore is checked with the server (getUser), not only local storage');
   assert(/signOutCloud\(\)/.test(ap.split("lo.onclick")[1].slice(0,200)), 'logout still ends the cloud session');
 }
+// ---- Findings of the end-to-end run with a second workshop (1.37.0) ----
+{
+  const pr=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8'), lk=fs.readFileSync(path.join(root,'js/lookup.js'),'utf8'), cu=fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), br=fs.readFileSync(path.join(root,'js/teiltool-bridge.js'),'utf8'), ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+  assert(/ownBrand\?`<div class="ta-head"><img class="ta-logo"/.test(pr) && /ta-brand-text/.test(pr) && /'Ihr Team von '\+esc\(brand\)/.test(pr), 'another workshop never prints the TABAH AUTO logo or team name');
+  const fn=lk.match(/function invoicePrefix\(\)\{[\s\S]*?\n\}/)[0];
+  const mk=(cid,brand)=>new Function('session','workshop',fn+'; return invoicePrefix();')({company:{id:cid}},()=>({workshopBrand:brand}));
+  assert(mk('de','TABAH AUTO')==='DE' && mk('es','X')==='ES', 'built-in workshops keep their number prefix');
+  assert(mk('ws_mwusvgikhrips','TESTWERKSTATT MUSTER')==='TM' && mk('ws_1','Öl & Reifen Müller KFZ Service')==='ORMK' && mk('ws_1','')==='WS', 'a new workshop gets its initials, not a technical id');
+  assert(/id="ttKbaC"/.test(cu) && /ttKbaC:\{hsn:'vhsn'/.test(br), 'the customer form has the vehicle search too');
+  assert(!/'Netto: '\+money/.test(ed) && !/Position übernommen/.test(ed), 'issue dialog and hint are translated');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

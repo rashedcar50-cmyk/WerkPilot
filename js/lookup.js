@@ -302,13 +302,22 @@ function bindKbaEnter(hsnId,tsnId,fillIds){
     tEl.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run(); }});
   }
 }
+// Number prefix of the workshop: the short id for the built-in workshops
+// (DE, ES); for workshops added later the initials of their name
+// ("TESTWERKSTATT MUSTER" -> TM) instead of a technical id.
+function invoicePrefix(){
+  const cid=(session?.company?.id||'RE').toString();
+  if(!/^ws_/i.test(cid)) return cid.slice(0,4).toUpperCase();
+  const w=workshop();
+  const ini=String(w.workshopBrand||w.workshopName||'').toUpperCase().split(/[^A-Z0-9ÄÖÜ]+/).filter(Boolean).map(x=>x[0]).join('').replace(/[ÄÖÜ]/g,c=>({'Ä':'A','Ö':'O','Ü':'U'})[c]).slice(0,4);
+  return ini||'WS';
+}
 function nextInvoiceNumber(){
   const y=new Date().getFullYear();
   const w=workshop();
   w.invoiceSeq=Number(w.invoiceSeq||0)+1;
   save();
-  const prefix=(session?.company?.id||'RE').toString().slice(0,4).toUpperCase();
-  return 'RE-'+prefix+'-'+y+'-'+String(w.invoiceSeq).padStart(4,'0');
+  return 'RE-'+invoicePrefix()+'-'+y+'-'+String(w.invoiceSeq).padStart(4,'0');
 }
 function nextAuftragNumber(){
   const y=new Date().getFullYear();

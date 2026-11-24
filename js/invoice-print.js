@@ -245,9 +245,15 @@ function buildWorkshopRechnung(x){
   const tpl=workshop().invoiceTpl||db.settings.invoiceTpl||'modern';
   const {w,cust}=m;
   const logo=window.WP_INVOICE_LOGO||'logo-invoice.jpg';
-  const head=`<div class="ta-head"><img class="ta-logo" src="${logo}" alt="TABAH AUTO"></div>
+  // Only the company's own workshop prints the TABAH AUTO logo and team
+  // name. Any other workshop gets its own name as the letterhead -- never
+  // another company's logo on its invoices.
+  const brand=String(w.workshopBrand||w.workshopName||'').trim();
+  const ownBrand=/tabah/i.test(brand+' '+String(w.workshopName||''));
+  const head=(ownBrand?`<div class="ta-head"><img class="ta-logo" src="${logo}" alt="TABAH AUTO"></div>`
+      :`<div class="ta-head ta-head-text"><div class="ta-brand-text">${esc(brand)}</div></div>`)+`
       <div class="ta-rule"></div>`;
-  const thanks=`<p class="rh-thanks">Vielen Dank für Ihr Vertrauen. Wir sind gerne für Sie da.<br><em>Mit freundlichen Grüßen<br>Ihr Tabah Auto Service Team</em></p>`;
+  const thanks=`<p class="rh-thanks">Vielen Dank für Ihr Vertrauen. Wir sind gerne für Sie da.<br><em>Mit freundlichen Grüßen<br>${ownBrand?'Ihr Tabah Auto Service Team':'Ihr Team von '+esc(brand)}</em></p>`;
   // Page frame: the content sits in a table whose footer row reserves the
   // room for the company footer; in print the footer is fixed to the bottom
   // of EVERY page, on screen (preview, PDF, saved file) it sits at the
