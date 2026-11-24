@@ -43,6 +43,22 @@
     }catch(e){ return {ok:false, error:e}; }
   }
 
+  // Session restore: a browser that is still signed in (until "logout") does
+  // not ask for the password again on every page load. getUser() asks the
+  // SERVER whether the stored session is still valid -- a merely stored,
+  // expired or revoked session never opens the app.
+  async function restoreCloudSession(){
+    const sb = client();
+    if(!sb) return {ok:false, skipped:true};
+    try{
+      const {data:s} = await sb.auth.getSession();
+      if(!s || !s.session) return {ok:false};
+      const {data, error} = await sb.auth.getUser();
+      if(error || !data || !data.user || !data.user.email) return {ok:false, error};
+      return {ok:true, user:data.user};
+    }catch(e){ return {ok:false, error:e}; }
+  }
+
   async function signOutCloud(){
     const sb = client();
     if(!sb) return;
@@ -143,7 +159,7 @@
   }
 
   W.CloudAuth = {
-    cloudAuthAvailable, signInCloud, signOutCloud,
+    cloudAuthAvailable, signInCloud, signOutCloud, restoreCloudSession,
     changeCloudPassword, requestPasswordReset, isRecoveryLink,
     completePasswordReset, clearRecoveryParamsFromUrl, redirectBase
   };

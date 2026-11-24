@@ -1903,6 +1903,20 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
   assert(/db\.companies\.find\(c=>c\.id===db\.settings\.lastCompanyId\)\|\|db\.companies\[0\]/.test(ap) && (ap.match(/db\.settings\.lastCompanyId=/g)||[]).length>=2, 'login reopens the last workshop; switching and creating remember it');
 }
+// ---- Session restore (1.36.0) ----
+{
+  const au=fs.readFileSync(path.join(root,'js/auth.js'),'utf8'), ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  const mk=(sess,user,err)=>{ const sb={window:{}, console}; sb.window=sb; sb.location={hash:'',search:'',origin:'https://x',pathname:'/'}; sb.supabaseClient={auth:{getSession:async()=>({data:{session:sess}}), getUser:async()=>({data:{user}, error:err})}}; vm.createContext(sb); vm.runInContext(au,sb); return sb.WP.CloudAuth; };
+  (async()=>{
+    assert((await mk(null,{email:'a@b.de'}).restoreCloudSession()).ok===false, 'no stored session -> login form');
+    assert((await mk({},null,{message:'expired'}).restoreCloudSession()).ok===false, 'a session the server rejects does not open the app');
+    const r=await mk({}, {email:'a@b.de'}).restoreCloudSession();
+    assert(r.ok===true && r.user.email==='a@b.de', 'a server-confirmed session opens the app without the password');
+  })().catch(e=>{ console.error('FAIL session restore async',e); process.exitCode=1; });
+  assert(/restoreCloudSession\(\)\.then\(r=>\{\s*if\(r && r\.ok && !session && document\.getElementById\('loginBtn'\)\) completeLogin\(r\.user\)/.test(ap), 'boot restores the session only while the login form is still showing');
+  assert(/sb\.auth\.getUser\(\)/.test(au.split('restoreCloudSession')[1]), 'restore is checked with the server (getUser), not only local storage');
+  assert(/signOutCloud\(\)/.test(ap.split("lo.onclick")[1].slice(0,200)), 'logout still ends the cloud session');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
