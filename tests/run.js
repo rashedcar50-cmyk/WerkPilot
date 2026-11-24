@@ -1948,6 +1948,11 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(mine.invoices.find(i=>i.id==='i1').total===99, 'a newer version from the other tab replaces the older one here');
   assert(/addEventListener\('storage'/.test(co) && /e\.key!==storeKey/.test(co), 'tabs listen for each other\'s saves');
 }
+// ---- Letterhead uses the invoice model's own field names (1.39.0) ----
+{
+  const pr=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+  assert(/const brand=String\(w\.brand\|\|w\.name\|\|''\)\.trim\(\);/.test(pr) && !/w\.workshopBrand\|\|w\.workshopName/.test(pr.split('function buildWorkshopRechnung')[1].slice(0,900)), 'the letterhead reads brand/name as workshopInfo() provides them');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
