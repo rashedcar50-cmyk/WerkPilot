@@ -418,9 +418,24 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       $('#katyHint').textContent=(hit.source||'OK')+' — '+hit.name;
       rememberKatyArticle(hit);
     } else {
-      addInvoiceRow({sku,name:typed||sku,qty,price:0,tax:+$('#ft').value||19,kind});
-      $('#katyHint').textContent=sku?t('notFoundLocal'):'Position übernommen';
-      if(sku) openWebSearch(sku);
+      const tax=+$('#ft').value||19;
+      const plain=()=>{
+        addInvoiceRow({sku,name:typed||sku,qty,price:0,tax,kind});
+        if($('#katyHint')) $('#katyHint').textContent=sku?t('notFoundLocal'):'Position übernommen';
+        if(sku) openWebSearch(sku);
+        refreshInvoiceSums();
+      };
+      // Unknown here: ask the Teiltool shop for its title and selling price.
+      if(sku && kind!=='labor' && window.WP && WP.Teiltool){
+        $('#katyHint').textContent='Teiltool …';
+        WP.Teiltool.article(sku,tax).then(a=>{
+          if(!document.querySelector('#invRows')) return;
+          if(!a) return plain();
+          addInvoiceRow({sku:a.sku,name:typed||a.name,qty,price:a.price,tax,kind});
+          if($('#katyHint')) $('#katyHint').textContent='Teiltool — '+a.name;
+          refreshInvoiceSums();
+        }).catch(plain);
+      } else plain();
     }
     $('#katySku').value=''; if($('#qName')) $('#qName').value=''; $('#katySku').focus();
   };

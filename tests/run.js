@@ -1870,6 +1870,34 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/\+tsn\+'&wp=1'/.test(appS) && /fahrzeugsuche\?wp=1'/.test(appS), 'Teiltool links carry wp=1');
   assert(/if\(ok \|\| label\)/.test(src), 'a vehicle without KBA numbers is still shown by name');
 }
+// ---- Teiltool bridge: vehicle search, article lookup, customer account (1.34.0) ----
+{
+  const src=fs.readFileSync(path.join(root,'js/teiltool-bridge.js'),'utf8');
+  const calls=[];
+  const sb={window:{}, document:{addEventListener(){}, getElementById(){return null;}}, AbortController, setTimeout, clearTimeout, JSON, Math, Number, String, Object, encodeURIComponent,
+    fetch:async(u,o)=>{ calls.push([u,o]); return sb._reply(u); }};
+  sb.window=sb; vm.createContext(sb); vm.runInContext(src,sb);
+  const T=sb.WP.Teiltool;
+  assert(T.netPrice(3570,true,19)===30 && T.netPrice(3570,false,19)===35.7, 'shop gross price becomes the net editor price');
+  (async()=>{
+    assert((await T.kba('35','ASL')).error==='input' && calls.length===0, 'a half KBA number is not sent');
+    sb._reply=()=>({ok:true,status:200,json:async()=>({vehicles:[{make:'OPEL'}]})});
+    const k=await T.kba('0035','aslx');
+    assert(k.vehicles.length===1 && /\/fz\/kba\?hsn=0035&tsn=ASL$/.test(calls[0][0]), 'vehicle search uses the shop\'s own KBA service');
+    assert(await T.article('GDB1330',19)===null && calls.length===1, 'no article lookup without a signed-in session');
+    sb.supabaseClient={auth:{getSession:async()=>({data:{session:{access_token:'tok'}}})}};
+    sb._reply=()=>({ok:true,status:200,json:async()=>({articles:[{sku:'GDB1330',name:'Bremsbelagsatz',priceCents:3570,taxIncluded:true}]})});
+    const a=await T.article('gdb1330',19);
+    assert(a && a.price===30 && a.name==='Bremsbelagsatz' && calls[1][1].headers.Authorization==='Bearer tok', 'article lookup sends the session and returns title and net price');
+    sb._reply=()=>({ok:false,status:503,json:async()=>({error:'not_configured'})});
+    assert(await T.article('GDB1330',19)===null && (await T.createCustomer('W')).error==='setup', 'an unconfigured server fails soft');
+    sb._reply=()=>{ throw new Error('net'); };
+    assert((await T.kba('0035','ASL')).error==='offline', 'a network error fails soft');
+  })().catch(e=>{ console.error('FAIL teiltool bridge async',e); process.exitCode=1; });
+  const ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8'), cu=fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(/WP\.Teiltool\.article\(sku,tax\)/.test(ed) && /id="ttKba"/.test(cu) && /id="ttCustomer"/.test(ap), 'editor, vehicle form and integrations use the bridge');
+  assert(!/password|X-Shopify|shpat_/i.test(src), 'the app holds no shop secret');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

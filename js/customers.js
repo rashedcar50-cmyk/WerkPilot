@@ -220,7 +220,9 @@ function vehicleModal(prefill={}){
   <div class="kba-row">
     <input id="hsn" value="${esc(prefill.hsn||'')}" maxlength="4" inputmode="numeric" placeholder="HSN 2.1">
     <input id="tsn" value="${esc(prefill.tsn||'')}" maxlength="3" placeholder="TSN 2.2">
+    <button type="button" class="btn small" id="ttKba">🔎 ${t('ttKbaBtn')}</button>
   </div>
+  <div id="ttKbaOut" class="hint tt-kba-out"></div>
  </div>
  <div class="field span2"><label>${t('partsCat')}</label>
   <div class="toolbar">

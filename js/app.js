@@ -1446,7 +1446,9 @@ function integrations(){
   <div class="field"><label>${t('katyPass')}</label><input id="katyP" type="password" value="${esc(db.settings.katyPass||'')}"></div>
   <div class="toolbar"><button type="button" class="btn primary" id="katySave">${t('saveLogin')}</button>
   <button type="button" class="btn" id="katyGo">${t('openKaty')}</button>
-  <button type="button" class="btn" id="teiltoolGo">🛒 Teiltool</button></div>
+  <button type="button" class="btn" id="teiltoolGo">🛒 Teiltool</button>
+  <button type="button" class="btn" id="ttCustomer">${t('ttCustBtn')}</button></div>
+  <p class="hint" id="ttCustomerOut">${(typeof workshop==='function'&&workshop().teiltoolCustomerId)||db.settings.teiltoolCustomerId?t('ttCustOld'):t('ttCustHint')}</p>
   <p class="hint">${t('henryImportHint')}</p>
   <input id="henryFile" type="file" accept=".csv,.txt,.tsv" class="hidden">
   <button type="button" class="btn" id="henryPick">${t('pickFile')}</button>
