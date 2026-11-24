@@ -454,3 +454,6 @@ body.nav-open{overflow:hidden;touch-action:none}
 }
 .vf-n{display:inline-block;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:#0B2A4A;color:#fff;font-size:10.5px;text-align:center;margin-inline-end:3px}
 .vf select.vf-next{border-color:#C45C12;box-shadow:0 0 0 2px #C45C1233;background:#fffaf5}
+.vf-err{margin-top:8px;padding:8px 10px;border:1px solid #e5b5b0;background:#fdecea;color:#8a1f17;border-radius:6px;font-size:13px;font-weight:700}
+.vf-err[hidden],.vf-newc[hidden]{display:none}
+.vf .vf-bad{border-color:#c0392b!important;box-shadow:0 0 0 2px #c0392b33}

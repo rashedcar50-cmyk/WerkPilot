@@ -218,10 +218,13 @@ function vehicleModal(prefill={}){
  <div class="vf-sec">
   <div class="vf-h">${t('vfOwner')}</div>
   <div class="vf-grid">
-   <div class="field vf-2"><label>${t('customer')}</label><select id="cu"><option value="">—</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+   <div class="field vf-2"><label>${t('customer')} *</label><select id="cu"><option value="">${t('vfPickCustomer')}</option><option value="__new" ${!customers.length&&!prefill.customerId?'selected':''}>＋ ${t('newCustomer')}</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
    <div class="field"><label>${t('plate')}</label><input id="pl" dir="ltr" value="${esc(prefill.plate||'')}"></div>
    <div class="field"><label>${t('km')}</label><input id="vkm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.km||'')}"></div>
+   <div class="field vf-2 vf-newc" id="cuNewBox" ${!customers.length&&!prefill.customerId?'':'hidden'}><label>${t('vfNewCustName')} *</label><input id="cuNewName" autocomplete="off"></div>
+   <div class="field vf-2 vf-newc" id="cuNewBox2" ${!customers.length&&!prefill.customerId?'':'hidden'}><label>${t('phone')}</label><input id="cuNewPhone" dir="ltr" autocomplete="off"></div>
   </div>
+  <div id="cuErr" class="vf-err" hidden></div>
  </div>
  <div class="vf-sec vf-find">
   <div class="vf-h">${t('vfFind')}</div>
@@ -292,7 +295,18 @@ function vehicleModal(prefill={}){
  <div class="field span2"><label>Feld 22</label><textarea id="vnotes" rows="2">${esc(prefill.specialNotes||'')}</textarea></div>
  </div>
  </details>`,()=>{
-  if(!$('#cu').value)return toast(t('pickCustomerFirst'));
+  // A vehicle belongs to a customer. Nothing is saved silently without one:
+  // the reason is shown inside the form, at the field, and the form stays open.
+  const fail=(msg,el)=>{ const e=$('#cuErr'); if(e){ e.textContent=msg; e.hidden=false; } if(el){ el.classList.add('vf-bad'); try{ el.scrollIntoView({block:'center'}); el.focus(); }catch(x){} } toast(msg); };
+  if(!$('#cu').value) return fail(t('pickCustomerFirst'), $('#cu'));
+  if($('#cu').value==='__new'){
+    const nm=$('#cuNewName').value.trim();
+    if(!nm) return fail(t('needName'), $('#cuNewName'));
+    const nc={id:id('c'),companyId:session.company.id,type:'private',name:nm,contact:nm,companyName:'',taxId:'',phone:$('#cuNewPhone').value.trim(),email:'',address:'',kdNr:nextKdNr()};
+    db.customers.push(nc); audit('customer.create',nc.name); save();
+    if(typeof upsertCustomerCloud==='function') upsertCustomerCloud(nc);
+    const o=document.createElement('option'); o.value=nc.id; o.textContent=nc.name; $('#cu').appendChild(o); $('#cu').value=nc.id;
+  }
   const v={id:prefill.id||id('v'),companyId:prefill.companyId||session.company.id,cloudId:prefill.cloudId,customerId:$('#cu').value,plate:$('#pl').value.trim(),vin:$('#vin').value.trim().toUpperCase(),hsn:$('#hsn').value.trim(),tsn:$('#tsn').value.trim().toUpperCase(),kba:($('#hsn').value.trim()+' '+$('#tsn').value.trim().toUpperCase()).trim(),make:$('#mk').value.trim(),model:$('#mo').value.trim(),firstRegistration:$('#firstreg')?.value.trim()||'',year:$('#yr').value,engine:$('#en').value.trim(),paint:$('#pa').value.trim(),engine_displacement_cm3:$('#cc').value,fuel_type:$('#fuel').value,engine_power_kw:$('#kw').value,ratedRpm:$('#vrpm')?.value||'',maxWeight:$('#vmaxw')?.value||'',seats:$('#vseats')?.value||'',vehicleClass:$('#vklass')?.value||'',ocrSource:prefill.ocrSource||'',km:Number($('#vkm').value||0),nextServiceKm:Number($('#vnext').value||0),photo:prefill.photo||'',
    nextHu:$('#vhu')?.value.trim()||'',vsn:$('#vvsn')?.value.trim().toUpperCase()||'',tsnFull:$('#vtsnfull')?.value.trim()||'',vinCheckDigit:$('#vvincheck')?.value.trim()||'',
    typ1:$('#vtyp1')?.value.trim()||'',typ2:$('#vtyp2')?.value.trim()||'',typ3:$('#vtyp3')?.value.trim()||'',typ4:$('#vtyp4')?.value.trim()||'',
@@ -304,6 +318,7 @@ function vehicleModal(prefill={}){
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
   else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(window.WP&&WP.TeiltoolImport&&WP.TeiltoolImport.resume(v)){} else if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
  });
+  if($('#cu')) $('#cu').onchange=()=>{ const n=$('#cu').value==='__new'; ['#cuNewBox','#cuNewBox2'].forEach(s=>{ if($(s)) $(s).hidden=!n; }); $('#cu').classList.remove('vf-bad'); if($('#cuErr')) $('#cuErr').hidden=true; if(n&&$('#cuNewName')) $('#cuNewName').focus(); };
   $('#partslinkBtn').onclick=()=>window.open('https://www.partslink24.com/','_blank');
   if($('#distriBtn')) $('#distriBtn').onclick=()=>openDistriAutoVin($('#vin')?.value||'');
   bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en',pa:'#pa'});
