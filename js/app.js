@@ -221,6 +221,16 @@ function teiltoolUrl(vehicleId){
   // wp=1 tells the shop the visitor comes from the workshop program, so the
   // cart offers "send to workshop program".
   if(/^[0-9]{4}$/.test(hsn) && /^[A-Z0-9]{3}$/.test(tsn)) return base+'/pages/fahrzeugsuche?hsn='+hsn+'&tsn='+tsn+'&wp=1';
+  // A vehicle chosen from the catalogue (no KBA number): open the shop on
+  // exactly this catalogue vehicle instead of whatever it showed last.
+  const cid=String(v&&v.catalogVehicleId||'').trim();
+  if(/^[0-9]{1,9}$/.test(cid) && v.make && v.model){
+    const q=new URLSearchParams({fzv:cid, mk:String(v.make).slice(0,40), md:String(v.model).slice(0,80)});
+    const kw=Number(v.engine_power_kw), cc=Number(v.engine_displacement_cm3);
+    if(kw>0) q.set('kw',String(kw)); if(cc>0) q.set('cc',String(cc)); if(v.fuel_type) q.set('fu',String(v.fuel_type).slice(0,20));
+    q.set('wp','1');
+    return base+'/pages/fahrzeugsuche?'+q.toString();
+  }
   return base+'/pages/fahrzeugsuche?wp=1';
 }
 function openTeiltool(vehicleId){ window.open(teiltoolUrl(vehicleId),'_blank','noopener'); }
