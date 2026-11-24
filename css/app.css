@@ -417,3 +417,6 @@ body.nav-open{overflow:hidden;touch-action:none}
 }
 .tt-import-note{border:1px solid #e3c9a8;background:#fff7ee;color:#3a2a14;border-radius:8px;padding:9px 12px;margin:0 0 10px;font-size:13.5px;line-height:1.5}
 .tt-import-note .btn{margin-inline-start:6px;background:#0B2A4A;color:#fff;border-radius:5px}
+.kba-row #ttKba{flex:none;white-space:nowrap}
+.tt-kba-out{margin-top:6px}
+.tt-kba-c{margin:3px 4px 0 0}
