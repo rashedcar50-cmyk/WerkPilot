@@ -235,9 +235,9 @@ function vehicleModal(prefill={}){
    </div>
    <div class="field vf-2"><label>${t('vinLbl')}</label><input id="vin" dir="ltr" value="${esc(prefill.vin||'')}" maxlength="17" placeholder="W0L..."></div>
    <div class="field vf-4 vf-or"><span>${t('vfOr')}</span></div>
-   <div class="field"><label>${t('make')}</label><input id="ttMake" list="ttMakeList" autocomplete="off" placeholder="${t('vfPickMake')}"><datalist id="ttMakeList"></datalist></div>
-   <div class="field"><label>${t('model')}</label><select id="ttModel" disabled><option value="">—</option></select></div>
-   <div class="field vf-2"><label>${t('vfEngine')}</label><select id="ttEngine" disabled><option value="">—</option></select></div>
+   <div class="field"><label><b class="vf-n">1</b> ${t('make')}</label><input id="ttMake" list="ttMakeList" autocomplete="off" placeholder="${t('vfPickMake')}"><datalist id="ttMakeList"></datalist></div>
+   <div class="field"><label><b class="vf-n">2</b> ${t('model')}</label><select id="ttModel" disabled><option value="">—</option></select></div>
+   <div class="field vf-2"><label><b class="vf-n">3</b> ${t('vfEngine')}</label><select id="ttEngine" disabled><option value="">—</option></select></div>
   </div>
   <div id="ttKbaOut" class="hint tt-kba-out"></div>
   <input type="hidden" id="ttCatId" value="${esc(prefill.catalogVehicleId||'')}">
@@ -245,8 +245,8 @@ function vehicleModal(prefill={}){
  <div class="vf-sec">
   <div class="vf-h">${t('vfData')}</div>
   <div class="vf-grid">
-   <div class="field vf-2"><label>${t('make')}</label><input id="mk" value="${esc(prefill.make||'')}"></div>
-   <div class="field vf-2"><label>${t('model')}</label><input id="mo" value="${esc(prefill.model||'')}"></div>
+   <div class="field vf-2"><label>${t('make')}</label><input id="mk" autocomplete="off" value="${esc(prefill.make||'')}"></div>
+   <div class="field vf-2"><label>${t('model')}</label><input id="mo" autocomplete="off" value="${esc(prefill.model||'')}"></div>
    <div class="field"><label>${t('firstReg')}</label><input id="firstreg" dir="ltr" value="${esc(prefill.firstRegistration||'')}" placeholder="TT.MM.JJJJ"></div>
    <div class="field"><label>${t('year')}</label><input id="yr" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.year||'')}"></div>
    <div class="field"><label>${t('displacement')}</label><input id="cc" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_displacement_cm3||'')}"></div>

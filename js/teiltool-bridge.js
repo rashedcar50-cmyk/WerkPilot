@@ -110,7 +110,10 @@
   });
   // make -> model -> engine
   const opt=(v,tx)=>{ const o=document.createElement('option'); o.value=v; o.textContent=tx; return o; };
-  function resetSel(id){ const s=$id(id); if(!s) return; s.innerHTML=''; s.appendChild(opt('','—')); s.disabled=true; }
+  function resetSel(id){ const s=$id(id); if(!s) return; s.innerHTML=''; s.appendChild(opt('','—')); s.disabled=true; s.classList.remove('vf-next'); }
+  // An enabled list says what to do and how many choices it has, and is
+  // highlighted as the next step.
+  function ready(sel,n,key){ sel.options[0].textContent=tt(key)+' ('+n+')'; sel.disabled=false; sel.classList.add('vf-next'); try{ sel.focus(); }catch(e){} }
   async function loadMakes(){
     const dl=$id('ttMakeList'); if(!dl||dl.dataset.ok) return;
     const list=await api.makes(); if(!list||!$id('ttMakeList')) return;
@@ -120,7 +123,7 @@
   async function onMake(){
     const inp=$id('ttMake'); if(!inp) return;
     resetSel('ttModel'); resetSel('ttEngine'); if($id('ttCatId')) $id('ttCatId').value='';
-    const name=inp.value.trim().toUpperCase(); if(!name) return;
+    const name=inp.value.trim().toUpperCase(); if(!name){ onMake._last=''; return; }
     const list=await api.makes(); const m=list&&list.find(x=>String(x.name).toUpperCase()===name);
     if(!m) return;
     const out=$id('ttKbaOut'); if(out) out.textContent='…';
@@ -128,7 +131,7 @@
     if(out) out.textContent=models?'':tt('ttOffline');
     if(!models||!sel||inp.value.trim().toUpperCase()!==name) return;
     models.forEach(x=>sel.appendChild(opt(x.id,x.name+((x.from||x.to)?' ('+String(x.from||'').slice(0,4)+'–'+String(x.to||'').slice(0,4)+')':''))));
-    sel.disabled=false;
+    ready(sel,models.length,'vfPickModel'); onMake._last=name;
   }
   async function onModel(){
     const sel=$id('ttModel'); resetSel('ttEngine'); if($id('ttCatId')) $id('ttCatId').value='';
@@ -139,14 +142,22 @@
     if(!engines||!es||sel.value!==id) return;
     es._vehicles=engines;
     engines.forEach((v,i)=>es.appendChild(opt(String(i),api.engineLabel(v))));
-    es.disabled=false;
+    sel.classList.remove('vf-next'); ready(es,engines.length,'vfPickEngine');
   }
   function onEngine(){
     const es=$id('ttEngine'); if(!es||es.value===''||!es._vehicles) return;
-    const v=es._vehicles[Number(es.value)]; if(v) applyVehicle(v,FORMS.ttKba);
+    const v=es._vehicles[Number(es.value)]; if(v){ es.classList.remove('vf-next'); applyVehicle(v,FORMS.ttKba); }
   }
+  // Picking a make from the suggestions (or typing it fully) loads the models
+  // at once -- no need to leave the field first.
+  document.addEventListener('input',async e=>{
+    const el=e.target; if(!el||el.id!=='ttMake') return;
+    const name=el.value.trim().toUpperCase(); if(!name||onMake._last===name) return;
+    const list=await api.makes(); if(list&&list.some(x=>String(x.name).toUpperCase()===name)&&el.value.trim().toUpperCase()===name){ onMake._last=name; onMake(); }
+  });
   document.addEventListener('change',e=>{
     const id=e.target&&e.target.id;
+    if(id==='ttMake'&&onMake._last===e.target.value.trim().toUpperCase()&&$id('ttModel')&&!$id('ttModel').disabled) return;
     if(id==='ttMake') onMake(); else if(id==='ttModel') onModel(); else if(id==='ttEngine') onEngine();
   });
   document.addEventListener('click',async e=>{
