@@ -2001,6 +2001,14 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/email_in_use/.test(fx) && /deleteUser\(made\.user\.id\)/.test(fx) && !/from\('companies'\)/.test(fx), 'server: no existing login is reused; a failed membership removes the new login; the legacy companies table is not touched');
   assert(/role: 'manager'/.test(fx) && !/console\.log\([^)]*email/.test(fx) && !/SERVICE_ROLE_KEY[^)]*reply/.test(fx), 'server: the new login manages only its workshop; nothing personal is logged');
 }
+// ---- Vehicle picker guidance; header shows the signed-in workshop (1.43.0) ----
+{
+  const ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), br=fs.readFileSync(path.join(root,'js/teiltool-bridge.js'),'utf8'), cu=fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), i18=fs.readFileSync(path.join(root,'i18n.js'),'utf8');
+  assert(!/session\.user\.name\|\|''\)\} · TABAH AUTO/.test(ap) && /· \$\{esc\(companyLabel\(session\.company\)\)\}/.test(ap), 'the header names the workshop that is open, not a fixed brand');
+  assert(/function ready\(sel,n,key\)/.test(br) && /vfPickModel/.test(br) && /vfPickEngine/.test(br) && /addEventListener\('input',async e=>\{\s*const el=e\.target; if\(!el\|\|el\.id!=='ttMake'\)/.test(br), 'choosing a make loads the models at once and the next list says what to do');
+  assert(/id="mk" autocomplete="off"/.test(cu) && /id="mo" autocomplete="off"/.test(cu), 'the browser\'s own suggestions do not cover the make and model fields');
+  assert((i18.match(/vfPickModel:'/g)||[]).length===3, 'picker hints exist in en/de/ar');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

@@ -452,3 +452,5 @@ body.nav-open{overflow:hidden;touch-action:none}
   .vf input,.vf select,.vf .kba-row #ttKba{height:44px;font-size:16px}
   .vf .kba-row{grid-template-columns:1fr 1fr}.vf .kba-row #ttKba{grid-column:1/-1}
 }
+.vf-n{display:inline-block;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:#0B2A4A;color:#fff;font-size:10.5px;text-align:center;margin-inline-end:3px}
+.vf select.vf-next{border-color:#C45C12;box-shadow:0 0 0 2px #C45C1233;background:#fffaf5}
