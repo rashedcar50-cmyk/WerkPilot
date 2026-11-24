@@ -74,7 +74,9 @@ function login(){
 function completeLogin(user){
   const startPage=(location.search.match(/[?&]page=([a-z]+)/)||[])[1]||'dashboard';
   const profile=resolveCloudProfile(user.email);
-  session={user:profile, company:db.companies[0], page:startPage};
+  // Reopen the workshop that was open last (e.g. when the Teiltool cart
+  // opens the app in a new tab), not always the first one.
+  session={user:profile, company:db.companies.find(c=>c.id===db.settings.lastCompanyId)||db.companies[0], page:startPage};
   audit('login');
   db.settings.cloudAuthError='';
   db.settings.cloudAuthCheckedAt=new Date().toISOString();
@@ -213,7 +215,7 @@ function bindShellEvents(){
  if($('#backBtn')) $('#backBtn').onclick=()=>{ closeMobileMenus(); goBack(); };
  const lo=$('#logout');
  if(lo) lo.onclick=async ()=>{audit('logout'); try{ await WP.CloudAuth.signOutCloud(); }catch(e){} session=null; const f=$('#devFab'); if(f)f.remove(); const p=$('#devPanel'); if(p)p.remove(); login()};
- if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);session.page='dashboard';syncAllCloud(true).finally(()=>render(true))};
+ if($('#company')) $('#company').onchange=e=>{closeMobileMenus();session.company=db.companies.find(c=>c.id===e.target.value);db.settings.lastCompanyId=session.company&&session.company.id;save();session.page='dashboard';syncAllCloud(true).finally(()=>render(true))};
  if($('#addWorkshop')) $('#addWorkshop').onclick=()=>{ closeMobileMenus(); newWorkshopModal(); };
  if($('#uiLangTop')) $('#uiLangTop').onchange=e=>{closeMobileMenus();db.settings.uiLang=e.target.value;save(true);applyUiLang();render(true);};
  if($('#menu')) $('#menu').onclick=()=>{
@@ -1525,7 +1527,7 @@ function newWorkshopModal(){
     co.profile.workshopAccountHolder=name||brand;
     co.profile.workshopAddress=$('#nwAddr').value.trim();
     co.profile.invoiceSeq=0; co.profile.auftragSeq=0;
-    db.companies.push(co); save();
+    db.companies.push(co); db.settings.lastCompanyId=co.id; save();
     session.company=co; closeModal(); render(); toast(t('wsAdded'));
   });
 }
