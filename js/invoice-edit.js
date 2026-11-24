@@ -150,6 +150,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   modal(title, `<div class="hy-desk">
     <div class="hy-bar">
       <span>${new Date().toLocaleDateString('de-DE')}</span>
+      ${existing?'':`<label class="muted" style="display:flex;align-items:center;gap:6px">${t('serviceDate')} <input id="fsd" type="date" value="${esc(String((template&&template.serviceDate)||todayISO()).slice(0,10))}" style="width:auto"></label>`}
       <select id="pay">${[['open',t('payOpen')],['cash',t('payCash')],['card',t('payCard')],['bank',t('payBank')]].map(([v,p])=>`<option value="${v}" ${((existing&&existing.payment)|| (kind==='bar'?'cash':'open'))===v?'selected':''}>${p}</option>`).join('')}</select>
       <select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select>
       <select id="fcust"><option value="walkin" ${!customerId?'selected':''}>${t('walkIn')||t('cashSale')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select>
@@ -213,26 +214,40 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     const custIdFinal=custId||veh.customerId||'';
     const obj={id:existing?existing.id:id('i'),cloudId:existing&&existing.cloudId,companyId:session.company.id,vehicleId:$('#fv').value,km:veh.km||existing&&existing.km||'',customerId:custIdFinal,parts,labor,discount,tax,net,total,date:existing?existing.date:new Date().toISOString(),
       type:kind==='bar'?'Barverkauf':'Rechnung', payment:payCode($('#pay')&&$('#pay').value), paid:['cash','card'].includes(payCode($('#pay')&&$('#pay').value)),
-      number:existing?existing.number:nextInvoiceNumber(), lines, repairId:existing&&existing.repairId, auftrag:existing&&existing.auftrag, updatedAt:new Date().toISOString()};
-    lines.forEach(rememberKatyArticle);
-    // Customer numbers are assigned only when an invoice is actually saved
-    // for that customer -- never as a side effect of preview (see
-    // js/invoice-print.js's ensureKd/assignKdNr).
-    if(custIdFinal) assignKdNr(custIdFinal);
-    if(existing){
-      const i=db.invoices.findIndex(x=>x.id===existing.id);
-      if(i>=0) db.invoices[i]=obj; else db.invoices.push(obj);
-      upsertInvoiceCloud(obj); audit('invoice.update',obj.number);
-    } else {
-      if(typeof freezeInvoiceParties==='function') freezeInvoiceParties(obj);
-      db.invoices.push(obj); upsertInvoiceCloud(obj);
-      db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:t('sales'),debit:0,credit:total,note:obj.number});
-      audit('invoice.create',obj.number);
-    }
-    archiveBeleg(obj);
-    save(); closeModal(); render();
-    setTimeout(()=>previewInvoice(obj.id), 200);
-  }, existing?t('saveEdit'):t('saveShowDesign'));
+      number:existing?existing.number:'', lines, repairId:existing?existing.repairId:(template&&template.repairId)||undefined, auftrag:existing?existing.auftrag:(template&&template.auftrag)||undefined, updatedAt:new Date().toISOString()};
+    if(!existing){ const sd=$('#fsd')&&$('#fsd').value; if(sd) obj.serviceDate=sd; if(template&&template.km) obj.km=template.km; }
+    const issue=()=>{
+      lines.forEach(rememberKatyArticle);
+      // Customer numbers are assigned only when an invoice is actually saved
+      // for that customer -- never as a side effect of preview (see
+      // js/invoice-print.js's ensureKd/assignKdNr).
+      if(custIdFinal) assignKdNr(custIdFinal);
+      if(existing){
+        const i=db.invoices.findIndex(x=>x.id===existing.id);
+        if(i>=0) db.invoices[i]=obj; else db.invoices.push(obj);
+        upsertInvoiceCloud(obj); audit('invoice.update',obj.number);
+      } else {
+        obj.number=nextInvoiceNumber();
+        if(typeof freezeInvoiceParties==='function') freezeInvoiceParties(obj);
+        db.invoices.push(obj); upsertInvoiceCloud(obj);
+        db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:t('sales'),debit:0,credit:total,note:obj.number});
+        audit('invoice.create',obj.number);
+      }
+      // Issued from a repair order: link it and book the parts out of stock
+      // (once -- consumePartsFromRepair skips parts already booked).
+      if(!existing && obj.repairId){ const rr=db.repairs.find(x=>x.id===obj.repairId); if(rr){ rr.invoiceId=obj.id; delete rr.noInvoiceReason; try{ consumePartsFromRepair(rr); }catch(e){} } }
+      archiveBeleg(obj);
+      save(); closeModal(); render();
+      setTimeout(()=>previewInvoice(obj.id), 200);
+    };
+    if(existing) return issue();
+    // Nothing gets a number before this confirmation: an issued invoice can
+    // no longer be changed, only cancelled.
+    const cName=(()=>{ const c=db.customers.find(x=>x.id===custIdFinal); return c?(c.companyName||c.name||''):(t('walkIn')||''); })();
+    askConfirm(t('reviewIssue'),
+      [cName, t('serviceDate')+': '+(obj.serviceDate?deDate(obj.serviceDate):'-'), 'Netto: '+money(net), 'MwSt.: '+money(total-net), t('total')+': '+money(total), '', t('issueHint')].filter((x,i)=>x||i===5).join('\n'),
+      issue);
+  }, existing?t('saveEdit'):t('reviewIssue'));
   if(existing && existing.lines && existing.lines.length){
     existing.lines.forEach(l=>addInvoiceRow(l));
   } else if(!existing && template && template.lines && template.lines.length){

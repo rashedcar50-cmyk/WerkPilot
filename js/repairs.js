@@ -53,7 +53,13 @@ function repairs(){
     <div class="muted">${esc(dLabel(r.complaint||r.description||'-'))}</div>
     <div class="muted">${esc(r.tech||'-')} · ${esc(r.hours||0)} ${t('hoursShort')} · ${money(repairPartsTotal(r))}</div>
   </div>`).join('') || `<div class="card muted">${t('noOrders')}</div>`;
- $('#content').innerHTML=head(t('repairOrders'),`<div class="toolbar"><button class="btn ok" id="scanSchein">📷 ${t('scanSchein')}</button>${canEdit()?`<button class="btn primary" id="add">${t('manualOrder')}</button>`:''}</div>`)+
+ // Follow-up list: handed over but not billed (warranty and goodwill are
+ // settled and do not appear).
+ const L_=window.WP&&WP.InvoiceLifecycle;
+ const open_=L_?rows.filter(r=>L_.needsBilling(r, db.invoices)):[];
+ const followUp=open_.length?`<div class="card" style="border-left:4px solid #c2570c"><b>${t('deliveredNotBilled')} (${open_.length})</b>
+   ${open_.map(r=>`<div class="row" style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:6px"><span>${esc(vehicleName(r.vehicleId))} · ${esc(dLabel(r.complaint||r.description||'-'))}${r.noInvoiceReason?' · '+t('nir'+r.noInvoiceReason.charAt(0).toUpperCase()+r.noInvoiceReason.slice(1)):''}</span>${canEdit()?`<button class="btn small ok" onclick="event.stopPropagation();convertRepairToInvoice('${r.id}')">${t('toInvoice')}</button>`:''}</div>`).join('')}</div>`:'';
+ $('#content').innerHTML=head(t('repairOrders'),`<div class="toolbar"><button class="btn ok" id="scanSchein">📷 ${t('scanSchein')}</button>${canEdit()?`<button class="btn primary" id="add">${t('manualOrder')}</button>`:''}</div>`)+followUp+
  // Fix (audit 2026-11-08): repair orders had no print/PDF/share at all.
  listShareBar('repairs')+cards+
  `<div class="bottom-action"><button class="btn ok" id="scanSchein2">📷 ${t('scanScheinOpen')}</button></div>`;
@@ -94,7 +100,10 @@ function repairDesk(rid){
   </div>
   <p><b>${t('complaint')}:</b> ${esc(dLabel(r.complaint||'-'))}<br><b>${t('work')}:</b> ${esc(dLabel(r.description||'-'))}<br>
   <b>${t('fuel')}:</b> ${esc(fuelLabel(r.fuel||'-'))} · <b>${t('tech')}:</b> ${esc(dLabel(r.tech||'-'))}</p>
-  <p><b>${t('jobsList')}</b><br>${(r.jobs||[]).map(j=>'• '+esc(dLabel(j))).join('<br>')||'-'}</p>
+  <p><b>${t('jobsList')}</b><br>${(r.jobs||[]).map(j=>'• '+esc((window.WP&&WP.InvoiceLifecycle)?WP.InvoiceLifecycle.formatJob(dLabel(j)):dLabel(j))).join('<br>')||'-'}</p>
+  ${(()=>{ const L=window.WP&&WP.InvoiceLifecycle; if(!L) return ''; const a=L.activeInvoiceForRepair(db.invoices, r.id);
+    if(a) return `<p><b>${t('invoice')}:</b> ${esc(a.number)} · ${money(a.total)} · ${a.paid?t('paid'):t('payOpen')} <button class="btn small" onclick="previewInvoice('${a.id}')">${t('preview')||'Vorschau'}</button></p>`;
+    return `<p><b>${t('invoice')}:</b> ${t('notBilledYet')}${r.noInvoiceReason?' · '+t('nirReason')+': '+t('nir'+r.noInvoiceReason.charAt(0).toUpperCase()+r.noInvoiceReason.slice(1)):''}</p>`; })()}
   <h3>${t('issuePart')}</h3>
   <div class="toolbar">
     <select id="stockPick">${stock.map(i=>`<option value="${i.id}">${esc(i.sku||'')} ${esc(dLabel(i.name))} (${i.qty})</option>`).join('')}</select>
@@ -152,7 +161,32 @@ window.addRepairPhoto=async function(rid,kind,input){
 };
 window.setRepairStatus=function(rid,st){
   const r=db.repairs.find(x=>x.id===rid); if(!r) return;
-  r.status=st; save(); upsertRepairCloud(r); audit('repair.status',st); render();
+  const L=window.WP&&WP.InvoiceLifecycle;
+  const apply=()=>{ r.status=st; save(); upsertRepairCloud(r); audit('repair.status',st); render(); };
+  const billed=L?L.activeInvoiceForRepair(db.invoices, r.id):null;
+  // "Ready for handover": the invoice is PREPARED from the order and opened
+  // for review. It is issued only by the user's confirmation there.
+  if(st==='ready'){
+    if(!r.readyAt) r.readyAt=new Date().toISOString();
+    apply();
+    if(!billed && canEdit()) convertRepairToInvoice(rid);
+    return;
+  }
+  // "Handed over" without an issued invoice: allowed, but with a recorded
+  // reason, so that unbilled work cannot simply be forgotten.
+  if(st==='delivered' && !billed && L){
+    const opts=[['later',t('nirLater')],['collective',t('nirCollective')],['warranty',t('nirWarranty')],['goodwill',t('nirGoodwill')]];
+    modal(t('deliverNoInvoice'),
+      `<p>${t('deliverNoInvoiceHint')}</p>
+       <div class="field"><label>${t('nirReason')}</label><select id="nir">${opts.map(([v,p])=>`<option value="${v}" ${r.noInvoiceReason===v?'selected':''}>${p}</option>`).join('')}</select></div>
+       <div class="toolbar"><button type="button" class="btn ok" id="nirInvoice">${t('toInvoice')}</button></div>`,
+      ()=>{ r.noInvoiceReason=$('#nir').value; r.deliveredAt=r.deliveredAt||new Date().toISOString(); closeModal(); apply(); },
+      t('deliverAnyway'));
+    if($('#nirInvoice')) $('#nirInvoice').onclick=()=>{ closeModal(); convertRepairToInvoice(rid); };
+    return;
+  }
+  if(st==='delivered' && !r.deliveredAt) r.deliveredAt=new Date().toISOString();
+  apply();
 };
 
 function repairModal(existing){

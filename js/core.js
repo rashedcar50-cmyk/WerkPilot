@@ -355,7 +355,7 @@ function askConfirm(title, detail, onYes){
   const no=typeof t==='function'?t('cancelBtn'):'Cancel';
   box.innerHTML=`<div class="ask-box" role="dialog">
     <h3>${String(title||'').replace(/</g,'')}</h3>
-    ${detail?`<p>${String(detail).replace(/</g,'')}</p>`:''}
+    ${detail?`<p style="white-space:pre-line">${String(detail).replace(/</g,'')}</p>`:''}
     <div class="ask-actions">
       <button type="button" class="btn ghost" id="askNo">${no}</button>
       <button type="button" class="btn bad" id="askYes">${yes}</button>

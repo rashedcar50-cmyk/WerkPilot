@@ -88,7 +88,63 @@
     return o;
   }
 
-  WP.InvoiceLifecycle={ isStornoDoc:isStornoDoc, isCancelled:isCancelled, isIssued:isIssued, canCancel:canCancel,
+  /* ---- repair order -> invoice ---- */
+
+  // A job line may be plain text, or "Text|hours|amount" (amount = price of
+  // the whole job). Returns {name, hours, price} with price per hour.
+  function parseJob(job, hourlyRate){
+    var s=String(job==null?'':job).trim(); if(!s) return null;
+    var p=s.split('|').map(function(x){ return x.trim(); });
+    if(p.length>=3 && p[0]){
+      var h=Number(String(p[1]).replace(',','.')), amount=Number(String(p[2]).replace(',','.'));
+      if(h>0 && amount>=0) return {name:p[0], hours:h, price:round2(amount/h), priced:true};
+    }
+    return {name:s, hours:0, price:Number(hourlyRate||0), priced:false};
+  }
+  function formatJob(job){
+    var j=parseJob(job, 0); if(!j) return '';
+    if(!j.priced) return j.name;
+    var de=function(n){ return Number(n).toFixed(2).replace('.',','); };
+    return j.name+' · '+String(j.hours).replace('.',',')+' Std. · '+de(j.hours*j.price)+' €';
+  }
+  // Invoice lines for a repair order: the parts issued to it, the priced
+  // jobs one by one, and the remaining hours as one labour line that names
+  // the unpriced jobs.
+  function repairToLines(r, hourlyRate){
+    r=r||{}; var rate=Number(hourlyRate||0), lines=[];
+    (r.parts||[]).forEach(function(p){
+      if(!p || !(p.name||p.sku)) return;
+      lines.push({sku:String(p.sku||''), name:String(p.name||''), qty:Number(p.qty||1)||1, price:Number(p.price||0), tax:19, kind:'parts'});
+    });
+    var plain=[], pricedHours=0;
+    (r.jobs||[]).forEach(function(job){
+      var j=parseJob(job, rate); if(!j) return;
+      if(j.priced){ pricedHours+=j.hours; lines.push({sku:'', name:j.name, qty:j.hours, price:j.price, tax:19, kind:'labor'}); }
+      else plain.push(j.name);
+    });
+    var rest=round2(Number(r.hours||0)-pricedHours);
+    if(rest>0 || (plain.length && !pricedHours)){
+      var name=plain.length ? plain.join('; ') : (String(r.description||r.complaint||'').trim() || 'Arbeitswert');
+      lines.push({sku:'', name:name.slice(0,240), qty:rest>0?rest:1, price:rate, tax:19, kind:'labor'});
+    }
+    return lines;
+  }
+  // The invoice that currently bills a repair order: issued, not cancelled,
+  // not itself a cancellation document.
+  function activeInvoiceForRepair(invoices, repairId){
+    if(!repairId) return null;
+    return (invoices||[]).find(function(x){ return x && x.repairId===repairId && isIssued(x) && !isCancelled(x) && !isStornoDoc(x); }) || null;
+  }
+  var NO_INVOICE_REASONS=['warranty','goodwill','collective','later'];
+  // Handed over, not billed, and not settled by warranty or goodwill.
+  function needsBilling(r, invoices){
+    if(!r || r.status!=='delivered') return false;
+    if(activeInvoiceForRepair(invoices, r.id)) return false;
+    return !(r.noInvoiceReason==='warranty' || r.noInvoiceReason==='goodwill');
+  }
+
+  WP.InvoiceLifecycle={ parseJob:parseJob, formatJob:formatJob, repairToLines:repairToLines, activeInvoiceForRepair:activeInvoiceForRepair,
+    needsBilling:needsBilling, NO_INVOICE_REASONS:NO_INVOICE_REASONS, isStornoDoc:isStornoDoc, isCancelled:isCancelled, isIssued:isIssued, canCancel:canCancel,
     buildSnapshot:buildSnapshot, buildStornoDoc:buildStornoDoc, cancelMarks:cancelMarks, toMeta:toMeta, fromMeta:fromMeta };
 
   /* ---------------- glue to the app (browser only) ---------------- */
