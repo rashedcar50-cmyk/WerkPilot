@@ -1738,6 +1738,34 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
     assert(sbN.st.settings.workshopAccountHolder==='Autoservice und Autoteile UG (haftungsbeschränkt)' && sbN.st.companies[1].profile.workshopName==='Auto Service España', 'the bank account holder line and the second company are left untouched');
   }
 
+  // Repair order -> prepared invoice -> issued on confirmation (2026-11-24)
+  {
+    const sb5={window:{WP:{}}, console}; sb5.window.window=sb5.window; vm.createContext(sb5);
+    vm.runInContext('var window=this.window;'+fs.readFileSync(path.join(root,'js/invoice-lifecycle.js'),'utf8'), sb5);
+    const L=sb5.window.WP.InvoiceLifecycle;
+    const rep={id:'r1',hours:1.5,parts:[{sku:'OIL',name:'Motoröl',qty:4,price:9.8},{name:''}],jobs:['Ölwechsel mit Filter|0.5|50.00','Bremsen prüfen','']};
+    const ls=L.repairToLines(rep,100);
+    assert(ls.length===3 && ls[0].kind==='parts' && ls[0].qty===4 && ls[0].price===9.8, 'the parts issued to the order become invoice lines; empty part rows are skipped');
+    assert(ls[1].name==='Ölwechsel mit Filter' && ls[1].qty===0.5 && ls[1].price===100 && ls[1].kind==='labor', 'a job written as "text|hours|amount" becomes its own labour line with the hourly price derived from the amount');
+    assert(ls[2].name==='Bremsen prüfen' && ls[2].qty===1 && ls[2].price===100, 'the remaining hours become one labour line that names the unpriced jobs');
+    const plain=L.repairToLines({hours:2,jobs:[],parts:[],description:'Inspektion'},90);
+    assert(plain.length===1 && plain[0].name==='Inspektion' && plain[0].qty===2 && plain[0].price===90, 'an order with hours but no job lines is billed as one labour line named after the work description');
+    assert(L.repairToLines({hours:0,jobs:[],parts:[]},90).length===0, 'an order with nothing on it produces no invoice lines');
+    assert(L.formatJob('TEST Arbeit|1|40.00')==='TEST Arbeit · 1 Std. · 40,00 €' && L.formatJob('Bremsen prüfen')==='Bremsen prüfen', 'a priced job is shown readably instead of in its raw "text|hours|amount" form');
+    const invs=[{id:'a',repairId:'r1',number:'RE-1',status:'storno'},{id:'b',repairId:'r1',number:'ST-1',stornoOf:'a',type:'Stornorechnung'},{id:'c',repairId:'r2',number:'RE-2'}];
+    assert(L.activeInvoiceForRepair(invs,'r1')===null && L.activeInvoiceForRepair(invs,'r2').id==='c', 'a cancelled invoice and its cancellation document do not count as billing the order; an issued one does');
+    assert(L.needsBilling({id:'r1',status:'delivered'},invs)===true && L.needsBilling({id:'r2',status:'delivered'},invs)===false, 'a handed-over order without an active invoice needs billing; one with an invoice does not');
+    assert(L.needsBilling({id:'r1',status:'delivered',noInvoiceReason:'warranty'},invs)===false && L.needsBilling({id:'r1',status:'delivered',noInvoiceReason:'goodwill'},invs)===false, 'warranty and goodwill are settled and do not appear in the follow-up list');
+    assert(L.needsBilling({id:'r1',status:'delivered',noInvoiceReason:'later'},invs)===true && L.needsBilling({id:'r1',status:'delivered',noInvoiceReason:'collective'},invs)===true && L.needsBilling({id:'r1',status:'ready'},invs)===false, '"invoice later" and "collective invoice" stay on the follow-up list; an order not yet handed over is not on it');
+    const repSrc=fs.readFileSync(path.join(root,'js/repairs.js'),'utf8'), lookSrc=fs.readFileSync(path.join(root,'js/lookup.js'),'utf8'), edSrc=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+    const conv=lookSrc.slice(lookSrc.indexOf('function convertRepairToInvoice('), lookSrc.indexOf('function whatsappReady('));
+    assert(!/createInvoiceAuto\(/.test(conv) && /invoiceDesigner\(/.test(conv) && /activeInvoiceForRepair/.test(conv), 'turning an order into an invoice opens the editor for review and no longer issues an invoice by itself; an existing invoice is shown instead of creating a second one');
+    assert(/st==='ready'[\s\S]{0,400}convertRepairToInvoice\(rid\)/.test(repSrc), 'setting an order to "ready for handover" prepares its invoice');
+    assert(/st==='delivered' && !billed/.test(repSrc) && /noInvoiceReason=\$\('#nir'\)\.value/.test(repSrc), 'handing over without an invoice asks for a recorded reason');
+    assert(/number:existing\?existing\.number:''/.test(edSrc) && /obj\.number=nextInvoiceNumber\(\)/.test(edSrc) && edSrc.indexOf('obj.number=nextInvoiceNumber()')>edSrc.indexOf('const issue=()=>{') && /askConfirm\(t\('reviewIssue'\)/.test(edSrc), 'a new invoice gets its number only inside the confirmed issue step, never when the editor is merely saved towards the confirmation');
+    assert(/id="fsd" type="date"/.test(edSrc) && /obj\.serviceDate=sd/.test(edSrc), 'the service date is its own field on the invoice and is not copied silently from the issue date');
+  }
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

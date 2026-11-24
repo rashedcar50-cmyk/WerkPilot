@@ -438,28 +438,31 @@ window.createInvoiceAuto=createInvoiceAuto;
 window.WP=window.WP||{};
 window.WP.Invoice={create:createInvoiceAuto};
 
+// Prepares the invoice for a repair order: opens the invoice editor filled
+// from the order (parts issued, jobs, hours). Nothing is saved and no
+// number is used until the user reviews it and confirms "issue" there.
+// If the order already has an issued invoice, that one is shown instead --
+// so pressing "ready" twice never produces a second invoice.
 function convertRepairToInvoice(rid){
   const r=db.repairs.find(x=>x.id===rid);
   if(!r) return toast(t('jobMissing'));
-  const lines=[
-    ...(r.parts||[]).map(p=>({name:p.name, sku:p.sku, qty:p.qty, price:p.price, kind:'parts'})),
-    {name:'Arbeitswert', qty:Number(r.hours||1), price:Number(workshop().hourlyRate||db.settings.hourlyRate||100), kind:'labor'}
-  ];
-  let inv;
-  try{
-    inv=createInvoiceAuto({
-      vehicleId:r.vehicleId, repairId:r.id, customerId:r.customerId,
-      lines, tax:19, auftrag:r.number||nextAuftragNumber(), km:r.km
-    });
-  }catch(e){ return toast(e.message||'invoice'); }
-  r.status='ready';
-  consumePartsFromRepair(r);
-  if(typeof audit==='function') audit('invoice.from_repair', inv.number);
-  save();
-  toast(t('invoiceCreated')+' '+inv.number);
-  session.page='invoices';
-  render();
-  setTimeout(()=>{ try{ previewInvoice(inv.id); }catch(e){} }, 200);
+  const L=window.WP&&WP.InvoiceLifecycle;
+  const active=L?L.activeInvoiceForRepair(db.invoices, r.id):null;
+  if(active){
+    toast(t('invoiceExists')+' '+active.number);
+    session.page='invoices'; session.repairId=null; render();
+    setTimeout(()=>{ try{ previewInvoice(active.id); }catch(e){} }, 200);
+    return;
+  }
+  if(typeof canEdit==='function' && !canEdit()) return;
+  const rate=Number(workshop().hourlyRate||db.settings.hourlyRate||100);
+  const lines=L?L.repairToLines(r, rate):[];
+  if(!lines.length) return toast(t('needLine'));
+  const veh=vehicleOf(r.vehicleId)||{};
+  if(!r.number){ r.number=nextAuftragNumber(); save(); }
+  session.page='invoices'; session.repairId=null; render();
+  invoiceDesigner('invoice', r.customerId||veh.customerId||'', null, r.vehicleId||'',
+    {lines, tax:19, discount:0, repairId:r.id, auftrag:r.number, km:r.km||veh.km||'', serviceDate:(r.readyAt||todayISO()).slice(0,10)});
 }
 function whatsappReady(rid){
   const r=db.repairs.find(x=>x.id===rid);
