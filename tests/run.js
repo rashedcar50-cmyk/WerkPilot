@@ -2009,6 +2009,14 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/id="mk" autocomplete="off"/.test(cu) && /id="mo" autocomplete="off"/.test(cu), 'the browser\'s own suggestions do not cover the make and model fields');
   assert((i18.match(/vfPickModel:'/g)||[]).length===3, 'picker hints exist in en/de/ar');
 }
+// ---- Vehicle form: never "saved" without a customer; new customer inline (1.44.0) ----
+{
+  const cu=fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), i18=fs.readFileSync(path.join(root,'i18n.js'),'utf8');
+  assert(/<option value="__new"/.test(cu) && /id="cuNewName"/.test(cu) && /id="cuErr"/.test(cu), 'the vehicle form offers a new customer and has an in-form error line');
+  assert(/if\(!\$\('#cu'\)\.value\) return fail\(t\('pickCustomerFirst'\), \$\('#cu'\)\);/.test(cu), 'a missing customer is shown at the field, not only as a passing toast');
+  assert(/db\.customers\.push\(nc\); audit\('customer\.create',nc\.name\); save\(\);\s*if\(typeof upsertCustomerCloud==='function'\) upsertCustomerCloud\(nc\);/.test(cu) && /kdNr:nextKdNr\(\)/.test(cu.split("value==='__new'")[1].slice(0,500)), 'the inline customer is created with a customer number and synced before the vehicle');
+  assert((i18.match(/vfNewCustName:'/g)||[]).length===3, 'labels exist in en/de/ar');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
