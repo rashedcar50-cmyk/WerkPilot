@@ -214,39 +214,63 @@ function vehicleModal(prefill={}){
  prefill.paint=prefill.paint||prefill.color||'';
  prefill.engine=prefill.engine||prefill.engine_code||'';
  if(!prefill.hsn && prefill.kba){ const p=String(prefill.kba).trim().split(/\s+/); prefill.hsn=p[0]||''; prefill.tsn=p[1]||''; }
- modal(t('addVehicle'),`<div class="form-grid">
- <div class="field"><label>${t('customer')}</label><select id="cu"><option value="">—</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
- <div class="field"><label>${t('plate')}</label><input id="pl" value="${esc(prefill.plate||'')}"></div>
- <div class="field"><label>${t('vinLbl')}</label><input id="vin" value="${esc(prefill.vin||'')}" maxlength="17" placeholder="W0L..."></div>
- <div class="field span2"><label>${t('kbaKey')}</label>
-  <div class="kba-row">
-    <input id="hsn" value="${esc(prefill.hsn||'')}" maxlength="4" inputmode="numeric" placeholder="HSN 2.1">
-    <input id="tsn" value="${esc(prefill.tsn||'')}" maxlength="3" placeholder="TSN 2.2">
-    <button type="button" class="btn small" id="ttKba">🔎 ${t('ttKbaBtn')}</button>
+ modal(t('addVehicle'),`<div class="vf">
+ <div class="vf-sec">
+  <div class="vf-h">${t('vfOwner')}</div>
+  <div class="vf-grid">
+   <div class="field vf-2"><label>${t('customer')}</label><select id="cu"><option value="">—</option>${customers.map(c=>`<option value="${c.id}" ${c.id===prefill.customerId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+   <div class="field"><label>${t('plate')}</label><input id="pl" dir="ltr" value="${esc(prefill.plate||'')}"></div>
+   <div class="field"><label>${t('km')}</label><input id="vkm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.km||'')}"></div>
+  </div>
+ </div>
+ <div class="vf-sec vf-find">
+  <div class="vf-h">${t('vfFind')}</div>
+  <div class="vf-grid">
+   <div class="field vf-2"><label>${t('kbaKey')}</label>
+    <div class="kba-row">
+     <input id="hsn" dir="ltr" value="${esc(prefill.hsn||'')}" maxlength="4" inputmode="numeric" placeholder="HSN 2.1">
+     <input id="tsn" dir="ltr" value="${esc(prefill.tsn||'')}" maxlength="3" placeholder="TSN 2.2">
+     <button type="button" class="btn small" id="ttKba">🔎 ${t('ttKbaBtn')}</button>
+    </div>
+   </div>
+   <div class="field vf-2"><label>${t('vinLbl')}</label><input id="vin" dir="ltr" value="${esc(prefill.vin||'')}" maxlength="17" placeholder="W0L..."></div>
+   <div class="field vf-4 vf-or"><span>${t('vfOr')}</span></div>
+   <div class="field"><label>${t('make')}</label><input id="ttMake" list="ttMakeList" autocomplete="off" placeholder="${t('vfPickMake')}"><datalist id="ttMakeList"></datalist></div>
+   <div class="field"><label>${t('model')}</label><select id="ttModel" disabled><option value="">—</option></select></div>
+   <div class="field vf-2"><label>${t('vfEngine')}</label><select id="ttEngine" disabled><option value="">—</option></select></div>
   </div>
   <div id="ttKbaOut" class="hint tt-kba-out"></div>
+  <input type="hidden" id="ttCatId" value="${esc(prefill.catalogVehicleId||'')}">
  </div>
- <div class="field span2"><label>${t('partsCat')}</label>
-  <div class="toolbar">
-    <button type="button" class="btn" id="partslinkBtn">PartsLink24</button>
-    <button type="button" class="btn primary" id="distriBtn">DistriAuto (VIN)</button>
+ <div class="vf-sec">
+  <div class="vf-h">${t('vfData')}</div>
+  <div class="vf-grid">
+   <div class="field vf-2"><label>${t('make')}</label><input id="mk" value="${esc(prefill.make||'')}"></div>
+   <div class="field vf-2"><label>${t('model')}</label><input id="mo" value="${esc(prefill.model||'')}"></div>
+   <div class="field"><label>${t('firstReg')}</label><input id="firstreg" dir="ltr" value="${esc(prefill.firstRegistration||'')}" placeholder="TT.MM.JJJJ"></div>
+   <div class="field"><label>${t('year')}</label><input id="yr" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.year||'')}"></div>
+   <div class="field"><label>${t('displacement')}</label><input id="cc" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
+   <div class="field"><label>${t('powerKw')}</label><input id="kw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_power_kw||'')}"></div>
+   <div class="field"><label>${t('fuel')}</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
+   <div class="field"><label>${t('engineCode')}</label><input id="en" dir="ltr" value="${esc(prefill.engine||'')}"></div>
+   <div class="field"><label>${t('paintCode')}</label><input id="pa" value="${esc(prefill.paint||'')}"></div>
+   <div class="field"><label>${t('nextService')}</label><input id="vnext" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.nextServiceKm||'')}"></div>
   </div>
  </div>
- <div class="field"><label>${t('make')}</label><input id="mk" value="${esc(prefill.make||'')}"></div>
- <div class="field"><label>${t('model')}</label><input id="mo" value="${esc(prefill.model||'')}"></div>
- <div class="field"><label>${t('firstReg')}</label><input id="firstreg" value="${esc(prefill.firstRegistration||'')}" placeholder="TT.MM.JJJJ"></div>
- <div class="field"><label>${t('year')}</label><input id="yr" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.year||'')}"></div>
- <div class="field"><label>${t('displacement')}</label><input id="cc" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_displacement_cm3||'')}"></div>
- <div class="field"><label>${t('fuel')}</label><input id="fuel" value="${esc(prefill.fuel_type||'')}"></div>
- <div class="field"><label>${t('powerKw')}</label><input id="kw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_power_kw||'')}"></div>
- <div class="field"><label>${t('ratedRpm')}</label><input id="vrpm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_rated_rpm||prefill.ratedRpm||'')}" placeholder="U/min"></div>
- <div class="field"><label>${t('maxWeight')}</label><input id="vmaxw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.maxWeight||'')}"></div>
- <div class="field"><label>${t('seats')}</label><input id="vseats" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.seats||'')}"></div>
- <div class="field"><label>${t('vClass')}</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
- <div class="field"><label>${t('engineCode')}</label><input id="en" value="${esc(prefill.engine||'')}"></div>
- <div class="field"><label>${t('paintCode')}</label><input id="pa" value="${esc(prefill.paint||'')}" placeholder="z. B. Schwarz Metallic"></div>
- <div class="field"><label>${t('km')}</label><input id="vkm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.km||'')}"></div>
- <div class="field"><label>${t('nextService')}</label><input id="vnext" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.nextServiceKm||'')}"></div>
+ <details class="form-grid-details vf-more"><summary>${t('vfMore')}</summary>
+  <div class="vf-grid">
+   <div class="field"><label>${t('ratedRpm')}</label><input id="vrpm" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.engine_rated_rpm||prefill.ratedRpm||'')}" placeholder="U/min"></div>
+   <div class="field"><label>${t('maxWeight')}</label><input id="vmaxw" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.maxWeight||'')}"></div>
+   <div class="field"><label>${t('seats')}</label><input id="vseats" class="latnum" inputmode="decimal" lang="de" value="${esc(prefill.seats||'')}"></div>
+   <div class="field"><label>${t('vClass')}</label><input id="vklass" value="${esc(prefill.vehicleClass||'')}" placeholder="M1"></div>
+   <div class="field vf-4"><label>${t('partsCat')}</label>
+    <div class="vf-btns">
+     <button type="button" class="btn small" id="partslinkBtn">PartsLink24</button>
+     <button type="button" class="btn small" id="distriBtn">DistriAuto (VIN)</button>
+    </div>
+   </div>
+  </div>
+ </details>
  </div>
  <details class="form-grid-details"><summary>${t('scheinExtraFields')}</summary>
  <div class="form-grid">
@@ -275,6 +299,7 @@ function vehicleModal(prefill={}){
    emissionClass:$('#vemclass')?.value.trim()||'',emissionCode:$('#vemcode')?.value.trim()||'',
    specialNotes:$('#vnotes')?.value.trim()||'',maxWeightNational:$('#vweightnat')?.value||'',unladenWeight:$('#vunladen')?.value||'',
    tireAxle1:$('#vtire1')?.value.trim()||'',tireAxle2:$('#vtire2')?.value.trim()||'',dateK:$('#vdatek')?.value.trim()||'',
+   catalogVehicleId:$('#ttCatId')?.value||'',catalogProvider:$('#ttCatId')?.value?'tecdoc':'',
    ocrRaw:prefill.ocrRaw||''};
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
   else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(window.WP&&WP.TeiltoolImport&&WP.TeiltoolImport.resume(v)){} else if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
@@ -282,7 +307,7 @@ function vehicleModal(prefill={}){
   $('#partslinkBtn').onclick=()=>window.open('https://www.partslink24.com/','_blank');
   if($('#distriBtn')) $('#distriBtn').onclick=()=>openDistriAutoVin($('#vin')?.value||'');
   bindVinEnter('#vin',{vin:'#vin',make:'#mk',model:'#mo',year:'#yr',cc:'#cc',fuel:'#fuel',kw:'#kw',en:'#en',pa:'#pa'});
-  bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',year:'#yr',kw:'#kw',cc:'#cc',fuel:'#fuel',seats:'#vseats',weight:'#vmaxw',klass:'#vklass'});
+  bindKbaEnter('#hsn','#tsn',{make:'#mk',model:'#mo',kw:'#kw',cc:'#cc',fuel:'#fuel',seats:'#vseats',weight:'#vmaxw',klass:'#vklass'});
 }
 // Low-friction entry point for places (like the invoice designer's quick
 // scan field) that already have a file and no room for the full wizard
