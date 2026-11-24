@@ -1723,6 +1723,21 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
     assert(!/1 von 1/.test(printSrc3) && !/Kein Ersatz für steuerliche Einzelberatung/.test(printSrc3) && !/AT-MwSt/.test(printSrc3), 'the fixed "page 1 of 1", the tax-advice sentence and the always-zero rows are gone from the print');
   }
 
+  // Registered company name (2026-11-24)
+  {
+    const coreSrc4=fs.readFileSync(path.join(root,'js/core.js'),'utf8');
+    const a4=coreSrc4.indexOf('function migrateLegalName(st){'), b4=coreSrc4.indexOf('function stripTstBranding(store){');
+    const sbN={console}; vm.createContext(sbN);
+    vm.runInContext(coreSrc4.slice(a4,b4)+`
+      var st={settings:{workshopName:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)'},
+        companies:[{id:'de',name:'TABAH AUTO — Autoservice und Autoteile UG',profile:{workshopName:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)'}},{id:'es',name:'Auto Service España',profile:{workshopName:'Auto Service España'}}]};
+      migrateLegalName(st); migrateLegalName(st); this.st=st;`, sbN);
+    const R='Autoteile und Autoservice Tabah UG (haftungsbeschränkt)';
+    assert(sbN.st.settings.workshopName===R && sbN.st.companies[0].profile.workshopName===R, 'stored company data is corrected to the registered name "Autoteile und Autoservice Tabah UG (haftungsbeschränkt)"');
+    assert(sbN.st.companies[0].name==='TABAH AUTO — Autoteile und Autoservice Tabah UG', 'the company switcher shows the registered name, and running the correction twice changes nothing more');
+    assert(sbN.st.settings.workshopAccountHolder==='Autoservice und Autoteile UG (haftungsbeschränkt)' && sbN.st.companies[1].profile.workshopName==='Auto Service España', 'the bank account holder line and the second company are left untouched');
+  }
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
