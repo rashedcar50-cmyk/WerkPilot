@@ -105,6 +105,36 @@ function refreshInvoiceSums(){
   if($('#hyCount')) $('#hyCount').textContent=lines.length;
   if($('#henryGross')) $('#henryGross').textContent=fmt(gross);
 }
+// Typed text in the invoice editor is upper-cased automatically (ß stays).
+// A part number keeps its original spelling when it was pasted or when a
+// known article (stock, catalog cache, earlier invoices) is spelled with
+// lower-case letters -- some manufacturers' numbers are case-sensitive.
+function invUpper(v){ return String(v||'').replace(/[^ß]+/g,m=>m.toUpperCase()); }
+function invOriginalSku(v){
+  const hit=typeof lookupKatyArticle==='function'?lookupKatyArticle(v):null;
+  const o=hit&&String(hit.sku||'');
+  return (o && o.toUpperCase()===String(v||'').trim().toUpperCase() && o!==o.toUpperCase()) ? o : '';
+}
+function wireInvoiceUppercase(desk){
+  if(!desk||desk.dataset.upper) return; desk.dataset.upper='1';
+  const isText=el=>el&&el.matches&&el.matches('.c-name,.c-sku,#katySku,#qName');
+  const isSku=el=>el.matches('.c-sku,#katySku');
+  desk.addEventListener('input',e=>{
+    const el=e.target; if(!isText(el)||e.isComposing) return;
+    if(isSku(el)){
+      if(!el.value) delete el.dataset.keepCase;
+      if(e.inputType==='insertFromPaste'||e.inputType==='insertFromDrop') el.dataset.keepCase='1';
+      if(el.dataset.keepCase) return;
+    }
+    const up=invUpper(el.value); if(up===el.value) return;
+    const a=el.selectionStart,b=el.selectionEnd; el.value=up;
+    try{ el.setSelectionRange(a,b); }catch(_){}
+  });
+  desk.addEventListener('focusout',e=>{
+    const el=e.target; if(!isText(el)||!isSku(el)) return;
+    const o=invOriginalSku(el.value); if(o && o!==el.value) el.value=o;
+  });
+}
 function addInvoiceRow(data){
   const d=Object.assign({sku:'',name:'',qty:1,price:0,tax:19,kind:'parts'},data||{});
   const tb=$('#invRows'); if(!tb) return;
@@ -316,6 +346,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     $('#katySku').value=''; if($('#qName')) $('#qName').value=''; $('#katySku').focus();
   };
   if($('#katyFetch')) $('#katyFetch').onclick=doFetch;
+  wireInvoiceUppercase(document.querySelector('.hy-desk'));
   ['katySku','katyQty','qName'].forEach(id=>{
     const el=$('#'+id); if(el) el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
   });

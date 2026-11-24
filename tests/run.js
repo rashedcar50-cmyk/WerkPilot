@@ -1798,6 +1798,16 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/\.modal:has\(\.hy-desk\)/.test(css) && /col\.w-sku\{width:13%\}/.test(css), 'the description column gets the remaining width');
   ['invDate','unitNet','sumNet','sumItems','netTotal','taxDefault'].forEach(k=>assert((i18.match(new RegExp(k+":'",'g'))||[]).length>=3, 'i18n key '+k+' exists in en/de/ar'));
 }
+// ---- Editor auto upper-case (1.27.0) ----
+{
+  const ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+  const up=new Function(ed.match(/function invUpper\(v\)\{[^\n]*\}/)[0]+'; return invUpper;')();
+  assert(up('bremse hinten 5w-30')==='BREMSE HINTEN 5W-30', 'typed text is upper-cased');
+  assert(up('fußmatte')==='FUßMATTE', 'ß is kept, not turned into SS');
+  assert(up('قطعة abc')==='قطعة ABC', 'Arabic text is untouched');
+  assert(/wireInvoiceUppercase\(document\.querySelector\('\.hy-desk'\)\)/.test(ed), 'the editor wires the upper-case rule');
+  assert(/insertFromPaste/.test(ed) && /function invOriginalSku/.test(ed), 'pasted or known part numbers keep their original spelling');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
