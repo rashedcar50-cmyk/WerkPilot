@@ -59,10 +59,7 @@ function openKatySearch(sku){
 // Web search for a part number: the workshop chooses the site -- built-in
 // general ones plus its own list (db.settings.searchSites, {q} = search term).
 const WP_SEARCH_SITES=[
-  {name:'Google',url:'https://www.google.com/search?q={q}'},
-  {name:'Teiltool',url:'https://kfcjjs-ri.myshopify.com/search?q={q}'},
-  {name:'eBay',url:'https://www.ebay.de/sch/i.html?_nkw={q}'},
-  {name:'Daparto',url:'https://www.daparto.de/Teilenummernsuche/Teile/Alle-Hersteller/{q}'}
+  {name:'Teiltool',url:'https://kfcjjs-ri.myshopify.com/search?q={q}'}
 ];
 function searchSites(){
   const own=(db.settings.searchSites||[]).filter(x=>x&&x.name&&/^https:\/\//i.test(x.url||''));
