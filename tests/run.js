@@ -1898,6 +1898,11 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/WP\.Teiltool\.article\(sku,tax\)/.test(ed) && /id="ttKba"/.test(cu) && /id="ttCustomer"/.test(ap), 'editor, vehicle form and integrations use the bridge');
   assert(!/password|X-Shopify|shpat_/i.test(src), 'the app holds no shop secret');
 }
+// ---- The workshop that was open last is reopened after login (1.35.0) ----
+{
+  const ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  assert(/db\.companies\.find\(c=>c\.id===db\.settings\.lastCompanyId\)\|\|db\.companies\[0\]/.test(ap) && (ap.match(/db\.settings\.lastCompanyId=/g)||[]).length>=2, 'login reopens the last workshop; switching and creating remember it');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
