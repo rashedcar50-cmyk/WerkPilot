@@ -2,14 +2,16 @@
    UI follows selected language.
    Invoices/print for DE companies stay German. */
 window.WP_RTL = ['ar','fa','ur','he','ps','sd','ug','dv','yi'];
+// The seven languages offered in the picker, each shown with a small flag
+// (see .lang-sel in css/app.css). Serbian stays loadable for devices that
+// already use it, but is no longer offered.
 window.WP_LANGS = [
   ['de','Deutsch'],
-  ['ar','العربية'],
   ['en','English'],
+  ['ar','العربية'],
   ['tr','Türkçe'],
-  ['sr','Srpski'],
-  ['ru','Русский'],
   ['pl','Polski'],
+  ['ru','Русский'],
   ['es','Español']
 ];
 window.WP_ALLOWED_LANGS = ['de','ar','en','tr','sr','ru','pl','es'];

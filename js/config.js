@@ -60,6 +60,8 @@ window.langOptions = window.langOptions || function(sel){
     return `<option value="${c}" ${c===(sel||'de')?'selected':''}>${label}</option>`;
   }).join('');
 };
+// The flag on a language picker follows the chosen language at once.
+document.addEventListener('change', function(e){ var el=e.target; if(el && el.classList && el.classList.contains('lang-sel')) el.setAttribute('data-lang', el.value); });
 window.docLang = window.docLang || function(){ return 'de'; };
 window.WP_RTL = window.WP_RTL || ['ar','fa','ur','he'];
 window.addEventListener('error', function(ev){
