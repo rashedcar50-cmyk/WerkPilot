@@ -313,6 +313,71 @@ function save(immediate){
   if(_saveTimer) clearTimeout(_saveTimer);
   _saveTimer=setTimeout(persistNow, 80);
 }
+// ---- Several tabs of the app on one device ----
+// Every tab keeps the whole database in memory and writes all of it on save.
+// Without this, a tab that was opened earlier would overwrite what a second
+// tab saved in the meantime (found in the end-to-end run 2026-11-24: an
+// invoice issued in the tab opened from the Teiltool cart was wiped by the
+// first tab). Now each tab merges what another tab wrote, in place:
+// rows it does not have are added, a row both have keeps the newer version,
+// number counters never go backwards.
+const MERGE_LISTS=['customers','vehicles','repairs','invoices','purchases','inventory','employees','expenses','appointments','estimates','journal','audit','archive','companies'];
+function mergeDbInto(mine, theirs){
+  if(!mine || !theirs || typeof theirs!=='object') return 0;
+  let changed=0;
+  const maxNum=(o,p,k)=>{ const a=Number(o[k]||0), b=Number(p[k]||0); if(b>a){ o[k]=p[k]; changed++; } };
+  MERGE_LISTS.forEach(k=>{
+    if(!Array.isArray(theirs[k])) return;
+    if(!Array.isArray(mine[k])) mine[k]=[];
+    const byId=new Map(); mine[k].forEach(r=>{ if(r && r.id!=null) byId.set(r.id,r); });
+    theirs[k].forEach(r=>{
+      if(!r || r.id==null) return;
+      const own=byId.get(r.id);
+      if(!own){ mine[k].push(r); byId.set(r.id,r); changed++; return; }
+      if(k==='companies'){
+        if(r.profile && typeof r.profile==='object'){
+          own.profile=own.profile||{};
+          Object.keys(r.profile).forEach(pk=>{ if(/Seq$/.test(pk)) maxNum(own.profile,r.profile,pk); else if(own.profile[pk]===undefined){ own.profile[pk]=r.profile[pk]; changed++; } });
+        }
+        return;
+      }
+      if(r.updatedAt && String(r.updatedAt)>String(own.updatedAt||'')){ Object.assign(own,r); changed++; }
+    });
+  });
+  if(Array.isArray(theirs.katyCache)){
+    mine.katyCache=mine.katyCache||[];
+    const have=new Set(mine.katyCache.map(x=>String(x.sku).toUpperCase()));
+    theirs.katyCache.forEach(x=>{ if(x && x.sku && !have.has(String(x.sku).toUpperCase())){ mine.katyCache.push(x); changed++; } });
+  }
+  if(theirs.settings && typeof theirs.settings==='object'){
+    mine.settings=mine.settings||{};
+    Object.keys(theirs.settings).forEach(sk=>{
+      const v=theirs.settings[sk];
+      if(/Seq$/.test(sk)) maxNum(mine.settings,theirs.settings,sk);
+      else if(sk==='ttImports' && Array.isArray(v)){ const u=[...new Set([...(mine.settings.ttImports||[]),...v])].slice(-50); if(u.length!==(mine.settings.ttImports||[]).length){ mine.settings.ttImports=u; changed++; } }
+      else if(mine.settings[sk]===undefined){ mine.settings[sk]=v; changed++; }
+    });
+  }
+  return changed;
+}
+window.mergeDbInto=mergeDbInto;
+let _mergedFromOtherTab=false;
+window.addEventListener('storage', function(e){
+  if(e.key!==storeKey || !e.newValue) return;
+  let theirs; try{ theirs=JSON.parse(e.newValue); }catch(err){ return; }
+  if(!mergeDbInto(db, theirs)) return;
+  flushRows(); _mergedFromOtherTab=true;
+  showMergedIfIdle();
+});
+function showMergedIfIdle(){
+  // Redraw only when nobody is typing here: tab in the background, or no dialog open.
+  if(!_mergedFromOtherTab || typeof session==='undefined' || !session || typeof render!=='function') return;
+  if(document.querySelector('.modal-back,.ask-overlay')) return;
+  if(!document.hidden && document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+  _mergedFromOtherTab=false;
+  try{ if(session.company) session.company=db.companies.find(c=>c.id===session.company.id)||session.company; render(true); }catch(err){}
+}
+if(typeof document!=='undefined' && document.addEventListener) document.addEventListener('visibilitychange', function(){ if(!document.hidden) showMergedIfIdle(); });
 window.addEventListener('pagehide', function(){ if(_saveTimer) persistNow(); });
 window.addEventListener('beforeunload', function(){ if(_saveTimer) persistNow(); });
 function loadRaw(){
