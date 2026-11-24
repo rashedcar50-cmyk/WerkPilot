@@ -1824,6 +1824,14 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/id="webSearch"/.test(ed) && /openWebSearch\(sku\)/.test(ed) && !/if\(sku\) openKatySearch\(sku\)/.test(ed), 'an unknown number opens the site chooser, not a fixed catalog');
   assert(/\^https:/.test(ed), 'own search sites must be https addresses');
 }
+// ---- Quantity + / − buttons (1.30.0) ----
+{
+  const ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+  const st=new Function(ed.match(/function stepQty\(v,dir\)\{[\s\S]*?\n\}/)[0]+'; return stepQty;')();
+  assert(st(1,1)===2 && st(4.5,1)===5.5 && st(2,-1)===1, 'plus and minus change the quantity by one');
+  assert(st(1,-1)===1 && st(0.5,-1)===0.5, 'minus never brings a quantity to zero or below');
+  assert((ed.match(/class="q-btn"/g)||[]).length===4, 'line rows and quick entry both have − and + buttons');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
