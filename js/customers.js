@@ -273,7 +273,7 @@ function vehicleModal(prefill={}){
    tireAxle1:$('#vtire1')?.value.trim()||'',tireAxle2:$('#vtire2')?.value.trim()||'',dateK:$('#vdatek')?.value.trim()||'',
    ocrRaw:prefill.ocrRaw||''};
   if(prefill.id){ const i=db.vehicles.findIndex(x=>x.id===prefill.id); if(i>=0) db.vehicles[i]=v; audit('vehicle.update',v.plate||v.vin); save(); upsertVehicleCloud(v); closeModal(); render(); }
-  else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
+  else { db.vehicles.push(v);save();upsertVehicleCloud(v);audit('vehicle.create',v.plate||v.vin);closeModal();render(); if(window.WP&&WP.TeiltoolImport&&WP.TeiltoolImport.resume(v)){} else if(canEdit()) setTimeout(()=>addVehiclePhoto(v.id), 200); }
  });
   $('#partslinkBtn').onclick=()=>window.open('https://www.partslink24.com/','_blank');
   if($('#distriBtn')) $('#distriBtn').onclick=()=>openDistriAutoVin($('#vin')?.value||'');

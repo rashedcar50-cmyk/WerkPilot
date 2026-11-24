@@ -415,3 +415,5 @@ body.nav-open{overflow:hidden;touch-action:none}
   .hy-desk .q-btn{width:34px}
   .hy-entry{grid-template-columns:1fr 150px}
 }
+.tt-import-note{border:1px solid #e3c9a8;background:#fff7ee;color:#3a2a14;border-radius:8px;padding:9px 12px;margin:0 0 10px;font-size:13.5px;line-height:1.5}
+.tt-import-note .btn{margin-inline-start:6px;background:#0B2A4A;color:#fff;border-radius:5px}

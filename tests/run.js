@@ -1838,6 +1838,32 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const blk=ed.match(/const WP_SEARCH_SITES=\[[\s\S]*?\];/)[0];
   assert(/Teiltool/.test(blk) && !/google|ebay|daparto/i.test(blk), 'only Teiltool is offered as built-in search site');
 }
+// ---- Teiltool cart hand-over (1.32.0) ----
+{
+  const src=fs.readFileSync(path.join(root,'js/teiltool-import.js'),'utf8');
+  const store={};
+  const sb={window:{}, location:{hash:'#tt=AAAAAAAAAA',pathname:'/WerkPilot/',search:'?v=1'}, history:{replaceState(a,b,u){ sb.location.hash=''; sb._url=u; }},
+    sessionStorage:{setItem(k,v){store[k]=v;},getItem(k){return store[k]||null;},removeItem(k){delete store[k];}},
+    atob:s=>Buffer.from(s,'base64').toString('binary'), Uint8Array, TextDecoder, JSON, Math, Number, String, Array, setTimeout};
+  sb.window=sb; vm.createContext(sb); vm.runInContext(src,sb);
+  const TI=sb.WP.TeiltoolImport;
+  assert(store['wp-tt-import']==='AAAAAAAAAA' && sb._url==='/WerkPilot/?v=1', 'the cart is taken out of the address bar and kept for after login');
+  const enc=o=>Buffer.from(JSON.stringify(o),'utf8').toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const good={v:1,id:'abc123XYZ',ti:1,l:[['GDB1330','Bremsbelagsatz vorne – Ölfest',2,3570],['','Fracht',1,499]],veh:{h:'0035',t:'asl',mk:'OPEL',md:'ASTRA J',n:'Opel Astra J'}};
+  const p=TI.validate(TI.decode(enc(good)));
+  assert(p && p.lines.length===2 && p.lines[0].name==='Bremsbelagsatz vorne – Ölfest' && p.veh.tsn==='ASL', 'a valid cart is decoded (UTF-8) with the vehicle type');
+  const ln=TI.toLines(p,19);
+  assert(ln[0].price===30 && ln[0].qty===2 && ln[0].tax===19 && ln[0].kind==='parts', 'gross shop prices become net editor prices (35,70 -> 30,00)');
+  assert(TI.toLines(Object.assign({},p,{taxIncluded:false}),19)[0].price===35.7, 'net shop prices are taken as they are');
+  const bad=[{v:2,id:'abc123XYZ',l:[['A','B',1,100]]},{v:1,id:'x',l:[['A','B',1,100]]},{v:1,id:'abc123XYZ',l:[]},{v:1,id:'abc123XYZ',l:[['A','B',0,100]]},{v:1,id:'abc123XYZ',l:[['A','B',1,-5]]},{v:1,id:'abc123XYZ',l:[['A','B',1,10.5]]},{v:1,id:'abc123XYZ',l:[['A','B',1,'x']]},{v:1,id:'abc123XYZ',l:new Array(101).fill(['A','B',1,1])}];
+  assert(bad.every(b=>TI.validate(b)===null) && TI.validate(TI.decode('%%%'))===null, 'malformed or out-of-range carts are rejected');
+  const x=TI.validate({v:1,id:'abc123XYZ',l:[['<b>S','<img src=x onerror=1>N',1,100]],veh:{h:'12',t:'ASL'}});
+  assert(x && !/[<>]/.test(x.lines[0].name+x.lines[0].sku) && x.veh===null, 'markup is stripped and an invalid vehicle is ignored');
+  assert(!/plate|vin|customerName/i.test(src.split('Payload:')[1].split('*/')[0].slice(0,200)), 'the payload format carries no personal data');
+  const appS=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), idxS=fs.readFileSync(path.join(root,'index.html'),'utf8'), swS=fs.readFileSync(path.join(root,'sw.js'),'utf8');
+  assert(/WP\.TeiltoolImport\.consume\(\)/.test(appS) && idxS.includes('js/teiltool-import.js?v=') && swS.includes('./js/teiltool-import.js?v='), 'the import runs after login and the module is loaded and cached');
+  assert(/mark\(p\.id\)/.test(src) && /seen\(p\.id\)/.test(src) && !/nextInvoiceNumber|db\.invoices\.push/.test(src), 'import is a draft only and guarded against double import');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
