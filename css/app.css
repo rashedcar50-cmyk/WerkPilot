@@ -330,7 +330,7 @@ body.nav-open{overflow:hidden;touch-action:none}
 .hy-main{padding:12px 14px;background:#fff;min-width:0}
 .hy-main .table-wrap{margin:0;border:1px solid #d5dce6;border-radius:8px;overflow:auto}
 .hy-desk table.inv-edit{width:100%;border-collapse:collapse;table-layout:fixed;min-width:640px}
-.inv-edit col.w-pos{width:30px}.inv-edit col.w-kind{width:100px}.inv-edit col.w-sku{width:13%}.inv-edit col.w-qty{width:60px}.inv-edit col.w-price{width:84px}.inv-edit col.w-sum{width:86px}.inv-edit col.w-tax{width:82px}.inv-edit col.w-del{width:34px}
+.inv-edit col.w-pos{width:30px}.inv-edit col.w-kind{width:100px}.inv-edit col.w-sku{width:13%}.inv-edit col.w-qty{width:112px}.inv-edit col.w-price{width:84px}.inv-edit col.w-sum{width:86px}.inv-edit col.w-tax{width:82px}.inv-edit col.w-del{width:34px}
 .modal:has(.hy-desk){width:min(1280px,98vw)}
 .hy-desk .inv-edit th{background:#0B2A4A;color:#fff;font-size:11.5px;font-weight:700;padding:7px 6px;text-align:start;white-space:normal;line-height:1.2;vertical-align:bottom;border:0}
 .hy-desk .inv-edit td{padding:3px 4px;border:0;border-top:1px solid #e3e8ef;vertical-align:top;background:#fff}
@@ -346,7 +346,7 @@ body.nav-open{overflow:hidden;touch-action:none}
 .hy-desk .c-del{width:28px;height:28px;margin-top:2px;border:1px solid transparent;border-radius:5px;background:transparent;color:#a33;font-size:18px;line-height:1;cursor:pointer;padding:0}
 .hy-desk .c-del:hover,.hy-desk .c-del:focus{background:#fdecea;border-color:#e5b5b0;outline:none}
 .hy-cap{margin:12px 0 4px}
-.hy-entry{display:grid;grid-template-columns:104px 70px minmax(0,1fr) minmax(0,2fr) auto;gap:6px;align-items:center;background:#f6f8fb;border:1px solid #d5dce6;border-radius:8px;padding:8px;margin:0}
+.hy-entry{display:grid;grid-template-columns:104px 124px minmax(0,1fr) minmax(0,2fr) auto;gap:6px;align-items:center;background:#f6f8fb;border:1px solid #d5dce6;border-radius:8px;padding:8px;margin:0}
 .hy-entry input,.hy-entry select{border-radius:5px;border:1px solid #c5ceda;padding:0 9px}
 .hy-entry #katyQty{width:100%;text-align:right;direction:ltr}
 .hy-entry #katySku,.hy-entry #qName{min-width:0}
@@ -405,3 +405,13 @@ body.nav-open{overflow:hidden;touch-action:none}
 .hy-web summary{cursor:pointer;font-size:12.5px;color:#566579;font-weight:700}
 .ws-add{display:grid;grid-template-columns:140px minmax(0,1fr) auto;gap:6px;margin-top:6px}
 @media(max-width:700px){.ws-add{grid-template-columns:1fr}}
+.qty-step{display:flex;align-items:stretch;direction:ltr;gap:2px}
+.hy-desk .qty-step input{flex:1;min-width:0;text-align:center;padding:0 2px}
+.hy-desk .q-btn{flex:none;width:28px;border:1px solid #c5ceda;border-radius:4px;background:#eef2f7;color:#0B2A4A;font-size:17px;font-weight:700;line-height:1;cursor:pointer;padding:0}
+.hy-desk .q-btn:hover{background:#0B2A4A;color:#fff;border-color:#0B2A4A}
+.hy-desk .q-btn:active{background:#C45C12;border-color:#C45C12;color:#fff}
+@media(max-width:700px){
+  .hy-desk .inv-edit tr{grid-template-columns:1.7fr 1fr 1fr 58px}
+  .hy-desk .q-btn{width:34px}
+  .hy-entry{grid-template-columns:1fr 150px}
+}

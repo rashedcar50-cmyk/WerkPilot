@@ -167,8 +167,20 @@ function invOriginalSku(v){
   const o=hit&&String(hit.sku||'');
   return (o && o.toUpperCase()===String(v||'').trim().toUpperCase() && o!==o.toUpperCase()) ? o : '';
 }
+// + / − next to a quantity: one step up or down, never to zero or below.
+function stepQty(v,dir){
+  const n=Number(v)||0, nv=Math.round((n+dir)*100)/100;
+  return nv>0?nv:n;
+}
 function wireInvoiceUppercase(desk){
   if(!desk||desk.dataset.upper) return; desk.dataset.upper='1';
+  desk.addEventListener('click',e=>{
+    const b=e.target.closest&&e.target.closest('.q-btn'); if(!b) return;
+    const inp=b.parentNode.querySelector('input'); if(!inp) return;
+    const nv=stepQty(latNum(inp.value||0),Number(b.dataset.q));
+    inp.value=inp.id==='katyQty'?nv.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}):String(nv);
+    refreshInvoiceSums();
+  });
   const isText=el=>el&&el.matches&&el.matches('.c-name,.c-sku,#katySku,#qName');
   const isSku=el=>el.matches('.c-sku,#katySku');
   desk.addEventListener('input',e=>{
@@ -195,7 +207,7 @@ function addInvoiceRow(data){
     <td class="k"><select class="c-kind"><option value="parts" ${d.kind!=='labor'?'selected':''}>${t('kindParts')}</option><option value="labor" ${d.kind==='labor'?'selected':''}>${t('kindLabor')}</option></select></td>
     <td class="s"><input class="c-sku" dir="ltr" value="${esc(d.sku)}" placeholder="${t('sku')}"></td>
     <td class="d"><textarea class="c-name" rows="1" placeholder="${t('desc')}">${esc(d.name)}</textarea></td>
-    <td class="n" data-l="${t('colQty')}"><input class="c-qty latnum" inputmode="decimal" lang="de" value="${Number(d.qty)}"></td>
+    <td class="n" data-l="${t('colQty')}"><div class="qty-step"><button type="button" class="q-btn" data-q="-1" tabindex="-1" aria-label="−">−</button><input class="c-qty latnum" inputmode="decimal" lang="de" value="${Number(d.qty)}"><button type="button" class="q-btn" data-q="1" tabindex="-1" aria-label="+">+</button></div></td>
     <td class="n" data-l="${t('unitNet')}"><input class="c-price latnum" inputmode="decimal" lang="de" value="${Number(d.price)}"></td>
     <td class="c-sum n" data-l="${t('sumNet')}">${(Number(d.qty||0)*Number(d.price||0)).toLocaleString('de-DE',{minimumFractionDigits:2})}</td>
     <td class="n c-vatcell" data-l="${t('colVat')}"><button type="button" class="c-vat" title="${t('taxPct')}"></button><input class="c-tax latnum" inputmode="decimal" lang="de" value="${Number(d.tax||19)}" hidden></td>
@@ -207,6 +219,8 @@ function addInvoiceRow(data){
   const nameEl=tr.querySelector('.c-name');
   const grow=()=>{ nameEl.style.height='auto'; nameEl.style.height=Math.max(32,nameEl.scrollHeight+2)+'px'; };
   nameEl.addEventListener('input',grow); nameEl.addEventListener('focus',grow); setTimeout(grow,0); setTimeout(grow,250);
+  if(window.ResizeObserver){ let w=0; new ResizeObserver(()=>{ if(nameEl.clientWidth!==w){ w=nameEl.clientWidth; grow(); } }).observe(nameEl); }
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(grow).catch(()=>{});
   // The VAT column shows the line's VAT amount; a click on it opens the
   // rate (%) for this line, leaving the field shows the amount again.
   const vatBtn=tr.querySelector('.c-vat'), taxEl=tr.querySelector('.c-tax');
@@ -268,7 +282,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
         <div class="hy-cap">${t('quickEntry')}</div>
         <div class="hy-entry">
           <select id="qArt"><option value="parts">${t('kindParts')}</option><option value="labor">${t('kindLabor')}</option></select>
-          <input id="katyQty" class="latnum" inputmode="decimal" lang="de" value="1,00">
+          <div class="qty-step"><button type="button" class="q-btn" data-q="-1" tabindex="-1" aria-label="−">−</button><input id="katyQty" class="latnum" inputmode="decimal" lang="de" value="1,00"><button type="button" class="q-btn" data-q="1" tabindex="-1" aria-label="+">+</button></div>
           <input id="katySku" dir="ltr" placeholder="${t('orderNo')}">
           <input id="qName" placeholder="${t('desc')}">
           <button type="button" class="btn primary" id="katyFetch">${t('apply')}</button>
