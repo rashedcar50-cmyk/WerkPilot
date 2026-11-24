@@ -195,8 +195,10 @@ function teiltoolUrl(vehicleId){
   const base=String(w.teiltoolUrl||db.settings.teiltoolUrl||TEILTOOL_URL).trim().replace(/\/+$/,'');
   const v=vehicleId && typeof vehicleOf==='function' ? vehicleOf(vehicleId) : null;
   const hsn=String(v&&v.hsn||'').trim(), tsn=String(v&&v.tsn||'').trim().toUpperCase().slice(0,3);
-  if(/^[0-9]{4}$/.test(hsn) && /^[A-Z0-9]{3}$/.test(tsn)) return base+'/pages/fahrzeugsuche?hsn='+hsn+'&tsn='+tsn;
-  return base+'/pages/fahrzeugsuche';
+  // wp=1 tells the shop the visitor comes from the workshop program, so the
+  // cart offers "send to workshop program".
+  if(/^[0-9]{4}$/.test(hsn) && /^[A-Z0-9]{3}$/.test(tsn)) return base+'/pages/fahrzeugsuche?hsn='+hsn+'&tsn='+tsn+'&wp=1';
+  return base+'/pages/fahrzeugsuche?wp=1';
 }
 function openTeiltool(vehicleId){ window.open(teiltoolUrl(vehicleId),'_blank','noopener'); }
 function openPartsShop(){

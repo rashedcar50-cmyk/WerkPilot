@@ -42,7 +42,10 @@
     let veh=null;
     if(p.veh && typeof p.veh==='object'){
       const h=clean(p.veh.h,4), t=clean(p.veh.t,3).toUpperCase();
-      if(/^[0-9]{4}$/.test(h) && /^[A-Z0-9]{3}$/.test(t)) veh={hsn:h,tsn:t,make:clean(p.veh.mk,40),model:clean(p.veh.md,80),label:clean(p.veh.n,120)};
+      const ok=/^[0-9]{4}$/.test(h) && /^[A-Z0-9]{3}$/.test(t);
+      const label=clean(p.veh.n,120);
+      // Without KBA numbers the vehicle is still shown by name.
+      if(ok || label) veh={hsn:ok?h:'',tsn:ok?t:'',make:clean(p.veh.mk,40),model:clean(p.veh.md,80),label};
     }
     return {id,taxIncluded:p.ti!==0,lines,veh};
   }
@@ -53,7 +56,7 @@
       price:p.taxIncluded ? Math.round(l.cents/(1+rate/100))/100 : l.cents/100}));
   }
   function findVehicle(veh){
-    if(!veh) return [];
+    if(!veh || !veh.hsn) return [];
     return companyRows('vehicles').filter(v=>String(v.hsn||'').trim()===veh.hsn && String(v.tsn||'').trim().toUpperCase().slice(0,3)===veh.tsn);
   }
   function open(p,vehicle){
@@ -62,7 +65,7 @@
     invoiceDesigner('invoice', v&&v.customerId||'', null, v?v.id:'', {lines:toLines(p,19), tax:19, discount:0});
     const main=document.querySelector('.hy-main'); if(!main) return;
     const box=document.createElement('div'); box.className='tt-import-note';
-    const vehTxt=p.veh?[p.veh.label||[p.veh.make,p.veh.model].filter(Boolean).join(' '),'HSN/TSN '+p.veh.hsn+' / '+p.veh.tsn].filter(Boolean).join(' · '):'';
+    const vehTxt=p.veh?[p.veh.label||[p.veh.make,p.veh.model].filter(Boolean).join(' '),p.veh.hsn?'HSN/TSN '+p.veh.hsn+' / '+p.veh.tsn:''].filter(Boolean).join(' · '):'';
     box.innerHTML='<b>'+esc(t('ttImported'))+'</b> '+esc(t('ttDraftHint'))+(vehTxt?'<br>'+esc(t('vehicle'))+': '+esc(vehTxt):'')
       +(p.veh&&!v?(hits.length>1?'<br>'+esc(t('ttVehMany')):'<br>'+esc(t('ttVehNew'))+' <button type="button" class="btn small" id="ttVehAdd">'+esc(t('addVehicle'))+'</button>'):'');
     main.insertBefore(box,main.firstChild);
