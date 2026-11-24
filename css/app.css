@@ -395,3 +395,13 @@ body.nav-open{overflow:hidden;touch-action:none}
 .hy-desk .c-vat::after{content:attr(data-rate);display:block;font-size:10.5px;color:#7a8799}
 .hy-desk .c-vat:hover,.hy-desk .c-vat:focus{border-color:#c5ceda;background:#fff;outline:none}
 .hy-desk .c-vat[hidden],.hy-desk .c-tax[hidden]{display:none}
+.hy-web{border:1px solid #d5dce6;border-radius:8px;background:#f6f8fb;padding:10px;margin:0 0 10px}
+.hy-web[hidden]{display:none}
+.hy-web .hy-cap{margin:0 0 6px}
+.ws-sites{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.ws-site{display:inline-flex;align-items:center}
+.ws-site .btn{background:#0B2A4A;color:#fff;border-radius:5px}
+.hy-desk .ws-x{width:24px;height:28px;border:0;background:transparent;color:#a33;font-size:16px;cursor:pointer;padding:0}
+.hy-web summary{cursor:pointer;font-size:12.5px;color:#566579;font-weight:700}
+.ws-add{display:grid;grid-template-columns:140px minmax(0,1fr) auto;gap:6px;margin-top:6px}
+@media(max-width:700px){.ws-add{grid-template-columns:1fr}}
