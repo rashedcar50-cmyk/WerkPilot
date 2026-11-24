@@ -53,8 +53,14 @@
   // Teiltool shows prices including VAT; the editor works with net prices.
   function toLines(p,rate){
     rate=Number(rate)||19;
-    return p.lines.map(l=>({sku:l.sku,name:l.name,qty:l.qty,tax:rate,kind:'parts',
-      price:p.taxIncluded ? Math.round(l.cents/(1+rate/100))/100 : l.cents/100}));
+    // The shop price is what the workshop pays (buy); its own margin is added
+    // in the editor (see partsMarkup in invoice-edit.js).
+    const m=typeof partsMarkup==='function'?partsMarkup():0;
+    return p.lines.map(l=>{
+      const buy=p.taxIncluded ? Math.round(l.cents/(1+rate/100))/100 : l.cents/100;
+      return {sku:l.sku,name:l.name,qty:l.qty,tax:rate,kind:'parts',buy,autoPrice:true,
+        price:typeof applyMarkup==='function'?applyMarkup(buy,m):buy};
+    });
   }
   function findVehicle(veh){
     if(!veh) return [];
@@ -70,7 +76,7 @@
     const main=document.querySelector('.hy-main'); if(!main) return;
     const box=document.createElement('div'); box.className='tt-import-note';
     const vehTxt=p.veh?[p.veh.label||[p.veh.make,p.veh.model].filter(Boolean).join(' '),p.veh.hsn?'HSN/TSN '+p.veh.hsn+' / '+p.veh.tsn:''].filter(Boolean).join(' · '):'';
-    box.innerHTML='<b>'+esc(t('ttImported'))+'</b> '+esc(t('ttDraftHint'))+(vehTxt?'<br>'+esc(t('vehicle'))+': '+esc(vehTxt):'')
+    box.innerHTML='<b>'+esc(t('ttImported'))+'</b> '+esc(t('ttDraftHint'))+' '+esc(t('mkNote'))+(vehTxt?'<br>'+esc(t('vehicle'))+': '+esc(vehTxt):'')
       +(p.veh&&!v?(hits.length>1?'<br>'+esc(t('ttVehMany')):'<br>'+esc(t('ttVehNew'))+' <button type="button" class="btn small" id="ttVehAdd">'+esc(t('addVehicle'))+'</button>'):'');
     main.insertBefore(box,main.firstChild);
     const add=document.getElementById('ttVehAdd');

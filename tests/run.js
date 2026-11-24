@@ -2029,6 +2029,19 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(url({make:'VW',model:'Golf'})==='https://shop.example/pages/fahrzeugsuche?wp=1' && url({make:'VW',model:'Golf',catalogVehicleId:'12;x'})==='https://shop.example/pages/fahrzeugsuche?wp=1', 'no or invalid catalogue id: plain shop link');
   assert(/String\(v\.catalogVehicleId\|\|''\)===veh\.cid/.test(src) && /const cid=\/\^\[0-9\]\{1,9\}\$\//.test(src), 'a cart from the shop is matched to the vehicle by its catalogue id');
 }
+// ---- The workshop's own margin on Teiltool parts (1.46.0) ----
+{
+  const ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8'), im=fs.readFileSync(path.join(root,'js/teiltool-import.js'),'utf8'), pr=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+  const am=new Function(ed.match(/function applyMarkup\(buy,m\)\{[^\n]*\}/)[0]+'; return applyMarkup;')();
+  assert(am(30,30)===39 && am(15.96,25)===19.95 && am(30.66,0)===30.66 && am(10,'x')===10, 'selling price = purchase price + the workshop\'s margin, rounded to cents');
+  const pmFn=ed.match(/function partsMarkup\(\)\{[^\n]*\}/)[0];
+  const pm=v=>new Function('workshop',pmFn+'; return partsMarkup();')(()=>({partsMarkup:v}));
+  assert(pm(30)===30 && pm(undefined)===0 && pm(-5)===0 && pm(9999)===0 && pm('12.5')===12.5, 'the margin is the workshop\'s own setting; nonsense values count as 0');
+  assert(/if\(tr\.dataset\.buy==null \|\| tr\.dataset\.auto!=='1'\) return;/.test(ed) && /if\(e\.isTrusted\) delete tr\.dataset\.auto;/.test(ed), 'a price typed by hand is never recalculated');
+  assert(/line\.buy=Number\(tr\.dataset\.buy\)/.test(ed) && /buy,autoPrice:true/.test(im) && /buy:a\.price,price:applyMarkup\(a\.price,partsMarkup\(\)\)/.test(ed), 'cart import and part lookup keep the purchase price and apply the margin');
+  assert(!/\.buy\b/.test(pr), 'the purchase price is never printed on the invoice');
+  assert(/id="fmk"/.test(ed) && /id="hyProfit"/.test(ed), 'the editor shows the margin field and the profit');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

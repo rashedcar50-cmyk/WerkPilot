@@ -109,6 +109,25 @@ function parseInvoiceLine(l){
   return {sku:'',name:parts[0]||'Position',qty:Number(parts[1]||1),price:Number(parts[2]||0)};
 }
 
+// ---- The workshop's own margin on parts bought from Teiltool ----
+// A part that comes from the shop (cart or part-number lookup) carries the
+// shop price as the workshop's PURCHASE price (line.buy). The selling price
+// on the invoice is purchase price + the workshop's own margin, which each
+// workshop sets itself and which is remembered for that workshop. A price the
+// user typed by hand is never recalculated. The purchase price is internal:
+// it is stored with the line but never printed.
+function partsMarkup(){ const m=Number(workshop().partsMarkup); return Number.isFinite(m)&&m>=0&&m<=500?m:0; }
+function applyMarkup(buy,m){ return Math.round(Number(buy||0)*(1+(Number(m)||0)/100)*100)/100; }
+function setPartsMarkup(v){
+  let m=latNum(v); if(!Number.isFinite(m)||m<0) m=0; if(m>500) m=500;
+  workshop().partsMarkup=m; save();
+  document.querySelectorAll('#invRows tr').forEach(tr=>{
+    if(tr.dataset.buy==null || tr.dataset.auto!=='1') return;
+    const p=tr.querySelector('.c-price'); if(p) p.value=String(applyMarkup(tr.dataset.buy,m));
+  });
+  refreshInvoiceSums();
+  return m;
+}
 function collectInvoiceRows(){
   return [...document.querySelectorAll('#invRows tr')].map(tr=>{
     const sku=tr.querySelector('.c-sku')?.value.trim()||'';
@@ -117,7 +136,9 @@ function collectInvoiceRows(){
     const price=latNum(tr.querySelector('.c-price')?.value||0);
     const tax=latNum(tr.querySelector('.c-tax')?.value||19);
     const kind=tr.querySelector('.c-kind')?.value||'parts';
-    return {sku,name,qty,price,tax,kind,sum:qty*price};
+    const line={sku,name,qty,price,tax,kind,sum:qty*price};
+    if(tr.dataset.buy!=null && tr.dataset.buy!=='') line.buy=Number(tr.dataset.buy);
+    return line;
   }).filter(x=>x.name||x.sku);
 }
 function refreshInvoiceVat(){
@@ -152,6 +173,13 @@ function refreshInvoiceSums(){
   if($('#hyVat')) $('#hyVat').textContent=fmt(totals.vat);
   if($('#hyVatLbl')){ const rates=[...new Set(lines.map(l=>Number(l.tax)))]; $('#hyVatLbl').textContent=t('tax')+(rates.length===1?' '+String(rates[0]).replace('.',',')+' %':''); }
   if($('#hyCount')) $('#hyCount').textContent=lines.length;
+  // internal: what the Teiltool parts cost the workshop and what it earns on them
+  const bought=lines.filter(l=>l.buy!=null);
+  if($('#hyMarginBox')){
+    $('#hyMarginBox').hidden=!bought.length;
+    if($('#hyBuy')) $('#hyBuy').textContent=fmt(bought.reduce((a,l)=>a+l.qty*l.buy,0));
+    if($('#hyProfit')) $('#hyProfit').textContent=fmt(bought.reduce((a,l)=>a+l.qty*(l.price-l.buy),0));
+  }
   if($('#henryGross')) $('#henryGross').textContent=fmt(gross);
 }
 // Typed text in the invoice editor is upper-cased automatically (ß stays).
@@ -210,6 +238,8 @@ function addInvoiceRow(data){
     <td class="n c-vatcell" data-l="${t('colVat')}"><button type="button" class="c-vat" title="${t('taxPct')}"></button><input class="c-tax latnum" inputmode="decimal" lang="de" value="${Number(d.tax||19)}" hidden></td>
     <td class="x"><button type="button" class="c-del" title="${t('del')}" aria-label="${t('del')}">×</button></td>`;
   tb.appendChild(tr);
+  if(d.buy!=null && d.buy!=='' && Number.isFinite(Number(d.buy))){ tr.dataset.buy=String(Number(d.buy)); if(d.autoPrice) tr.dataset.auto='1'; }
+  tr.querySelector('.c-price').addEventListener('input',e=>{ if(e.isTrusted) delete tr.dataset.auto; });
   tr.querySelector('.c-del').onclick=()=>{tr.remove(); numberInvoiceRows(); refreshInvoiceSums();};
   tr.querySelectorAll('input,textarea,select').forEach(inp=>inp.addEventListener('input',refreshInvoiceSums));
   // The description wraps and grows with its text instead of being cut off.
@@ -305,6 +335,13 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
         <button type="button" class="btn small" id="katyPasteBtn">${t('paste')}</button>
       </div>
       <aside class="hy-side">
+        <div class="hy-margin" id="hyMarginBox" hidden>
+          <div class="hy-cap">${t('mkTitle')}</div>
+          <label class="hy-tot hy-in"><span>${t('mkPct')}</span><input id="fmk" class="latnum" inputmode="decimal" lang="de" value="${String(partsMarkup()).replace('.',',')}"></label>
+          <div class="hy-tot"><span>${t('mkBuy')}</span><b id="hyBuy">0,00</b></div>
+          <div class="hy-tot"><span>${t('mkProfit')}</span><b id="hyProfit">0,00</b></div>
+          <div class="hint">${t('mkHint')}</div>
+        </div>
         <div class="hy-cap">${t('sumTitle')} · <span id="hyCount">0</span> ${t('positions')}</div>
         <div class="hy-tot"><span>${t('sumItems')}</span><b id="hySub">0,00</b></div>
         <label class="hy-tot hy-in"><span>${t('discount')}</span><input id="fd" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.discount||0):0}"></label>
@@ -431,7 +468,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
         WP.Teiltool.article(sku,tax).then(a=>{
           if(!document.querySelector('#invRows')) return;
           if(!a) return plain();
-          addInvoiceRow({sku:a.sku,name:typed||a.name,qty,price:a.price,tax,kind});
+          addInvoiceRow({sku:a.sku,name:typed||a.name,qty,buy:a.price,price:applyMarkup(a.price,partsMarkup()),autoPrice:true,tax,kind});
           if($('#katyHint')) $('#katyHint').textContent='Teiltool — '+a.name;
           refreshInvoiceSums();
         }).catch(plain);
@@ -440,6 +477,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     $('#katySku').value=''; if($('#qName')) $('#qName').value=''; $('#katySku').focus();
   };
   if($('#katyFetch')) $('#katyFetch').onclick=doFetch;
+  if($('#fmk')){ $('#fmk').addEventListener('input',()=>setPartsMarkup($('#fmk').value)); }
   wireInvoiceUppercase(document.querySelector('.hy-desk'));
   ['katySku','katyQty','qName'].forEach(id=>{
     const el=$('#'+id); if(el) el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
