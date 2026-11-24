@@ -1787,6 +1787,17 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
     assert(/>MwSt\.<\/th>/.test(sbV.mixed) && />19,00 \(19 %\)<\/td>/.test(sbV.mixed) && />0,70 \(7 %\)<\/td>/.test(sbV.mixed), 'with mixed rates every line shows its amount together with its own rate');
   }
 
-  if(failed){ console.error(failed+' failed'); process.exit(1); }
+  // ---- Invoice editor redesign (1.26.0) ----
+{
+  const ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8'), css=fs.readFileSync(path.join(root,'css/app.css'),'utf8'), i18=fs.readFileSync(path.join(root,'i18n.js'),'utf8');
+  assert(/<textarea class="c-name"/.test(ed), 'the line description is a wrapping textarea, not a cut-off input');
+  assert(/querySelectorAll\('input,textarea'\)/.test(ed), 'Enter navigation covers the description textarea');
+  ['fcust','fv','pay','fsd','ft','fd','invRows','katySku','qName','katyQty','katyFetch','addRow','addLabor','katyOpen','teiltoolOpen','henryGross','hySub','hyVat'].forEach(id=>assert(ed.includes('id="'+id+'"'), 'editor keeps field #'+id));
+  assert(/class="hy-f[^"]*"><span>\$\{t\('customer'\)\}/.test(ed) && /<span>\$\{t\('payMethod'\)\}/.test(ed), 'header fields carry visible labels');
+  assert(!/<span>EK<\/span>|<span>VK<\/span>/.test(ed), 'net and gross are no longer mislabelled as EK/VK');
+  assert(/\.modal:has\(\.hy-desk\)/.test(css) && /col\.w-sku\{width:13%\}/.test(css), 'the description column gets the remaining width');
+  ['invDate','unitNet','sumNet','sumItems','netTotal','taxDefault'].forEach(k=>assert((i18.match(new RegExp(k+":'",'g'))||[]).length>=3, 'i18n key '+k+' exists in en/de/ar'));
+}
+if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

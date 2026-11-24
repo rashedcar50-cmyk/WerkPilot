@@ -313,3 +313,81 @@ body.nav-open{overflow:hidden;touch-action:none}
 .btn-wa svg{flex-shrink:0}
 
 .shop-link{margin-top:10px;background:#0B2A4A;color:#fff;border:0;border-radius:10px;padding:10px 12px;font-weight:800;text-align:start}
+
+/* ---- Invoice editor (redesign 1.26.0): compact, labelled, description first ---- */
+.hy-desk{background:#fff;border:1px solid #d5dce6;border-radius:10px;overflow:hidden;color:#16202c}
+.hy-desk input,.hy-desk select,.hy-desk textarea{font:inherit;font-size:14px;width:100%;height:36px;padding:0 9px;border:1px solid #c5ceda;border-radius:5px;background:#fff;color:#16202c;box-shadow:none}
+.hy-desk textarea{height:auto;min-height:32px;padding:6px 9px;line-height:1.35;resize:none;overflow:hidden;display:block}
+.hy-desk input:focus,.hy-desk select:focus,.hy-desk textarea:focus{outline:2px solid #C45C12;outline-offset:0;border-color:#C45C12;background:#fffaf5}
+.hy-bar{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.5fr) auto auto minmax(120px,.8fr);gap:10px 12px;align-items:end;background:#f6f8fb;color:#16202c;padding:12px 14px;border-bottom:1px solid #d5dce6}
+.hy-bar select,.hy-bar input{font-size:14px;border-radius:5px;padding:0 9px;border:1px solid #c5ceda}
+.hy-f{display:flex;flex-direction:column;gap:3px;min-width:0;margin:0}
+.hy-f>span,.hy-cap{font-size:11.5px;font-weight:700;letter-spacing:.02em;color:#566579;text-transform:none}
+.hy-f output{height:36px;display:flex;align-items:center;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hy-scan{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+.hy-scan .btn{background:#fff;color:#0B2A4A;border:1px solid #c5ceda}
+.hy-split{display:grid;grid-template-columns:minmax(0,1fr) 264px;min-height:0}
+.hy-main{padding:12px 14px;background:#fff;min-width:0}
+.hy-main .table-wrap{margin:0;border:1px solid #d5dce6;border-radius:8px;overflow:auto}
+.hy-desk table.inv-edit{width:100%;border-collapse:collapse;table-layout:fixed;min-width:640px}
+.inv-edit col.w-pos{width:30px}.inv-edit col.w-kind{width:100px}.inv-edit col.w-sku{width:13%}.inv-edit col.w-qty{width:60px}.inv-edit col.w-price{width:84px}.inv-edit col.w-sum{width:86px}.inv-edit col.w-tax{width:52px}.inv-edit col.w-del{width:34px}
+.modal:has(.hy-desk){width:min(1280px,98vw)}
+.hy-desk .inv-edit th{background:#0B2A4A;color:#fff;font-size:11.5px;font-weight:700;padding:7px 6px;text-align:start;white-space:normal;line-height:1.2;vertical-align:bottom;border:0}
+.hy-desk .inv-edit td{padding:3px 4px;border:0;border-top:1px solid #e3e8ef;vertical-align:top;background:#fff}
+.hy-desk .inv-edit tbody tr:nth-child(even) td{background:#fafbfd}
+.hy-desk .inv-edit input,.hy-desk .inv-edit select,.hy-desk .inv-edit textarea{min-width:0;height:32px;padding:0 7px;border-color:#d9e0e9;border-radius:4px;font-size:14px}
+.hy-desk .inv-edit textarea{height:auto;padding:5px 7px}
+.hy-desk .inv-edit td:nth-child(3) input{min-width:0}
+.hy-desk .inv-edit .c-name{font-weight:500}
+.hy-desk .inv-edit .c-kind{padding:0 4px;font-size:12.5px;background:#eef2f7;border-color:#d9e0e9;color:#0B2A4A;font-weight:700}
+.hy-desk .inv-edit th.n,.hy-desk .inv-edit td.n,.hy-desk .inv-edit td.n input{text-align:right;direction:ltr;font-variant-numeric:tabular-nums}
+.hy-desk .inv-edit td.c-pos{text-align:center;color:#7a8799;font-size:12.5px;line-height:32px}
+.hy-desk .inv-edit td.c-sum{line-height:32px;font-weight:700;padding-inline:8px}
+.hy-desk .c-del{width:28px;height:28px;margin-top:2px;border:1px solid transparent;border-radius:5px;background:transparent;color:#a33;font-size:18px;line-height:1;cursor:pointer;padding:0}
+.hy-desk .c-del:hover,.hy-desk .c-del:focus{background:#fdecea;border-color:#e5b5b0;outline:none}
+.hy-cap{margin:12px 0 4px}
+.hy-entry{display:grid;grid-template-columns:104px 70px minmax(0,1fr) minmax(0,2fr) auto;gap:6px;align-items:center;background:#f6f8fb;border:1px solid #d5dce6;border-radius:8px;padding:8px;margin:0}
+.hy-entry input,.hy-entry select{border-radius:5px;border:1px solid #c5ceda;padding:0 9px}
+.hy-entry #katyQty{width:100%;text-align:right;direction:ltr}
+.hy-entry #katySku,.hy-entry #qName{min-width:0}
+.hy-entry .btn{height:36px;padding:0 16px;border-radius:5px}
+.hy-main .hint{font-size:12px;color:#566579;margin:4px 0 0}
+.hy-tools{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.hy-tools .btn{background:#fff;color:#0B2A4A;border:1px solid #c5ceda;border-radius:5px}
+.hy-main #katyPaste{height:auto;min-height:52px;overflow:auto;margin-bottom:6px}
+.hy-side{background:#f6f8fb;border:0;border-inline-start:1px solid #d5dce6;padding:14px;font-size:14px}
+.hy-side .hy-cap{margin:0 0 8px}
+.hy-tot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #e0e6ee;margin:0;color:#16202c}
+.hy-tot b{font-variant-numeric:tabular-nums;direction:ltr}
+.hy-tot.hy-in input{width:96px;height:32px;text-align:right;direction:ltr;flex:none}
+.hy-tot.hy-gross{border-bottom:0;border-top:2px solid #0B2A4A;margin-top:4px;padding-top:12px;font-weight:800}
+.hy-tot.hy-gross b{font-size:22px;color:#0B2A4A;white-space:nowrap}
+.hy-tot.hy-def{border:0;margin-top:14px;font-size:12px;color:#566579}
+.hy-tot.hy-def input{width:64px}
+@media(max-width:900px){
+  .hy-bar{grid-template-columns:1fr 1fr}
+  .hy-split{grid-template-columns:1fr}
+  .hy-side{border-inline-start:0;border-top:1px solid #d5dce6}
+}
+@media(max-width:700px){
+  .hy-desk input,.hy-desk select,.hy-desk .inv-edit input,.hy-desk .inv-edit select{height:44px;font-size:16px}
+  .hy-desk textarea,.hy-desk .inv-edit textarea{font-size:16px;min-height:44px;padding:10px 9px}
+  .hy-bar{grid-template-columns:1fr 1fr}.hy-f-w{grid-column:1/-1}
+  .hy-bar input,.hy-bar select,.hy-entry input,.hy-entry select{min-height:0;flex:none}
+  .hy-main .table-wrap{border:0;overflow:visible}
+  .hy-desk table.inv-edit{min-width:0;display:block}
+  .hy-desk .inv-edit colgroup,.hy-desk .inv-edit thead{display:none}
+  .hy-desk .inv-edit tbody{display:block}
+  .hy-desk .inv-edit tr{display:grid;grid-template-columns:1fr 1.2fr 1.2fr 58px;gap:6px;border:1px solid #d5dce6;border-radius:8px;padding:8px;margin-bottom:8px;background:#fff;position:relative}
+  .hy-desk .inv-edit tbody tr td{display:block;border:0;padding:0;background:transparent}
+  .hy-desk .inv-edit tbody tr td.c-pos{display:none}
+  .hy-desk .inv-edit td.d{grid-column:1/-1;grid-row:1;padding-inline-end:48px}
+  .hy-desk .inv-edit td.k{grid-column:1/3;grid-row:2}.hy-desk .inv-edit td.s{grid-column:3/5;grid-row:2}
+  .hy-desk .inv-edit td.n{grid-row:3}
+  .hy-desk .inv-edit td.n::before{content:attr(data-l);display:block;font-size:11px;font-weight:700;color:#566579;text-align:right;line-height:1.5;white-space:nowrap;overflow:hidden}
+  .hy-desk .inv-edit tbody tr td.c-sum{line-height:44px;text-align:right;padding:0 4px}
+  .hy-desk .inv-edit td.x{position:absolute;top:8px;inset-inline-end:8px}
+  .hy-desk .c-del{width:44px;height:44px;margin:0;border-color:#e3e8ef}
+  .hy-entry{grid-template-columns:1fr 90px}.hy-entry #katySku,.hy-entry #qName,.hy-entry .btn{grid-column:1/-1}
+  .hy-entry .btn{height:44px}
+}
