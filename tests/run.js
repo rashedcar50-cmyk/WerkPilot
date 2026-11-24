@@ -1630,6 +1630,114 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(!/RZ[- ]?AA ?4763|SJNFBAN16U0504041/.test(autoSrcStatic), 'PROOF: the G-vs-F.1 and vehicle-class checks are NOT keyed to this specific plate/VIN anywhere in js/autosiastik.js -- only test fixtures reference the real case');
   assert(/VEHICLE_CLASS_RE/.test(autoSrcStatic), 'PROOF OF FIX: Fahrzeugklasse (J) is now validated against known EU category codes, generally');
 
+  // ---------------------------------------------------------------
+  // Invoice lifecycle (2026-11-24): an issued invoice is never
+  // overwritten; cancellation is a document of its own.
+  // ---------------------------------------------------------------
+  {
+    const sb2={window:{WP:{}}, console};
+    sb2.window.window=sb2.window;
+    vm.createContext(sb2);
+    vm.runInContext('var window=this.window;'+fs.readFileSync(path.join(root,'js/invoice-lifecycle.js'),'utf8'), sb2);
+    const L=sb2.window.WP.InvoiceLifecycle;
+    const orig={id:'i1',companyId:'de',type:'Rechnung',number:'RE-DE-2026-0312',date:'2026-11-20T10:00:00.000Z',customerId:'c1',vehicleId:'v1',
+      lines:[{sku:'A',name:'Bremsbelag',qty:2,price:50,tax:19,kind:'parts'},{name:'Einbau',qty:1.5,price:100,tax:19,kind:'labor'}],
+      parts:100,labor:150,discount:10,tax:19,net:240,total:285.6,payment:'open',paid:false,
+      snapshot:{customer:{name:'Erika Mustermann'}}};
+    assert(L.isIssued(orig) && L.canCancel(orig), 'an invoice with a number is issued and can be cancelled');
+    assert(!L.isIssued({id:'x',lines:[]}), 'a record without a number is not an issued invoice');
+    const doc=L.buildStornoDoc(orig,'ST-DE-2026-0001','2026-11-24T09:00:00.000Z','i2');
+    assert(doc.type==='Stornorechnung' && doc.number==='ST-DE-2026-0001', 'the cancellation document has its own type and its own number');
+    assert(doc.stornoOf==='i1' && doc.stornoOfNumber==='RE-DE-2026-0312', 'the cancellation document refers to the original by id and number');
+    assert(doc.total===-285.6 && doc.net===-240 && doc.parts===-100 && doc.labor===-150 && doc.discount===-10, 'the cancellation document mirrors the stored amounts of the original with the sign reversed');
+    assert(doc.lines.length===2 && doc.lines[0].qty===-2 && doc.lines[1].qty===-1.5 && doc.lines[0].price===50, 'lines are mirrored with negative quantity and unchanged price');
+    assert(orig.lines[0].qty===2 && orig.total===285.6 && !orig.status, 'building the cancellation document does not touch the original');
+    assert(doc.paid===true, 'nothing is owed on a cancellation document, so it never shows up as unpaid');
+    assert(doc.snapshot && doc.snapshot.customer.name==='Erika Mustermann' && doc.snapshot!==orig.snapshot, 'the cancellation document carries its own copy of the frozen parties');
+    const marks=L.cancelMarks(doc,'2026-11-24T09:00:00.000Z');
+    assert(marks.status==='storno' && marks.stornoBy==='ST-DE-2026-0001' && marks.stornoById==='i2', 'the original is marked as cancelled and points to its cancellation document');
+    Object.assign(orig, marks);
+    assert(!L.canCancel(orig), 'an invoice that is already cancelled cannot be cancelled a second time');
+    assert(!L.canCancel(doc) && L.buildStornoDoc(doc,'ST-X','now','i3')===null, 'a cancellation document cannot itself be cancelled');
+    const meta=L.toMeta(orig), back=L.fromMeta(meta);
+    assert(back.status==='storno' && back.stornoBy==='ST-DE-2026-0001' && back.snapshot.customer.name==='Erika Mustermann', 'the cancelled state and the frozen parties survive the round trip through the cloud metadata');
+    const backDoc=L.fromMeta(L.toMeta(doc));
+    assert(backDoc.stornoOf==='i1' && backDoc.stornoOfNumber==='RE-DE-2026-0312', 'the link from the cancellation document to its original survives the round trip through the cloud metadata');
+    const snap=L.buildSnapshot({id:'c1',name:'Erika',address:'Weg 1',secret:'x'},{id:'v1',plate:'RZ-A 1',vin:'W'},{name:'TABAH'},'2026-11-24T09:00:00.000Z');
+    assert(snap.customer.name==='Erika' && snap.customer.address==='Weg 1' && snap.customer.secret===undefined && snap.vehicle.plate==='RZ-A 1' && snap.company.name==='TABAH', 'the snapshot keeps the invoice-relevant fields of customer, vehicle and workshop and nothing else');
+
+    // Totals of a cancellation document, including a discount.
+    const tsb={window:{}, console}; tsb.window.window=tsb.window; vm.createContext(tsb);
+    const printSrc=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+    const from=printSrc.indexOf('function lineSum'), a=printSrc.indexOf('function computeInvoiceTotals'), b=printSrc.indexOf('window.computeInvoiceTotals');
+    vm.runInContext(printSrc.slice(from, printSrc.indexOf('\n',from)+1)+'function isLaborLine(ln){return ln.kind==="labor";}\n'+printSrc.slice(a,b)+'\nthis.cit=computeInvoiceTotals;', tsb);
+    const pos=tsb.cit(orig.lines, 10), negT=tsb.cit(doc.lines, -10);
+    assert(pos.total===285.6 && negT.total===-285.6 && negT.net===-240 && negT.vat===-45.6, 'the totals of a cancellation document are exactly the negative of the original, discount included');
+
+    const appSrc2=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+    const editSrc2=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+    const cloudSrc2=fs.readFileSync(path.join(root,'js/cloud.js'),'utf8');
+    const edit2=appSrc2.slice(appSrc2.indexOf('function editInvoice('), appSrc2.indexOf('function deleteInvoice('));
+    assert(/L\.isIssued\(inv\)/.test(edit2) && /stornoInvoice\(iid\)/.test(edit2) && /invoiceDesigner\([^)]*null, inv\.vehicleId\|\|'', inv\)/.test(edit2), 'editing an issued invoice cancels it and opens a NEW invoice from it as a template, instead of opening the original for overwriting');
+    assert(/WP\.InvoiceLifecycle\.isIssued\(existing\)\) return toast\(t\('invLocked'\)\)/.test(editSrc2), 'the invoice designer itself refuses to save over an issued invoice');
+    assert(/freezeInvoiceParties\(obj\)/.test(editSrc2), 'a newly issued invoice freezes the parties it was issued with');
+    assert(/WP\.InvoiceLifecycle\.toMeta\(inv\)/.test(cloudSrc2) && /WP\.InvoiceLifecycle\.fromMeta\(meta\)/.test(cloudSrc2), 'the lifecycle state is written to and read from the cloud row');
+    assert(!/Math\.max\(0,Number\(x\.total\|\|0\)-Number\(x\.net\|\|0\)\)/.test(appSrc2), 'the VAT summary no longer drops the negative tax of cancellation documents');
+    const idx=fs.readFileSync(path.join(root,'index.html'),'utf8'), sw2=fs.readFileSync(path.join(root,'sw.js'),'utf8');
+    assert(idx.indexOf('js/invoice-lifecycle.js')>idx.indexOf('js/invoice-edit.js') && idx.indexOf('js/invoice-lifecycle.js')<idx.indexOf('js/app.js'), 'the lifecycle module is loaded before the app shell');
+    assert(/invoice-lifecycle\.js/.test(sw2) && /js\/auth\.js/.test(sw2), 'the offline cache list contains the lifecycle module and the login module');
+
+    // End to end in a small fake app: cancel once, never twice.
+    const app={window:{WP:{Engine:{touch(x){x.updatedAt='t';}}}}, console};
+    app.window.window=app.window; vm.createContext(app);
+    vm.runInContext(`var window=this.window; var session={company:{id:'de'}}; var W_={stornoSeq:0};
+      var db={invoices:[${JSON.stringify(Object.assign({},orig,{status:undefined,stornoAt:undefined,stornoBy:undefined,stornoById:undefined}))}],journal:[],customers:[]};
+      var pushed=[], audits=[], n=0;
+      function workshop(){return W_;} function save(){} function id(p){return p+'_'+(++n);} function todayISO(){return '2026-11-24';}
+      function t(k){return k;} function audit(a,d){audits.push(a+' '+d);} function archiveBeleg(){} function upsertInvoiceCloud(x){pushed.push(x.number);}
+      `+fs.readFileSync(path.join(root,'js/invoice-lifecycle.js'),'utf8')+`
+      var first=window.stornoInvoice('i1'); var second=window.stornoInvoice('i1'); var third=first?window.stornoInvoice(first.id):'x';
+      this.out={first:first&&first.number, second:second, third:third, count:db.invoices.length, origStatus:db.invoices[0].status, origTotal:db.invoices[0].total,
+        origBy:db.invoices[0].stornoBy, journal:db.journal.length, debit:db.journal[0]&&db.journal[0].debit, pushed:pushed, sum:db.invoices.reduce(function(s,x){return s+x.total;},0), seq:W_.stornoSeq};`, app);
+    const o=app.out;
+    assert(o.first==='ST-DE-'+new Date().getFullYear()+'-0001' && o.count===2, 'cancelling creates exactly one cancellation document with a number from its own series');
+    assert(o.second===null && o.third===null && o.seq===1, 'a second cancellation of the same invoice, or of the cancellation document, does nothing and uses no number');
+    assert(o.origStatus==='storno' && o.origTotal===285.6 && o.origBy===o.first, 'the original keeps its number and amounts and is only marked as cancelled');
+    assert(Math.abs(o.sum)<0.005, 'original plus cancellation document sum to zero in every sales total');
+    assert(o.journal===1 && o.debit===285.6, 'the cancellation books one reversing journal entry');
+    assert(o.pushed.length===2 && o.pushed.indexOf('RE-DE-2026-0312')>=0 && o.pushed.indexOf(o.first)>=0, 'both the cancelled original and the cancellation document are sent to the cloud');
+  }
+
+  // Teiltool button and print layout (2026-11-24)
+  {
+    const appSrc3=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), editSrc3=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8'), custSrc3=fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), printSrc3=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+    assert(!/henryGo|henryOpen|henry\.matthies\.de|henry-jr/.test(appSrc3+editSrc3), 'the Henry buttons and links are gone');
+    assert(/id="teiltoolOpen"/.test(editSrc3) && /id="teiltoolGo"/.test(appSrc3) && /openTeiltool\('\$\{v\.id\}'\)/.test(custSrc3), 'a Teiltool button sits in the invoice editor, on the integrations page and on every vehicle row');
+    const sbT={console}; vm.createContext(sbT);
+    const a3=appSrc3.indexOf("const TEILTOOL_URL"), b3=appSrc3.indexOf('function openTeiltool');
+    vm.runInContext('var db={settings:{}}; function workshop(){return {};} var V={v1:{hsn:"0035",tsn:"ASL00123"},v2:{hsn:"",tsn:""},v3:{hsn:"35",tsn:"AS"}}; function vehicleOf(i){return V[i];}\n'+appSrc3.slice(a3,b3)+'\nthis.u=[teiltoolUrl("v1"),teiltoolUrl("v2"),teiltoolUrl("v3"),teiltoolUrl("")];', sbT);
+    assert(sbT.u[0]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?hsn=0035&tsn=ASL', 'with KBA numbers the shop opens directly on the parts for that vehicle (TSN cut to its first three characters)');
+    assert(sbT.u[1]===sbT.u[3] && sbT.u[1]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche' && sbT.u[2]===sbT.u[1], 'without valid KBA numbers the shop opens on its vehicle search, never with a half number');
+    assert(/Rechnung'\} Nr\. \$\{esc\(x\.number/.test(printSrc3) && /Rechnungsnummer/.test(printSrc3), 'the printed invoice carries the title "Rechnung" with its number');
+    assert(/<b>\$\{esc\(w\.name\)\}<\/b><br>\$\{esc\(w\.address\)\}/.test(printSrc3) && /rh-sender/.test(printSrc3), 'the full company name and address of the issuer are printed (footer and sender line)');
+    assert(!/1 von 1/.test(printSrc3) && !/Kein Ersatz für steuerliche Einzelberatung/.test(printSrc3) && !/AT-MwSt/.test(printSrc3), 'the fixed "page 1 of 1", the tax-advice sentence and the always-zero rows are gone from the print');
+  }
+
+  // Registered company name (2026-11-24)
+  {
+    const coreSrc4=fs.readFileSync(path.join(root,'js/core.js'),'utf8');
+    const a4=coreSrc4.indexOf('function migrateLegalName(st){'), b4=coreSrc4.indexOf('function stripTstBranding(store){');
+    const sbN={console}; vm.createContext(sbN);
+    vm.runInContext(coreSrc4.slice(a4,b4)+`
+      var st={settings:{workshopName:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)'},
+        companies:[{id:'de',name:'TABAH AUTO — Autoservice und Autoteile UG',profile:{workshopName:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)'}},{id:'es',name:'Auto Service España',profile:{workshopName:'Auto Service España'}}]};
+      migrateLegalName(st); migrateLegalName(st); this.st=st;`, sbN);
+    const R='Autoteile und Autoservice Tabah UG (haftungsbeschränkt)';
+    assert(sbN.st.settings.workshopName===R && sbN.st.companies[0].profile.workshopName===R, 'stored company data is corrected to the registered name "Autoteile und Autoservice Tabah UG (haftungsbeschränkt)"');
+    assert(sbN.st.companies[0].name==='TABAH AUTO — Autoteile und Autoservice Tabah UG', 'the company switcher shows the registered name, and running the correction twice changes nothing more');
+    assert(sbN.st.settings.workshopAccountHolder==='Autoservice und Autoteile UG (haftungsbeschränkt)' && sbN.st.companies[1].profile.workshopName==='Auto Service España', 'the bank account holder line and the second company are left untouched');
+  }
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

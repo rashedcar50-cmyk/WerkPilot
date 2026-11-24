@@ -36,7 +36,7 @@ const seed={
   {u:'warehouse',p:null,name:'Lager',role:'warehouse',disabled:true}
  ],
  companies:[
-  {id:'de',name:'TABAH AUTO — Autoservice und Autoteile UG',country:'DE',currency:'EUR',docLang:'de'},
+  {id:'de',name:'TABAH AUTO — Autoteile und Autoservice Tabah UG',country:'DE',currency:'EUR',docLang:'de'},
   {id:'es',name:'Auto Service España',country:'ES',currency:'EUR',docLang:'es'}
  ],
  customers:[
@@ -78,7 +78,7 @@ const seed={
  ],
  journal:[],
  audit:[],
- settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopBrand:'TABAH AUTO',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
+ settings:{theme:'light',font:16,uiLang:'de',invoiceSeq:311,auftragSeq:1,lastBackup:'',hourlyRate:100,workshopName:'Autoteile und Autoservice Tabah UG (haftungsbeschränkt)',workshopBrand:'TABAH AUTO',workshopAddress:'Hans-Koch-Ring 12, 21493 Schwarzenbek',workshopPhone:'016096585124',workshopEmail:'rashed.car50@gmail.com',workshopTaxId:'DE369361489',workshopSteuerNr:'22 290/41079',workshopCourt:'Amtsgericht Lübeck',workshopOwner:'Rashid Tabah',workshopBank:'Raiffeisenbank eG',workshopIban:'DE36230631290000273384',workshopAccountHolder:'Autoservice und Autoteile UG (haftungsbeschränkt)',workshopHrb:'25248 HL',workshopBic:'GENODEF1RLB',workshopSitz:'Schwarzenbek',paymentDays:0,invoiceTpl:'modern',printPaper:'A4',printMargin:'8mm',printColor:true,katyUser:'',katyPass:'',katyUrl:'https://www.matthies.de/software/katy.html',henryUrl:'https://henry.matthies.de/',vincarioKey:'',vincarioSecret:'',openaiKey:''}
 };
 // Correctness fix (audit 2026-11-08): this const used to sit AFTER
 // `let db=load()` below -- but load() calls ensureCompanyProfiles(), which
@@ -189,7 +189,14 @@ function companyLabel(c){
   const cleaned=stripTstToken(raw);
   return cleaned||'TABAH AUTO';
 }
-function migrateLegalName(st){const right="Autoservice und Autoteile UG (haftungsbeschränkt)";const bad=/Autoteile und Autoservice Tabah UG/i;if(!st||!st.settings)return;if(bad.test(String(st.settings.workshopName||"")))st.settings.workshopName=right;if(bad.test(String(st.settings.workshopAccountHolder||"")))st.settings.workshopAccountHolder=right;(st.companies||[]).forEach(c=>{if(!c||!c.profile)return;if(bad.test(String(c.profile.workshopName||"")))c.profile.workshopName=right;if(bad.test(String(c.profile.workshopAccountHolder||"")))c.profile.workshopAccountHolder=right;});}
+// Legal company name exactly as registered (Amtsgericht Lübeck, HRB 25248 HL,
+// registration notice of 08.08.2024): "Autoteile und Autoservice Tabah UG
+// (haftungsbeschränkt)". An earlier version had aligned the invoice name
+// with the bank letterhead instead ("Autoservice und Autoteile UG ..."); an
+// invoice has to carry the registered name. Only the name of the company is
+// corrected -- the account holder line keeps whatever the bank account is
+// actually held under.
+function migrateLegalName(st){const right="Autoteile und Autoservice Tabah UG (haftungsbeschränkt)";const bad=/^\s*Autoservice und Autoteile UG\b/i;if(!st||!st.settings)return;if(bad.test(String(st.settings.workshopName||"")))st.settings.workshopName=right;(st.companies||[]).forEach(c=>{if(!c)return;if(/Autoservice und Autoteile UG\s*$/.test(String(c.name||"")))c.name=String(c.name).replace(/Autoservice und Autoteile UG\s*$/,"Autoteile und Autoservice Tabah UG");if(!c.profile)return;if(bad.test(String(c.profile.workshopName||"")))c.profile.workshopName=right;});}
 function stripTstBranding(store){
   const st=store||(typeof db!=='undefined'?db:null);
   if(!st) return;
@@ -199,7 +206,7 @@ function stripTstBranding(store){
   }
   (st.companies||[]).forEach(c=>{
     if(!c) return;
-    if(/\bTST\b/i.test(String(c.name||''))) c.name=stripTstToken(c.name)||'TABAH AUTO — Autoservice und Autoteile UG';
+    if(/\bTST\b/i.test(String(c.name||''))) c.name=stripTstToken(c.name)||'TABAH AUTO — Autoteile und Autoservice Tabah UG';
     if(c.profile){
       if(/\bTST\b/i.test(String(c.profile.workshopBrand||''))) c.profile.workshopBrand='TABAH AUTO';
       if(/\bTST\b/i.test(String(c.profile.workshopName||''))) c.profile.workshopName=stripTstToken(c.profile.workshopName);

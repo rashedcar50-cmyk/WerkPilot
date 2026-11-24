@@ -427,7 +427,7 @@ async function loadInvoicesFromCloud(){
     const localWon = mergeByCompany('invoices', data.map(r=>{
       const meta=r.metadata||{};
       const paid = r.status==='paid' || (Number(r.total_amount||0)>0 && Number(r.paid_amount||0)>=Number(r.total_amount||0));
-      return {
+      return Object.assign((window.WP&&WP.InvoiceLifecycle)?WP.InvoiceLifecycle.fromMeta(meta):{}, {
         id:'i_cloud_'+r.id, cloudId:r.id, companyId:r.company_id||'de',
         vehicleId:localIdForCloudId('vehicles', r.vehicle_id),
         customerId:localIdForCloudId('customers', r.customer_id),
@@ -435,7 +435,7 @@ async function loadInvoicesFromCloud(){
         parts:meta.parts||0, labor:meta.labor||0, discount:meta.discount||0, tax:meta.taxPercent||19,
         net:r.subtotal||0, total:r.total_amount||0, payment:meta.payment||'', paid,
         date:r.issue_date||'', updatedAt:r.updated_at||r.issue_date||'', lines: meta.lines||[]
-      };
+      });
     }));
     repushLocalWinners(localWon, upsertInvoiceCloud);
     return true;
@@ -456,7 +456,7 @@ async function upsertInvoiceCloud(inv){
       issue_date:inv.date||new Date().toISOString().slice(0,10),
       subtotal:net, tax_amount:Math.max(total-net,0), total_amount:total,
       paid_amount: inv.paid?total:0,
-      metadata:{type:inv.type||'Rechnung', parts:Number(inv.parts||0), labor:Number(inv.labor||0), discount:Number(inv.discount||0), taxPercent:Number(inv.tax||19), payment:inv.payment||'', repairLocalId:inv.repairId||'', lines:inv.lines||[]},
+      metadata:Object.assign({type:inv.type||'Rechnung', parts:Number(inv.parts||0), labor:Number(inv.labor||0), discount:Number(inv.discount||0), taxPercent:Number(inv.tax||19), payment:inv.payment||'', repairLocalId:inv.repairId||'', lines:inv.lines||[]}, (window.WP&&WP.InvoiceLifecycle)?WP.InvoiceLifecycle.toMeta(inv):{}),
       updated_at: syncedAt
     };
     if(inv.cloudId){

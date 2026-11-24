@@ -143,7 +143,7 @@ function numberInvoiceRows(){
     const p=tr.querySelector('.c-pos'); if(p) p.textContent=i+1;
   });
 }
-function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId=''){
+function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId='', template=null){
   const title = existing ? (t('editInvoice')+' '+(existing.number||'')) : (kind==='bar' ? t('cashSale') : t('createInv'));
   const rate=workshop().hourlyRate||db.settings.hourlyRate||100;
   if(existing){ customerId=customerId||existing.customerId||''; vehicleId=vehicleId||existing.vehicleId||''; }
@@ -178,7 +178,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
           <button type="button" class="btn small" id="addRow">+ ${t('kindParts')}</button>
           <button type="button" class="btn small" id="addLabor">+ ${t('kindLabor')}</button>
           <button type="button" class="btn small" id="katyOpen">${t('catalog')}</button>
-          <button type="button" class="btn small" id="henryOpen">Henry</button>
+          <button type="button" class="btn small" id="teiltoolOpen">🛒 Teiltool</button>
         </div>
         <textarea id="katyPaste" rows="2" placeholder="${t('pasteHint')}"></textarea>
         <button type="button" class="btn small" id="katyPasteBtn">${t('paste')}</button>
@@ -194,6 +194,8 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       </aside>
     </div>
   </div>`,()=>{
+    // An issued invoice is never overwritten -- see js/invoice-lifecycle.js.
+    if(existing && window.WP && WP.InvoiceLifecycle && WP.InvoiceLifecycle.isIssued(existing)) return toast(t('invLocked'));
     const lines=collectInvoiceRows();
     if(window.WP&&WP.Quality) WP.Quality.legalToast();
     if(!lines.length) return toast(t('needLine'));
@@ -222,6 +224,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       if(i>=0) db.invoices[i]=obj; else db.invoices.push(obj);
       upsertInvoiceCloud(obj); audit('invoice.update',obj.number);
     } else {
+      if(typeof freezeInvoiceParties==='function') freezeInvoiceParties(obj);
       db.invoices.push(obj); upsertInvoiceCloud(obj);
       db.journal.push({id:id('j'),companyId:session.company.id,date:todayISO(),account:t('sales'),debit:0,credit:total,note:obj.number});
       audit('invoice.create',obj.number);
@@ -232,6 +235,12 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   }, existing?t('saveEdit'):t('saveShowDesign'));
   if(existing && existing.lines && existing.lines.length){
     existing.lines.forEach(l=>addInvoiceRow(l));
+  } else if(!existing && template && template.lines && template.lines.length){
+    // New invoice pre-filled from a cancelled one ("cancel and create new").
+    template.lines.forEach(l=>addInvoiceRow(Object.assign({}, l)));
+    if($('#fd')) $('#fd').value=String(Number(template.discount||0)).replace('.',',');
+    if($('#ft') && template.tax) $('#ft').value=String(Number(template.tax)).replace('.',',');
+    if(typeof refreshInvoiceSums==='function') refreshInvoiceSums();
   } else if(!existing){
     addInvoiceRow({sku:'',name:'',qty:1,price:0,tax:19,kind:'parts'});
     setTimeout(()=>{
@@ -285,7 +294,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     const el=$('#'+id); if(el) el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
   });
   if($('#katyOpen')) $('#katyOpen').onclick=()=>openKatySearch($('#katySku').value.trim());
-  if($('#henryOpen')) $('#henryOpen').onclick=()=>window.open(db.settings.henryUrl||'https://henry.matthies.de/','_blank');
+  if($('#teiltoolOpen')) $('#teiltoolOpen').onclick=()=>openTeiltool($('#fv')?$('#fv').value:'');
   if($('#katyPasteBtn')) $('#katyPasteBtn').onclick=()=>{
     const raw=$('#katyPaste').value||'';
     const rows=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
