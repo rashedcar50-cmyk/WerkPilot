@@ -178,7 +178,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
           <button type="button" class="btn small" id="addRow">+ ${t('kindParts')}</button>
           <button type="button" class="btn small" id="addLabor">+ ${t('kindLabor')}</button>
           <button type="button" class="btn small" id="katyOpen">${t('catalog')}</button>
-          <button type="button" class="btn small" id="henryOpen">Henry</button>
+          <button type="button" class="btn small" id="teiltoolOpen">🛒 Teiltool</button>
         </div>
         <textarea id="katyPaste" rows="2" placeholder="${t('pasteHint')}"></textarea>
         <button type="button" class="btn small" id="katyPasteBtn">${t('paste')}</button>
@@ -294,7 +294,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     const el=$('#'+id); if(el) el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
   });
   if($('#katyOpen')) $('#katyOpen').onclick=()=>openKatySearch($('#katySku').value.trim());
-  if($('#henryOpen')) $('#henryOpen').onclick=()=>window.open(db.settings.henryUrl||'https://henry.matthies.de/','_blank');
+  if($('#teiltoolOpen')) $('#teiltoolOpen').onclick=()=>openTeiltool($('#fv')?$('#fv').value:'');
   if($('#katyPasteBtn')) $('#katyPasteBtn').onclick=()=>{
     const raw=$('#katyPaste').value||'';
     const rows=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);

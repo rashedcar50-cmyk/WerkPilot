@@ -1708,6 +1708,21 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
     assert(o.pushed.length===2 && o.pushed.indexOf('RE-DE-2026-0312')>=0 && o.pushed.indexOf(o.first)>=0, 'both the cancelled original and the cancellation document are sent to the cloud');
   }
 
+  // Teiltool button and print layout (2026-11-24)
+  {
+    const appSrc3=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), editSrc3=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8'), custSrc3=fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), printSrc3=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+    assert(!/henryGo|henryOpen|henry\.matthies\.de|henry-jr/.test(appSrc3+editSrc3), 'the Henry buttons and links are gone');
+    assert(/id="teiltoolOpen"/.test(editSrc3) && /id="teiltoolGo"/.test(appSrc3) && /openTeiltool\('\$\{v\.id\}'\)/.test(custSrc3), 'a Teiltool button sits in the invoice editor, on the integrations page and on every vehicle row');
+    const sbT={console}; vm.createContext(sbT);
+    const a3=appSrc3.indexOf("const TEILTOOL_URL"), b3=appSrc3.indexOf('function openTeiltool');
+    vm.runInContext('var db={settings:{}}; function workshop(){return {};} var V={v1:{hsn:"0035",tsn:"ASL00123"},v2:{hsn:"",tsn:""},v3:{hsn:"35",tsn:"AS"}}; function vehicleOf(i){return V[i];}\n'+appSrc3.slice(a3,b3)+'\nthis.u=[teiltoolUrl("v1"),teiltoolUrl("v2"),teiltoolUrl("v3"),teiltoolUrl("")];', sbT);
+    assert(sbT.u[0]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?hsn=0035&tsn=ASL', 'with KBA numbers the shop opens directly on the parts for that vehicle (TSN cut to its first three characters)');
+    assert(sbT.u[1]===sbT.u[3] && sbT.u[1]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche' && sbT.u[2]===sbT.u[1], 'without valid KBA numbers the shop opens on its vehicle search, never with a half number');
+    assert(/Rechnung'\} Nr\. \$\{esc\(x\.number/.test(printSrc3) && /Rechnungsnummer/.test(printSrc3), 'the printed invoice carries the title "Rechnung" with its number');
+    assert(/<b>\$\{esc\(w\.name\)\}<\/b><br>\$\{esc\(w\.address\)\}/.test(printSrc3) && /rh-sender/.test(printSrc3), 'the full company name and address of the issuer are printed (footer and sender line)');
+    assert(!/1 von 1/.test(printSrc3) && !/Kein Ersatz für steuerliche Einzelberatung/.test(printSrc3) && !/AT-MwSt/.test(printSrc3), 'the fixed "page 1 of 1", the tax-advice sentence and the always-zero rows are gone from the print');
+  }
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();

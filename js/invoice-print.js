@@ -59,6 +59,7 @@ function customerBlock(cust){
   const person=dePrintName(rawPerson);
   const tax=cust.taxId||cust.ustId||'';
   return `<div class="rh-cust">
+    ${(typeof workshopInfo==='function')?(w=>`<div class="rh-sender" style="font-size:10px;color:#555;border-bottom:1px solid #999;display:inline-block;margin-bottom:6px;padding-bottom:1px">${esc(w.name)} · ${esc(w.address)}</div>`)(workshopInfo()):''}
     <div class="muted">Rechnungsempfänger</div>
     ${firma?`<div><b>${esc(firma)}</b></div>`:''}
     ${person?`<div>${esc(person)}</div>`:''}
@@ -179,7 +180,7 @@ function invoiceModel(x){
 }
 function posTable(filled){
   return `<table class="pos-tbl">
-    <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th>E-Preis</th><th>Summe</th><th>MwSt.</th></tr></thead>
+    <thead><tr><th>Pos.</th><th>Nummer</th><th>Beschreibung</th><th>Menge</th><th style="white-space:nowrap">E-Preis</th><th>Summe</th><th style="white-space:nowrap">MwSt. %</th></tr></thead>
     <tbody>${filled.map(l=>`<tr>
       <td>${l.pos}</td><td>${esc(l.sku)}</td><td>${esc(l.name)}</td>
       <td>${deMoney(l.qty)}</td>
@@ -193,24 +194,22 @@ function totBlock(m){
     <div>
       <div>Nettobetrag Teile<span>${deMoney(m.teile)}</span></div>
       <div>Nettobetrag Leistungen<span>${deMoney(m.leist)}</span></div>
-      <div>Nettobetrag Sonstiges<span>0,00</span></div>
-      <div>Nettobetrag Fahrzeuge<span>0,00</span></div>
-      <div>Durchl. gem. §10 / 1 UStG<span>0,00</span></div>
     </div>
     <div>
       <div>Total EUR ohne MwSt.<span>${deMoney(m.net)}</span></div>
       <div>19% MwSt.<span>${deMoney(m.vat19s)}</span></div>
-      <div>7% MwSt.<span>${deMoney(m.vat7s)}</span></div>
-      <div>AT-MwSt.<span>0,00</span></div>
+      ${Number(m.vat7s)?`<div>7% MwSt.<span>${deMoney(m.vat7s)}</span></div>`:''}
       <div class="grand">Gesamtbetrag EUR inkl. MwSt.<span>${deMoney(m.total)}</span></div>
     </div>
   </div>
-  <p class="rh-pay">Bei Zahlung bitte Kd-Nr und Beleg-Nr angeben. Zahlbar sofort und ohne Abzug.</p>
-  <p class="rh-legalhint">Eigentumsvorbehalt: Gelieferte Teile bleiben bis zur vollständigen Bezahlung unser Eigentum. Es gelten unsere AGB. Beleg archiviert unter der Belegnummer. Kein Ersatz für steuerliche Einzelberatung.</p>`;
+  ${m.x&&m.x.stornoOf
+    ? `<p class="rh-pay">Mit dieser Stornorechnung wird die Rechnung Nr. ${esc(m.x.stornoOfNumber||'')} vollständig aufgehoben.</p>`
+    : `<p class="rh-pay">Bei Zahlung bitte Kundennummer und Rechnungsnummer angeben. Zahlbar ${Number(m.w.paymentDays||0)>0?('bis zum '+esc(m.dueDate)):'sofort'} ohne Abzug.</p>
+  <p class="rh-legalhint">Eigentumsvorbehalt: Gelieferte Teile bleiben bis zur vollständigen Bezahlung unser Eigentum.</p>`}`;
 }
 function footBlock(w){
   return `<div class="rh-foot">
-    <div>GF: ${esc(w.owner)}<br>${esc(w.address)}</div>
+    <div><b>${esc(w.name)}</b><br>${esc(w.address)}<br>Geschäftsführer: ${esc(w.owner)}</div>
     <div>Steuernummer: ${esc(w.steuerNr)}<br>USt-IdNr.: ${esc(w.taxId)}<br>HRB ${esc(w.hrb)} · Sitz ${esc(w.sitz)}<br>${esc(w.court)}<br>Mobil: ${esc(w.phone)}</div>
     <div>${esc(w.email)}<br>${esc(w.bank)}<br>Kontoinhaber: ${esc(w.accountHolder)}<br>IBAN: ${esc(w.iban)}<br>BIC: ${esc(w.bic)}</div>
   </div>`;
@@ -219,9 +218,8 @@ function metaTbl(m){
   const {cust,veh,kd,beleg,leistDate,x}=m;
   return `<table class="meta-tbl">
     <tr><td>Kundennummer:</td><td>${esc(kd||'-')}</td></tr>
-    <tr><td>Belegnummer:</td><td>${esc(beleg)}</td></tr>
+    <tr><td>${x.stornoOf?'Belegnummer':'Rechnungsnummer'}:</td><td>${esc(beleg)}</td></tr>
     <tr><td>Auftragsnummer:</td><td>${esc(m.auftrag||'-')}</td></tr>
-    <tr><td>Seite:</td><td>1 von 1</td></tr>
     <tr><td>Datum:</td><td>${deDate(x.date)}</td></tr>
     <tr><td>Fällig am:</td><td>${esc(m.dueDate)}</td></tr>
     <tr><td>Leistungsdatum:</td><td>${leistDate} bis ${leistDate}</td></tr>
@@ -245,6 +243,7 @@ function buildWorkshopRechnung(x){
   const thanks=`<p class="rh-thanks">Vielen Dank für Ihr Vertrauen. Wir sind gerne für Sie da.<br><em>Mit freundlichen Grüßen<br>Ihr Tabah Auto Service Team</em></p>`;
   return `<div class="rechnung tpl-tabah" dir="ltr" lang="de"><div class="rh-main">
       ${head}
+      ${(!x.stornoOf)?`<div class="rh-title" style="margin:6px 0 10px;font-weight:700;font-size:17px">${x.type==='Barverkauf'?'Barverkauf / Rechnung':'Rechnung'} Nr. ${esc(x.number||'')}</div>`:''}
       ${x.stornoOf?`<div class="rh-storno" style="margin:6px 0 10px;font-weight:700;font-size:15px">Stornorechnung Nr. ${esc(x.number||'')} zur Rechnung Nr. ${esc(x.stornoOfNumber||'')}${x.stornoOfDate?' vom '+deDate(x.stornoOfDate):''}</div>`:''}
       ${x.status==='storno'?`<div class="rh-storno" style="margin:6px 0 10px;font-weight:700;font-size:15px;color:#a40000">STORNIERT${x.stornoBy?' durch Stornorechnung Nr. '+esc(x.stornoBy):''}${x.stornoAt?' am '+deDate(x.stornoAt):''}</div>`:''}
       <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>

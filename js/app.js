@@ -183,6 +183,18 @@ function shopUrl(){
   const w=typeof workshop==='function'?workshop():{};
   return String(w.shopUrl||db.settings.shopUrl||'').trim();
 }
+// Opens the Teiltool parts shop. With a vehicle that has its KBA numbers
+// (HSN/TSN) the shop opens directly on the parts for that vehicle.
+const TEILTOOL_URL='https://kfcjjs-ri.myshopify.com';
+function teiltoolUrl(vehicleId){
+  const w=typeof workshop==='function'?workshop():{};
+  const base=String(w.teiltoolUrl||db.settings.teiltoolUrl||TEILTOOL_URL).trim().replace(/\/+$/,'');
+  const v=vehicleId && typeof vehicleOf==='function' ? vehicleOf(vehicleId) : null;
+  const hsn=String(v&&v.hsn||'').trim(), tsn=String(v&&v.tsn||'').trim().toUpperCase().slice(0,3);
+  if(/^[0-9]{4}$/.test(hsn) && /^[A-Z0-9]{3}$/.test(tsn)) return base+'/pages/fahrzeugsuche?hsn='+hsn+'&tsn='+tsn;
+  return base+'/pages/fahrzeugsuche';
+}
+function openTeiltool(vehicleId){ window.open(teiltoolUrl(vehicleId),'_blank','noopener'); }
 function openPartsShop(){
   const u=shopUrl();
   if(!u){ toast('Shop-URL in Einstellungen eintragen'); return; }
@@ -1428,7 +1440,7 @@ function integrations(){
   <div class="field"><label>${t('katyPass')}</label><input id="katyP" type="password" value="${esc(db.settings.katyPass||'')}"></div>
   <div class="toolbar"><button type="button" class="btn primary" id="katySave">${t('saveLogin')}</button>
   <button type="button" class="btn" id="katyGo">${t('openKaty')}</button>
-  <button type="button" class="btn" id="henryGo">${t('openHenry')}</button></div>
+  <button type="button" class="btn" id="teiltoolGo">🛒 Teiltool</button></div>
   <p class="hint">${t('henryImportHint')}</p>
   <input id="henryFile" type="file" accept=".csv,.txt,.tsv" class="hidden">
   <button type="button" class="btn" id="henryPick">${t('pickFile')}</button>
@@ -1473,7 +1485,7 @@ function integrations(){
    db.settings.katyLogged=true; save();
    openKatySearch('');
  };
- if($('#henryGo')) $('#henryGo').onclick=()=>window.open(db.settings.henryUrl||'https://www.matthies.de/software/henry-jr.print.html','_blank');
+ if($('#teiltoolGo')) $('#teiltoolGo').onclick=()=>openTeiltool('');
  if($('#henryPick')) $('#henryPick').onclick=()=>$('#henryFile').click();
  if($('#henryWa')) $('#henryWa').onclick=()=>pickWhatsApp('#henryFile');
  if($('#henryFile')) $('#henryFile').onchange=e=>{
