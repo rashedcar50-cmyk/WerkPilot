@@ -248,8 +248,8 @@ function buildWorkshopRechnung(x){
   // Only the company's own workshop prints the TABAH AUTO logo and team
   // name. Any other workshop gets its own name as the letterhead -- never
   // another company's logo on its invoices.
-  const brand=String(w.workshopBrand||w.workshopName||'').trim();
-  const ownBrand=/tabah/i.test(brand+' '+String(w.workshopName||''));
+  const brand=String(w.brand||w.name||'').trim();
+  const ownBrand=/tabah/i.test(brand+' '+String(w.name||''));
   const head=(ownBrand?`<div class="ta-head"><img class="ta-logo" src="${logo}" alt="TABAH AUTO"></div>`
       :`<div class="ta-head ta-head-text"><div class="ta-brand-text">${esc(brand)}</div></div>`)+`
       <div class="ta-rule"></div>`;
