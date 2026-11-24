@@ -83,7 +83,19 @@ function collectInvoiceRows(){
     return {sku,name,qty,price,tax,kind,sum:qty*price};
   }).filter(x=>x.name||x.sku);
 }
+function refreshInvoiceVat(){
+  // Per row (also rows still without a name, which collectInvoiceRows skips).
+  document.querySelectorAll('#invRows tr').forEach(tr=>{
+    const b=tr.querySelector('.c-vat'); if(!b) return;
+    const sum=latNum(tr.querySelector('.c-qty')?.value||0)*latNum(tr.querySelector('.c-price')?.value||0);
+    const rate=latNum(tr.querySelector('.c-tax')?.value||19);
+    b.textContent=(Math.round(sum*rate)/100).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+    b.title=t('taxPct')+': '+String(rate).replace('.',',');
+    b.dataset.rate=String(rate).replace('.',',')+' %';
+  });
+}
 function refreshInvoiceSums(){
+  refreshInvoiceVat();
   const lines=collectInvoiceRows();
   lines.forEach((l,i)=>{
     const tr=document.querySelectorAll('#invRows tr')[i];
@@ -146,7 +158,7 @@ function addInvoiceRow(data){
     <td class="n" data-l="${t('colQty')}"><input class="c-qty latnum" inputmode="decimal" lang="de" value="${Number(d.qty)}"></td>
     <td class="n" data-l="${t('unitNet')}"><input class="c-price latnum" inputmode="decimal" lang="de" value="${Number(d.price)}"></td>
     <td class="c-sum n" data-l="${t('sumNet')}">${(Number(d.qty||0)*Number(d.price||0)).toLocaleString('de-DE',{minimumFractionDigits:2})}</td>
-    <td class="n" data-l="${t('colVat')} %"><input class="c-tax latnum" inputmode="decimal" lang="de" value="${Number(d.tax||19)}"></td>
+    <td class="n c-vatcell" data-l="${t('colVat')}"><button type="button" class="c-vat" title="${t('taxPct')}"></button><input class="c-tax latnum" inputmode="decimal" lang="de" value="${Number(d.tax||19)}" hidden></td>
     <td class="x"><button type="button" class="c-del" title="${t('del')}" aria-label="${t('del')}">×</button></td>`;
   tb.appendChild(tr);
   tr.querySelector('.c-del').onclick=()=>{tr.remove(); numberInvoiceRows(); refreshInvoiceSums();};
@@ -155,11 +167,17 @@ function addInvoiceRow(data){
   const nameEl=tr.querySelector('.c-name');
   const grow=()=>{ nameEl.style.height='auto'; nameEl.style.height=Math.max(32,nameEl.scrollHeight+2)+'px'; };
   nameEl.addEventListener('input',grow); nameEl.addEventListener('focus',grow); setTimeout(grow,0); setTimeout(grow,250);
-  const order=['.c-sku','.c-name','.c-qty','.c-price','.c-tax'];
+  // The VAT column shows the line's VAT amount; a click on it opens the
+  // rate (%) for this line, leaving the field shows the amount again.
+  const vatBtn=tr.querySelector('.c-vat'), taxEl=tr.querySelector('.c-tax');
+  vatBtn.onclick=()=>{ vatBtn.hidden=true; taxEl.hidden=false; taxEl.focus(); taxEl.select&&taxEl.select(); };
+  taxEl.addEventListener('blur',()=>{ taxEl.hidden=true; vatBtn.hidden=false; refreshInvoiceSums(); });
+  const order=['.c-sku','.c-name','.c-qty','.c-price'];
   tr.querySelectorAll('input,textarea').forEach(inp=>{
     inp.addEventListener('keydown',e=>{
       if(e.key!=='Enter') return;
       e.preventDefault();
+      if(inp===taxEl){ taxEl.blur(); return; }
       const i=order.findIndex(sel=>tr.querySelector(sel)===inp);
       if(i>=0 && i<order.length-1){
         const next=tr.querySelector(order[i+1]);
@@ -174,6 +192,7 @@ function addInvoiceRow(data){
     });
   });
   numberInvoiceRows();
+  refreshInvoiceVat();
 }
 function numberInvoiceRows(){
   [...document.querySelectorAll('#invRows tr')].forEach((tr,i)=>{
@@ -202,7 +221,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
         <div class="table-wrap">
           <table class="inv-edit henry-pos">
             <colgroup><col class="w-pos"><col class="w-kind"><col class="w-sku"><col><col class="w-qty"><col class="w-price"><col class="w-sum"><col class="w-tax"><col class="w-del"></colgroup>
-            <thead><tr><th>${t('colPos')}</th><th>${t('colArt')}</th><th>${t('sku')}</th><th>${t('desc')}</th><th class="n">${t('colQty')}</th><th class="n">${t('unitNet')}</th><th class="n">${t('sumNet')}</th><th class="n">${t('colVat')} %</th><th></th></tr></thead>
+            <thead><tr><th>${t('colPos')}</th><th>${t('colArt')}</th><th>${t('sku')}</th><th>${t('desc')}</th><th class="n">${t('colQty')}</th><th class="n">${t('unitNet')}</th><th class="n">${t('sumNet')}</th><th class="n">${t('colVat')}</th><th></th></tr></thead>
             <tbody id="invRows"></tbody>
           </table>
         </div>
