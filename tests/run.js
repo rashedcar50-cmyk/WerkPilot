@@ -1775,6 +1775,18 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
     assert(/<td>Leistungsdatum:<\/td><td>\$\{leistDate\}<\/td>/.test(ip), 'the service date is printed once, not as "X bis X"');
   }
 
+  // Line tax amount instead of the bare rate (2026-11-24)
+  {
+    const ip2=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+    const a5=ip2.indexOf('function lineVat'), b5=ip2.indexOf('function totBlock');
+    const sbV={console}; vm.createContext(sbV);
+    vm.runInContext('function esc(x){return String(x==null?"":x);} function deMoney(n){return Number(n).toFixed(2).replace(".",",");}\n'+ip2.slice(a5,b5)+`
+      this.same=posTable([{pos:1,sku:'',name:'A',qty:1,price:55,sum:55,tax:19},{pos:2,sku:'',name:'B',qty:2,price:100,sum:200,tax:19}]);
+      this.mixed=posTable([{pos:1,sku:'',name:'A',qty:1,price:100,sum:100,tax:19},{pos:2,sku:'',name:'B',qty:1,price:10,sum:10,tax:7}]);`, sbV);
+    assert(/MwSt\. 19 %<\/th>/.test(sbV.same) && />10,45<\/td>/.test(sbV.same) && />38,00<\/td>/.test(sbV.same) && !/<td[^>]*>19<\/td>/.test(sbV.same), 'the tax column shows the tax amount of each line (55,00 -> 10,45; 200,00 -> 38,00) and the rate once in the column head, not the bare number 19');
+    assert(/>MwSt\.<\/th>/.test(sbV.mixed) && />19,00 \(19 %\)<\/td>/.test(sbV.mixed) && />0,70 \(7 %\)<\/td>/.test(sbV.mixed), 'with mixed rates every line shows its amount together with its own rate');
+  }
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
