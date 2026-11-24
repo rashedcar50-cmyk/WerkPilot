@@ -98,8 +98,11 @@ function refreshInvoiceSums(){
   const totals=computeInvoiceTotals(lines, disc);
   const net=totals.net, gross=totals.total;
   const fmt=n=>(Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if($('#hySub')) $('#hySub').textContent=fmt(totals.teile+totals.leist);
   if($('#henryEK')) $('#henryEK').textContent=fmt(net);
-  if($('#henryVK')) $('#henryVK').textContent=fmt(gross);
+  if($('#hyVat')) $('#hyVat').textContent=fmt(totals.vat);
+  if($('#hyVatLbl')){ const rates=[...new Set(lines.map(l=>Number(l.tax)))]; $('#hyVatLbl').textContent=t('tax')+(rates.length===1?' '+String(rates[0]).replace('.',',')+' %':''); }
+  if($('#hyCount')) $('#hyCount').textContent=lines.length;
   if($('#henryGross')) $('#henryGross').textContent=fmt(gross);
 }
 function addInvoiceRow(data){
@@ -107,19 +110,23 @@ function addInvoiceRow(data){
   const tb=$('#invRows'); if(!tb) return;
   const tr=document.createElement('tr');
   tr.innerHTML=`<td class="c-pos"></td>
-    <td><select class="c-kind"><option value="parts" ${d.kind!=='labor'?'selected':''}>${t('kindParts')}</option><option value="labor" ${d.kind==='labor'?'selected':''}>${t('kindLabor')}</option></select></td>
-    <td><input class="c-sku" value="${esc(d.sku)}" placeholder="${t('sku')}"></td>
-    <td><input class="c-name" value="${esc(d.name)}" placeholder="${t('desc')}"></td>
-    <td><input class="c-qty latnum" inputmode="decimal" lang="de" value="${Number(d.qty)}"></td>
-    <td><input class="c-price latnum" inputmode="decimal" lang="de" value="${Number(d.price)}"></td>
-    <td class="c-sum">${(Number(d.qty||0)*Number(d.price||0)).toLocaleString('de-DE',{minimumFractionDigits:2})}</td>
-    <td><input class="c-tax latnum" inputmode="decimal" lang="de" value="${Number(d.tax||19)}" style="width:60px"></td>
-    <td><button type="button" class="btn small bad c-del">×</button></td>`;
+    <td class="k"><select class="c-kind"><option value="parts" ${d.kind!=='labor'?'selected':''}>${t('kindParts')}</option><option value="labor" ${d.kind==='labor'?'selected':''}>${t('kindLabor')}</option></select></td>
+    <td class="s"><input class="c-sku" dir="ltr" value="${esc(d.sku)}" placeholder="${t('sku')}"></td>
+    <td class="d"><textarea class="c-name" rows="1" placeholder="${t('desc')}">${esc(d.name)}</textarea></td>
+    <td class="n" data-l="${t('colQty')}"><input class="c-qty latnum" inputmode="decimal" lang="de" value="${Number(d.qty)}"></td>
+    <td class="n" data-l="${t('unitNet')}"><input class="c-price latnum" inputmode="decimal" lang="de" value="${Number(d.price)}"></td>
+    <td class="c-sum n" data-l="${t('sumNet')}">${(Number(d.qty||0)*Number(d.price||0)).toLocaleString('de-DE',{minimumFractionDigits:2})}</td>
+    <td class="n" data-l="${t('colVat')} %"><input class="c-tax latnum" inputmode="decimal" lang="de" value="${Number(d.tax||19)}"></td>
+    <td class="x"><button type="button" class="c-del" title="${t('del')}" aria-label="${t('del')}">×</button></td>`;
   tb.appendChild(tr);
   tr.querySelector('.c-del').onclick=()=>{tr.remove(); numberInvoiceRows(); refreshInvoiceSums();};
-  tr.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',refreshInvoiceSums));
+  tr.querySelectorAll('input,textarea,select').forEach(inp=>inp.addEventListener('input',refreshInvoiceSums));
+  // The description wraps and grows with its text instead of being cut off.
+  const nameEl=tr.querySelector('.c-name');
+  const grow=()=>{ nameEl.style.height='auto'; nameEl.style.height=Math.max(32,nameEl.scrollHeight+2)+'px'; };
+  nameEl.addEventListener('input',grow); nameEl.addEventListener('focus',grow); setTimeout(grow,0); setTimeout(grow,250);
   const order=['.c-sku','.c-name','.c-qty','.c-price','.c-tax'];
-  tr.querySelectorAll('input').forEach(inp=>{
+  tr.querySelectorAll('input,textarea').forEach(inp=>{
     inp.addEventListener('keydown',e=>{
       if(e.key!=='Enter') return;
       e.preventDefault();
@@ -149,33 +156,37 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   if(existing){ customerId=customerId||existing.customerId||''; vehicleId=vehicleId||existing.vehicleId||''; }
   modal(title, `<div class="hy-desk">
     <div class="hy-bar">
-      <span>${new Date().toLocaleDateString('de-DE')}</span>
-      ${existing?'':`<label class="muted" style="display:flex;align-items:center;gap:6px">${t('serviceDate')} <input id="fsd" type="date" value="${esc(String((template&&template.serviceDate)||todayISO()).slice(0,10))}" style="width:auto"></label>`}
-      <select id="pay">${[['open',t('payOpen')],['cash',t('payCash')],['card',t('payCard')],['bank',t('payBank')]].map(([v,p])=>`<option value="${v}" ${((existing&&existing.payment)|| (kind==='bar'?'cash':'open'))===v?'selected':''}>${p}</option>`).join('')}</select>
-      <select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select>
-      <select id="fcust"><option value="walkin" ${!customerId?'selected':''}>${t('walkIn')||t('cashSale')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select>
-      <button type="button" class="btn ok small" id="scanInvCam" title="${t('openCam')}">📷 ${t('openCam')}</button>
-      ${waBtn("#scanInvFile","small")}
-      <input id="scanInvFile" type="file" accept="image/*" class="hidden">
+      <label class="hy-f hy-f-w"><span>${t('customer')}</span><select id="fcust"><option value="walkin" ${!customerId?'selected':''}>${t('walkIn')||t('cashSale')}</option>${companyRows('customers').map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.kdNr||'')} · ${esc(c.companyName||c.name)}</option>`).join('')}</select></label>
+      <label class="hy-f hy-f-w"><span>${t('vehicle')}</span><select id="fv"><option value="">${t('noVehicle')}</option>${companyRows('vehicles').filter(v=>!customerId||v.customerId===customerId|| (existing&&v.id===existing.vehicleId)||v.id===vehicleId).map(v=>`<option value="${v.id}" ${(existing&&v.id===existing.vehicleId)||v.id===vehicleId?'selected':''}>${esc(v.plate||v.vin)} · ${esc(v.make)} ${esc(v.model)}</option>`).join('')}</select></label>
+      <div class="hy-f"><span>${t('invDate')}</span><output>${new Date().toLocaleDateString('de-DE')}</output></div>
+      ${existing?'':`<label class="hy-f"><span>${t('serviceDate')}</span><input id="fsd" type="date" value="${esc(String((template&&template.serviceDate)||todayISO()).slice(0,10))}"></label>`}
+      <label class="hy-f"><span>${t('payMethod')}</span><select id="pay">${[['open',t('payOpen')],['cash',t('payCash')],['card',t('payCard')],['bank',t('payBank')]].map(([v,p])=>`<option value="${v}" ${((existing&&existing.payment)|| (kind==='bar'?'cash':'open'))===v?'selected':''}>${p}</option>`).join('')}</select></label>
+      <div class="hy-scan">
+        <button type="button" class="btn small" id="scanInvCam" title="${t('openCam')}">📷 ${t('openCam')}</button>
+        ${waBtn("#scanInvFile","small")}
+        <input id="scanInvFile" type="file" accept="image/*" class="hidden">
+      </div>
     </div>
     <div class="hy-split">
       <div class="hy-main">
         <div class="table-wrap">
           <table class="inv-edit henry-pos">
-            <thead><tr><th>${t('colPos')}</th><th>${t('colArt')}</th><th>${t('sku')}</th><th>${t('desc')}</th><th>${t('colQty')}</th><th>${t('colPrice')}</th><th>${t('colSum')}</th><th>${t('colVat')}</th><th></th></tr></thead>
+            <colgroup><col class="w-pos"><col class="w-kind"><col class="w-sku"><col><col class="w-qty"><col class="w-price"><col class="w-sum"><col class="w-tax"><col class="w-del"></colgroup>
+            <thead><tr><th>${t('colPos')}</th><th>${t('colArt')}</th><th>${t('sku')}</th><th>${t('desc')}</th><th class="n">${t('colQty')}</th><th class="n">${t('unitNet')}</th><th class="n">${t('sumNet')}</th><th class="n">${t('colVat')} %</th><th></th></tr></thead>
             <tbody id="invRows"></tbody>
           </table>
         </div>
+        <div class="hy-cap">${t('quickEntry')}</div>
         <div class="hy-entry">
           <select id="qArt"><option value="parts">${t('kindParts')}</option><option value="labor">${t('kindLabor')}</option></select>
           <input id="katyQty" class="latnum" inputmode="decimal" lang="de" value="1,00">
-          <input id="katySku" placeholder="${t('orderNo')}">
+          <input id="katySku" dir="ltr" placeholder="${t('orderNo')}">
           <input id="qName" placeholder="${t('desc')}">
           <button type="button" class="btn primary" id="katyFetch">${t('apply')}</button>
         </div>
         <div id="katyHint" class="hint">${t('henryHint')}</div>
         <div id="scanInvHint" class="hint"></div>
-        <div class="toolbar">
+        <div class="hy-tools">
           <button type="button" class="btn small" id="addRow">+ ${t('kindParts')}</button>
           <button type="button" class="btn small" id="addLabor">+ ${t('kindLabor')}</button>
           <button type="button" class="btn small" id="katyOpen">${t('catalog')}</button>
@@ -185,13 +196,13 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
         <button type="button" class="btn small" id="katyPasteBtn">${t('paste')}</button>
       </div>
       <aside class="hy-side">
-        <label>${t('taxPct')}</label>
-        <input id="ft" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.tax):19}">
-        <div class="hy-tot"><span>EK</span><b id="henryEK">0,00</b></div>
-        <div class="hy-tot"><span>VK</span><b id="henryVK">0,00</b></div>
-        <label>${t('discount')}</label>
-        <input id="fd" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.discount||0):0}">
-        <div class="hy-tot hy-gross"><span>${t('total')}</span><b id="henryGross">0,00</b></div>
+        <div class="hy-cap">${t('sumTitle')} · <span id="hyCount">0</span> ${t('positions')}</div>
+        <div class="hy-tot"><span>${t('sumItems')}</span><b id="hySub">0,00</b></div>
+        <label class="hy-tot hy-in"><span>${t('discount')}</span><input id="fd" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.discount||0):0}"></label>
+        <div class="hy-tot"><span>${t('netTotal')}</span><b id="henryEK">0,00</b></div>
+        <div class="hy-tot"><span id="hyVatLbl">${t('tax')}</span><b id="hyVat">0,00</b></div>
+        <div class="hy-tot hy-gross"><span>${t('total')}</span><b><span id="henryGross">0,00</span> €</b></div>
+        <label class="hy-tot hy-in hy-def"><span>${t('taxDefault')}</span><input id="ft" class="latnum" inputmode="decimal" lang="de" value="${existing?Number(existing.tax):19}"></label>
       </aside>
     </div>
   </div>`,()=>{
