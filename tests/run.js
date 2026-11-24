@@ -1928,6 +1928,26 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/id="ttKbaC"/.test(cu) && /ttKbaC:\{hsn:'vhsn'/.test(br), 'the customer form has the vehicle search too');
   assert(!/'Netto: '\+money/.test(ed) && !/Position übernommen/.test(ed), 'issue dialog and hint are translated');
 }
+// ---- Two tabs of the app must not overwrite each other (1.38.0) ----
+{
+  const co=fs.readFileSync(path.join(root,'js/core.js'),'utf8');
+  const a=co.indexOf("const MERGE_LISTS="), b=co.indexOf("window.mergeDbInto=mergeDbInto;");
+  const merge=new Function(co.slice(a,b)+'; return mergeDbInto;')();
+  const mine={invoices:[{id:'i1',number:'RE-1',updatedAt:'2026-11-24T10:00:00Z',total:10}],customers:[{id:'c1',name:'A'}],
+    companies:[{id:'ws',profile:{invoiceSeq:1,workshopBrand:'X'}}],settings:{invoiceSeq:311,uiLang:'ar',ttImports:['a']},katyCache:[{sku:'ab1'}]};
+  const theirs={invoices:[{id:'i1',number:'RE-1',updatedAt:'2026-11-24T09:00:00Z',total:5},{id:'i2',number:'RE-2',total:252.97}],customers:[{id:'c1',name:'OLD'},{id:'c2',name:'B'}],
+    companies:[{id:'ws',profile:{invoiceSeq:2,stornoSeq:1,workshopBrand:'Y',teiltoolCustomerId:'77'}},{id:'ws2',profile:{}}],settings:{invoiceSeq:300,uiLang:'de',ttImports:['b'],lastCompanyId:'ws'},katyCache:[{sku:'AB1'},{sku:'ZZ9'}]};
+  const n=merge(mine,theirs);
+  assert(n>0 && mine.invoices.length===2 && mine.invoices.find(i=>i.id==='i2').total===252.97, 'PROOF OF FIX: an invoice issued in another tab is kept');
+  assert(mine.invoices.find(i=>i.id==='i1').total===10 && mine.customers.find(c=>c.id==='c1').name==='A' && mine.customers.length===2, 'own (newer or unstamped) rows win, missing rows are added');
+  assert(mine.companies[0].profile.invoiceSeq===2 && mine.companies[0].profile.stornoSeq===1 && mine.companies[0].profile.workshopBrand==='X' && mine.companies[0].profile.teiltoolCustomerId==='77' && mine.companies.length===2, 'number counters never go backwards; own profile fields stay');
+  assert(mine.settings.invoiceSeq===311 && mine.settings.uiLang==='ar' && mine.settings.lastCompanyId==='ws' && mine.settings.ttImports.join()==='a,b', 'settings: own values stay, counters take the maximum, imported carts are united');
+  assert(mine.katyCache.length===2, 'article cache is united without duplicates');
+  assert(merge(mine,theirs)===0 && merge(mine,null)===0, 'merging the same data again changes nothing (no ping-pong between tabs)');
+  const newer={invoices:[{id:'i1',updatedAt:'2026-11-24T11:00:00Z',total:99}]}; merge(mine,newer);
+  assert(mine.invoices.find(i=>i.id==='i1').total===99, 'a newer version from the other tab replaces the older one here');
+  assert(/addEventListener\('storage'/.test(co) && /e\.key!==storeKey/.test(co), 'tabs listen for each other\'s saves');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
