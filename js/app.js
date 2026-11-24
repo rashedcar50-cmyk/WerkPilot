@@ -94,7 +94,11 @@ function completeLogin(user){
           if(window._sharedWaFile) ingestScheinFile(window._sharedWaFile);
         }, 250);
       }, 200);
-    } else render();
+    } else {
+      render();
+      // A cart handed over from Teiltool opens as an invoice draft.
+      if(window.WP && WP.TeiltoolImport) try{ WP.TeiltoolImport.consume(); }catch(e){}
+    }
   });
 }
 
