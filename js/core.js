@@ -467,9 +467,42 @@ function rowById(col, rid){
 }
 window.flushRows=flushRows;
 window.rowById=rowById;
+// ---- Workshops this login belongs to (cloud memberships) ----
+// The database only accepts rows of workshops the signed-in user is an active
+// member of (table company_memberships). The app mirrors that: the profile
+// gets the list and the role, and a workshop that exists in the cloud but not
+// yet on this device is created locally with an EMPTY profile -- it must
+// never inherit another company's bank, tax or address data.
+function applyCloudMemberships(profile, rows, meta, companies){
+  const act=(rows||[]).filter(r=>r && r.active!==false && r.company_id);
+  if(!act.length) return profile;
+  profile.cloudScoped=true;
+  profile.companies=[...new Set(act.map(r=>String(r.company_id)))];
+  profile.roles={}; act.forEach(r=>{ profile.roles[String(r.company_id)]=r.role||'manager'; });
+  const names={}; (companies||[]).forEach(c=>{ if(c&&c.id) names[c.id]=c; });
+  const fromMeta=(meta&&meta.workshops)||{};
+  profile.companies.forEach(cid=>{
+    if(db.companies.some(c=>c.id===cid)) return;
+    const src=names[cid]||fromMeta[cid]||{};
+    const co={id:cid, name:String(src.name||cid).slice(0,100), country:src.country||'DE', currency:src.currency||'EUR', docLang:'de'};
+    co.profile={}; WORKSHOP_KEYS.forEach(k=>{ co.profile[k]=''; });
+    co.profile.workshopBrand=co.name; co.profile.workshopName=co.name; co.profile.workshopAccountHolder=co.name;
+    co.profile.invoiceSeq=0; co.profile.auftragSeq=0;
+    db.companies.push(co);
+  });
+  return profile;
+}
+function roleForCompany(profile, cid){
+  const ok=['developer','manager','accountant','mechanic','warehouse'];
+  const r=profile&&profile.roles&&profile.roles[cid];
+  return ok.includes(r)?r:(profile&&profile.role);
+}
 function visibleCompanies(){
   const u=session?.user;
   if(!u) return db.companies||[];
+  // A login with cloud memberships sees exactly those workshops -- whatever
+  // its role and whatever else is stored on this device.
+  if(u.cloudScoped) return (db.companies||[]).filter(c=>(u.companies||[]).includes(c.id));
   if(['developer','manager'].includes(u.role) || !u.companies) return db.companies||[];
   return (db.companies||[]).filter(c=>(u.companies||[]).includes(c.id));
 }

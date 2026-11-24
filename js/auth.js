@@ -59,6 +59,18 @@
     }catch(e){ return {ok:false, error:e}; }
   }
 
+  // The signed-in user's own workshop memberships (RLS returns only its rows)
+  // plus the names of those workshops where readable.
+  async function loadMemberships(){
+    const sb = client();
+    if(!sb) return {rows:[], companies:[]};
+    try{
+      const m = await sb.from('company_memberships').select('company_id,role,active');
+      const c = await sb.from('companies').select('id,name,country,currency');
+      return {rows:(m && m.data) || [], companies:(c && c.data) || []};
+    }catch(e){ return {rows:[], companies:[]}; }
+  }
+
   async function signOutCloud(){
     const sb = client();
     if(!sb) return;
@@ -159,7 +171,7 @@
   }
 
   W.CloudAuth = {
-    cloudAuthAvailable, signInCloud, signOutCloud, restoreCloudSession,
+    cloudAuthAvailable, signInCloud, signOutCloud, restoreCloudSession, loadMemberships,
     changeCloudPassword, requestPasswordReset, isRecoveryLink,
     completePasswordReset, clearRecoveryParamsFromUrl, redirectBase
   };
