@@ -113,16 +113,17 @@ function parseInvoiceLine(l){
 // A part that comes from the shop (cart or part-number lookup) carries the
 // shop price as the workshop's PURCHASE price (line.buy). The selling price
 // on the invoice is purchase price + the workshop's own margin, which each
-// workshop sets itself and which is remembered for that workshop. A price the
-// user typed by hand is never recalculated. The purchase price is internal:
-// it is stored with the line but never printed.
+// workshop sets itself and which is remembered for that workshop. Nothing is
+// locked: every price can be typed by hand at any time, and changing the
+// margin recalculates all shop parts again -- the last action wins. The
+// purchase price is internal: it is stored with the line but never printed.
 function partsMarkup(){ const m=Number(workshop().partsMarkup); return Number.isFinite(m)&&m>=0&&m<=500?m:0; }
 function applyMarkup(buy,m){ return Math.round(Number(buy||0)*(1+(Number(m)||0)/100)*100)/100; }
 function setPartsMarkup(v){
   let m=latNum(v); if(!Number.isFinite(m)||m<0) m=0; if(m>500) m=500;
   workshop().partsMarkup=m; save();
   document.querySelectorAll('#invRows tr').forEach(tr=>{
-    if(tr.dataset.buy==null || tr.dataset.auto!=='1') return;
+    if(tr.dataset.buy==null || tr.dataset.buy==='') return;
     const p=tr.querySelector('.c-price'); if(p) p.value=String(applyMarkup(tr.dataset.buy,m));
   });
   refreshInvoiceSums();
@@ -238,8 +239,7 @@ function addInvoiceRow(data){
     <td class="n c-vatcell" data-l="${t('colVat')}"><button type="button" class="c-vat" title="${t('taxPct')}"></button><input class="c-tax latnum" inputmode="decimal" lang="de" value="${Number(d.tax||19)}" hidden></td>
     <td class="x"><button type="button" class="c-del" title="${t('del')}" aria-label="${t('del')}">×</button></td>`;
   tb.appendChild(tr);
-  if(d.buy!=null && d.buy!=='' && Number.isFinite(Number(d.buy))){ tr.dataset.buy=String(Number(d.buy)); if(d.autoPrice) tr.dataset.auto='1'; }
-  tr.querySelector('.c-price').addEventListener('input',e=>{ if(e.isTrusted) delete tr.dataset.auto; });
+  if(d.buy!=null && d.buy!=='' && Number.isFinite(Number(d.buy))) tr.dataset.buy=String(Number(d.buy));
   tr.querySelector('.c-del').onclick=()=>{tr.remove(); numberInvoiceRows(); refreshInvoiceSums();};
   tr.querySelectorAll('input,textarea,select').forEach(inp=>inp.addEventListener('input',refreshInvoiceSums));
   // The description wraps and grows with its text instead of being cut off.
