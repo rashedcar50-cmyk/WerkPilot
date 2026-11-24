@@ -65,30 +65,36 @@
     }
     el.value=String(val);
   }
-  function applyVehicle(v){
-    setField('mk',v.make);
-    setField('mo',[v.model,v.engine].filter(Boolean).join(' '));
-    if($id('cc')&&!$id('cc').value) setField('cc',v.ccm?Math.round(v.ccm):'');
-    if($id('kw')&&!$id('kw').value) setField('kw',v.kw?Math.round(v.kw):'');
-    if($id('fuel')&&!$id('fuel').value) setField('fuel',v.fuel);
-    if($id('en')&&!$id('en').value) setField('en',Array.isArray(v.engineCodes)?v.engineCodes.join(', '):v.engineCodes);
-    const out=$id('ttKbaOut'); if(out) out.textContent='✓ '+[v.make,v.model,v.engine].filter(Boolean).join(' ');
+  // Two forms use the vehicle search: the vehicle form and the vehicle part
+  // of the customer form (other field ids).
+  const FORMS={ttKba:{hsn:'hsn',tsn:'tsn',make:'mk',model:'mo',cc:'cc',kw:'kw',fuel:'fuel',en:'en',out:'ttKbaOut'},
+               ttKbaC:{hsn:'vhsn',tsn:'vtsn',make:'vmake',model:'vmodel',out:'ttKbaCOut'}};
+  function applyVehicle(v,f){
+    setField(f.make,v.make);
+    setField(f.model,[v.model,v.engine].filter(Boolean).join(' '));
+    const empty=id=>id&&$id(id)&&!$id(id).value;
+    if(empty(f.cc)) setField(f.cc,v.ccm?Math.round(v.ccm):'');
+    if(empty(f.kw)) setField(f.kw,v.kw?Math.round(v.kw):'');
+    if(empty(f.fuel)) setField(f.fuel,v.fuel);
+    if(empty(f.en)) setField(f.en,Array.isArray(v.engineCodes)?v.engineCodes.join(', '):v.engineCodes);
+    const out=$id(f.out); if(out) out.textContent='✓ '+[v.make,v.model,v.engine].filter(Boolean).join(' ');
   }
   document.addEventListener('click',async e=>{
-    const b=e.target.closest&&e.target.closest('#ttKba');
+    const b=e.target.closest&&e.target.closest('#ttKba,#ttKbaC');
     if(b){
-      const out=$id('ttKbaOut'); if(out) out.textContent='…';
+      const f=FORMS[b.id];
+      const out=$id(f.out); if(out) out.textContent='…';
       b.disabled=true;
-      const r=await api.kba($id('hsn')&&$id('hsn').value,$id('tsn')&&$id('tsn').value);
+      const r=await api.kba($id(f.hsn)&&$id(f.hsn).value,$id(f.tsn)&&$id(f.tsn).value);
       b.disabled=false; if(!out) return;
       if(r.error){ out.textContent=tt(r.error==='input'?'ttKbaInput':'ttOffline'); return; }
       if(!r.vehicles.length){ out.textContent=tt('ttKbaNone'); return; }
-      if(r.vehicles.length===1) return applyVehicle(r.vehicles[0]);
+      if(r.vehicles.length===1) return applyVehicle(r.vehicles[0],f);
       out.textContent=tt('ttKbaPick')+' ';
       r.vehicles.slice(0,12).forEach(v=>{
         const c=document.createElement('button'); c.type='button'; c.className='btn small tt-kba-c';
         c.textContent=[v.model,v.engine,v.kw?Math.round(v.kw)+' kW':'',v.from?String(v.from).slice(0,4):''].filter(Boolean).join(' · ');
-        c.onclick=()=>applyVehicle(v); out.appendChild(c);
+        c.onclick=()=>applyVehicle(v,f); out.appendChild(c);
       });
       return;
     }

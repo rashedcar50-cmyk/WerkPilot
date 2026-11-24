@@ -93,7 +93,9 @@ function customerModal(existing){
   <div class="kba-row">
     <input id="vhsn" maxlength="4" inputmode="numeric" placeholder="HSN 2.1">
     <input id="vtsn" maxlength="3" placeholder="TSN 2.2">
+    <button type="button" class="btn small" id="ttKbaC">🔎 ${t('ttKbaBtn')}</button>
   </div>
+  <div id="ttKbaCOut" class="hint tt-kba-out"></div>
  </div>
  <div class="field"><label>${t('make')}</label><input id="vmake"></div>
  <div class="field"><label>${t('model')}</label><input id="vmodel"></div>

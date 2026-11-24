@@ -365,7 +365,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     // no longer be changed, only cancelled.
     const cName=(()=>{ const c=db.customers.find(x=>x.id===custIdFinal); return c?(c.companyName||c.name||''):(t('walkIn')||''); })();
     askConfirm(t('reviewIssue'),
-      [cName, t('serviceDate')+': '+(obj.serviceDate?deDate(obj.serviceDate):'-'), 'Netto: '+money(net), 'MwSt.: '+money(total-net), t('total')+': '+money(total), '', t('issueHint')].filter((x,i)=>x||i===5).join('\n'),
+      [cName, t('serviceDate')+': '+(obj.serviceDate?deDate(obj.serviceDate):'-'), t('netTotal')+': '+money(net), t('tax')+': '+money(total-net), t('total')+': '+money(total), '', t('issueHint')].filter((x,i)=>x||i===5).join('\n'),
       issue);
   }, existing?t('saveEdit'):t('reviewIssue'));
   if(existing && existing.lines && existing.lines.length){
@@ -421,7 +421,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
       const tax=+$('#ft').value||19;
       const plain=()=>{
         addInvoiceRow({sku,name:typed||sku,qty,price:0,tax,kind});
-        if($('#katyHint')) $('#katyHint').textContent=sku?t('notFoundLocal'):'Position übernommen';
+        if($('#katyHint')) $('#katyHint').textContent=sku?t('notFoundLocal'):'';
         if(sku) openWebSearch(sku);
         refreshInvoiceSums();
       };

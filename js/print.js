@@ -140,6 +140,7 @@ function printDocMarkup(type, id){
       .pg>tfoot{display:none}
       .pg-space{height:27mm}
       .ta-head{text-align:left;margin:0 0 6px}
+      .ta-brand-text{font-size:26pt;font-weight:800;letter-spacing:.02em;color:#0B2A4A;line-height:1.1;padding:4mm 0 2mm}
       .ta-logo{max-width:92mm;width:auto;max-height:34mm;height:auto;display:block}
       .ta-rule{height:0;border-top:2px solid #0B2A4A;border-bottom:2px solid #E85D04;margin:6px 0 12px}
       .rh-title{text-align:left;font-size:18px;font-weight:700;margin:0;color:#0B2A4A}

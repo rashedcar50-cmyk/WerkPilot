@@ -155,7 +155,7 @@
     var w=workshop();
     w.stornoSeq=Number(w.stornoSeq||0)+1;
     save();
-    var prefix=((W.session&&session.company&&session.company.id)||(typeof session!=='undefined'&&session&&session.company&&session.company.id)||'ST').toString().slice(0,4).toUpperCase();
+    var prefix=typeof invoicePrefix==='function'?invoicePrefix():((typeof session!=='undefined'&&session&&session.company&&session.company.id)||'ST').toString().slice(0,4).toUpperCase();
     return 'ST-'+prefix+'-'+y+'-'+String(w.stornoSeq).padStart(4,'0');
   };
 
