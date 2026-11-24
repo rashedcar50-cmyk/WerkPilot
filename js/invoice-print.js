@@ -124,7 +124,9 @@ function computeInvoiceTotals(lines, discount){
   const vat19=rows.filter(l=>l.tax===19).reduce((s,l)=>s+l.sum*0.19,0);
   const vat7=rows.filter(l=>l.tax===7).reduce((s,l)=>s+l.sum*0.07,0);
   const vatOther=rows.filter(l=>![19,7].includes(l.tax)).reduce((s,l)=>s+l.sum*(l.tax||0)/100,0);
-  const factor=netBefore>0?net/netBefore:1;
+  // !==0 (not >0): a cancellation document has a negative net and still
+  // needs its discount applied to the tax in the same proportion.
+  const factor=netBefore!==0?net/netBefore:1;
   const vat19s=Math.round(vat19*factor*100)/100;
   const vat7s=Math.round(vat7*factor*100)/100;
   const vat=Math.round((vat19+vat7+vatOther)*factor*100)/100;
@@ -148,8 +150,13 @@ function lineSum(ln){ return Number(ln.qty||1)*Number(ln.price||0); }
 function isLaborLine(ln){ if(ln.kind==='parts'||ln.kind==='قطعة'||ln.kind==='Ersatzteil') return false; if(ln.kind==='labor'||ln.kind==='اجر'||ln.kind==='أجور') return true; return /lohn|أجر|اجور|أجور|عمالة|arbeit|Arbeitswert|Leist/i.test(String(ln.name||ln.sku||ln.kind||'')); }
 function invoiceModel(x){
   const w=workshopInfo();
-  let cust=customerOfVehicle(x.vehicleId) || db.customers.find(c=>c.id===x.customerId) || {};
-  const veh=vehicleOf(x.vehicleId) || {};
+  // An issued invoice prints the parties it was issued with (snapshot),
+  // not whatever the customer/vehicle card says today.
+  const snap=x.snapshot||{};
+  const hasSnapCust=snap.customer && Object.keys(snap.customer).length>0;
+  const hasSnapVeh=snap.vehicle && Object.keys(snap.vehicle).length>0;
+  let cust=(hasSnapCust?snap.customer:null) || customerOfVehicle(x.vehicleId) || db.customers.find(c=>c.id===x.customerId) || {};
+  const veh=(hasSnapVeh?snap.vehicle:null) || vehicleOf(x.vehicleId) || {};
   const lines=(x.lines&&x.lines.length)?x.lines:[{sku:'',name:'Arbeitswert',qty:1,price:x.labor||0,tax:19}].filter(l=>lineSum(l)||l.name);
   const filled=lines.map((ln,i)=>{
     const labor=isLaborLine(ln);
@@ -238,6 +245,8 @@ function buildWorkshopRechnung(x){
   const thanks=`<p class="rh-thanks">Vielen Dank für Ihr Vertrauen. Wir sind gerne für Sie da.<br><em>Mit freundlichen Grüßen<br>Ihr Tabah Auto Service Team</em></p>`;
   return `<div class="rechnung tpl-tabah" dir="ltr" lang="de"><div class="rh-main">
       ${head}
+      ${x.stornoOf?`<div class="rh-storno" style="margin:6px 0 10px;font-weight:700;font-size:15px">Stornorechnung Nr. ${esc(x.number||'')} zur Rechnung Nr. ${esc(x.stornoOfNumber||'')}${x.stornoOfDate?' vom '+deDate(x.stornoOfDate):''}</div>`:''}
+      ${x.status==='storno'?`<div class="rh-storno" style="margin:6px 0 10px;font-weight:700;font-size:15px;color:#a40000">STORNIERT${x.stornoBy?' durch Stornorechnung Nr. '+esc(x.stornoBy):''}${x.stornoAt?' am '+deDate(x.stornoAt):''}</div>`:''}
       <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
       ${posTable(m.filled)}${totBlock(m)}${thanks}</div>${footBlock(w)}</div>`;
 }

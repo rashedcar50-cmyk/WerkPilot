@@ -657,7 +657,7 @@ function dashboard(){
  ${due.length?`<div class="alert tap" onclick="goPage('vehicles')"><b>${t('maintDue')}:</b> ${due.map(v=>esc(v.plate||v.vin)+' '+Number(v.km)+' km').join(' · ')}</div>`:''}
  ${cloudSyncBannerHtml()}
  ${(window.WP&&WP.Quality&&WP.Quality.workshopLegalGaps().length)?`<div class="alert tap" onclick="goPage('settings')"><b>${t('legalGaps')}:</b> ${esc(WP.Quality.workshopLegalGaps().join(', '))}</div>`:''}
- ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+Math.max(0,Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
+ ${(()=>{const list=companyRows('invoices'); const teile=list.reduce((s,x)=>s+Number(x.parts||0),0); const leist=list.reduce((s,x)=>s+Number(x.labor||0),0); const vat=list.reduce((s,x)=>s+(Number(x.total||0)-Number(x.net||0)),0); const last=db.settings.lastBackup; const stale=!last||(Date.now()-new Date(last).getTime()>86400000);
  return `<div class="card" style="margin-top:12px"><b>${t('vatReport')}</b>
  <div class="grid" style="margin-top:8px">
   <div class="card tap" onclick="goPage('invoices')"><div class="muted">${t('netParts')}</div><div class="metric">${money(teile)}</div></div>
@@ -737,16 +737,16 @@ function invoices(){
  const payFilter=session.invoiceFilter||'';
  let rows=companyRows('invoices');
  if(filter) rows=rows.filter(x=>x.customerId===filter || (vehicleOf(x.vehicleId)||{}).customerId===filter);
- if(payFilter==='unpaid') rows=rows.filter(x=>x.status!=='storno' && !x.paid && !['cash','card'].includes(x.payment));
+ if(payFilter==='unpaid') rows=rows.filter(x=>x.status!=='storno' && !x.stornoOf && !x.paid && !['cash','card'].includes(x.payment));
  const cust=filter && db.customers.find(c=>c.id===filter);
  const title=payFilter==='unpaid' ? (t('unpaidInvoices')||t('invoices')) : (cust?(t('invoicesOf')+' · '+(cust.companyName||cust.name)): t('invoices'));
  $('#content').innerHTML=head(title,`<div class="toolbar"><button class="btn ok" id="scanInv">📷 ${t('scanSchein')}</button><button class="btn primary" id="inv">${t('createInvoice')}</button><button class="btn" id="bar">${t('cashSale')}</button>${filter||payFilter?`<button class="btn" id="clrCust">${t('allInvoices')}</button>`:''}</div>`)+
  listShareBar('invoices')+
  table([t('invoiceNo'),t('type'),t('vehicle'),t('total'),t('payment'),t('design')],rows.map(x=>[
-  esc(x.number||x.id)+(x.status==='storno'?' · STORNO':''), esc(x.type||''), esc(vehicleName(x.vehicleId))||'—', money(x.total), esc(payLabel(x.payment||'-')),
+  esc(x.number||x.id)+(x.status==='storno'?' · STORNO'+(x.stornoBy?' ('+esc(x.stornoBy)+')':''):'')+(x.stornoOfNumber?' → '+esc(x.stornoOfNumber):''), esc(x.type||''), esc(vehicleName(x.vehicleId))||'—', money(x.total), esc(payLabel(x.payment||'-')),
   `<button class="btn small primary" onclick="previewInvoice('${x.id}')">${t('preview')}</button>
-   <button class="btn small" onclick="editInvoice('${x.id}')">${t('edit')}</button>
-   <button class="btn small bad" onclick="deleteInvoice('${x.id}')">${t('del')}</button>
+   ${(window.WP&&WP.InvoiceLifecycle&&!WP.InvoiceLifecycle.canCancel(x))?'':`<button class="btn small" onclick="editInvoice('${x.id}')">${t('stornoNew')}</button>
+   <button class="btn small bad" onclick="deleteInvoice('${x.id}')">Storno</button>`}
    <button class="btn small" onclick="exportPrint('invoices','${x.id}')">${t('print')}</button>
    <button class="btn small" onclick="exportPDF('invoices','${x.id}')">${t('pdf')}</button>`
  ]), 'invoices')+
@@ -762,33 +762,44 @@ function invoicesForCustomer(cid){ session.customerFilter=cid; session.page='inv
 function editInvoice(iid){
   const inv=db.invoices.find(x=>x.id===iid);
   if(!inv) return toast(t('invMissing'));
+  const L=window.WP&&WP.InvoiceLifecycle;
+  // An issued invoice is never overwritten (see js/invoice-lifecycle.js).
+  // "Edit" on it means: cancel it with a cancellation document of its own
+  // and open a NEW invoice with the same items.
+  if(L && L.isIssued(inv)){
+    if(!canEdit()) return;
+    if(!L.canCancel(inv)) return toast(t('invLocked'));
+    return askConfirm(
+      t('stornoNew')+'  '+(inv.number||''),
+      t('stornoNewHint'),
+      ()=>{
+        const doc=stornoInvoice(iid);
+        if(!doc){ render(); return toast(t('stornoNotPossible')); }
+        render();
+        toast(t('stornoDone')+'\n'+doc.number);
+        invoiceDesigner(inv.type==='Barverkauf'?'bar':'invoice', inv.customerId||'', null, inv.vehicleId||'', inv);
+      }
+    );
+  }
   invoiceDesigner(inv.type==='Barverkauf'?'bar':'invoice', inv.customerId||'', inv);
 }
 function deleteInvoice(iid){
   if(!canEdit()) return;
   const inv=db.invoices.find(x=>x.id===iid);
   if(!inv) return;
+  const L=window.WP&&WP.InvoiceLifecycle;
+  if(L && !L.canCancel(inv)) return toast(t('stornoNotPossible'));
   askConfirm(
     (t('confirmDelInv')||'Storno')+'  '+ (inv.number||''),
     t('stornoHint')||'',
     ()=>{
-      inv.status='storno'; inv.stornoAt=new Date().toISOString();
-      if(WP.Engine) WP.Engine.touch(inv);
-      audit('invoice.storno', inv.number||iid); save();
-      if(typeof upsertInvoiceCloud==='function') try{ upsertInvoiceCloud(inv); }catch(e){}
+      const doc=stornoInvoice(iid);
       render();
-      toast((t('invDeleted')||'Storno')+'\n'+(inv.number||''));
+      if(!doc) return toast(t('stornoNotPossible'));
+      toast(t('stornoDone')+'\n'+doc.number+' → '+(inv.number||''));
     }
   );
 }
-window.invoiceForCustomer=invoiceForCustomer;
-window.invoicesForCustomer=invoicesForCustomer;
-window.editInvoice=editInvoice;
-window.deleteInvoice=deleteInvoice;
-
-
-
-
 function financeModal(type, vehicleId='', customerId=''){
  const title=type==='estimate'?t('estimates'):type==='bar'?t('cashSale'):t('newInv');
  modal(title,`<div class="form-grid">
@@ -1370,7 +1381,7 @@ function reports(){
  const sales=inv.reduce((a,x)=>a+Number(x.total||0),0);
  const purCost=pur.reduce((a,x)=>a+Number(x.total_amount||(x.qty||0)*(x.price||0)||0),0);
  const costs=exp.reduce((a,x)=>a+Number(x.amount||0),0)+purCost;
- const unpaid=inv.filter(x=>x.status!=='storno' && !x.paid && !['cash','card'].includes(x.payment));
+ const unpaid=inv.filter(x=>x.status!=='storno' && !x.stornoOf && !x.paid && !['cash','card'].includes(x.payment));
  const hours=companyRows('repairs').reduce((a,x)=>a+Number(x.hours||0),0);
  const topParts={};
  companyRows('repairs').forEach(r=>(r.parts||[]).forEach(p=>{topParts[p.name]=(topParts[p.name]||0)+Number(p.qty||0)}));
