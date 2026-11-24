@@ -1998,7 +1998,7 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/if\(window\._wpLoginBusy \|\| session\) return;/.test(ap), 'login button and session restore cannot both complete the login');
   const fx=fs.readFileSync(path.join(root,'supabase/functions/workshop-admin/index.ts'),'utf8');
   assert(/\.eq\('role', 'developer'\)/.test(fx) && /\.eq\('company_id', HOME_COMPANY\)/.test(fx) && /return reply\(403/.test(fx), 'server: only the platform owner may create workshops');
-  assert(/email_in_use/.test(fx) && /deleteUser\(made\.user\.id\)/.test(fx) && (fx.match(/from\('companies'\)\.delete\(\)/g)||[]).length===2, 'server: no existing login is reused; failed steps are undone');
+  assert(/email_in_use/.test(fx) && /deleteUser\(made\.user\.id\)/.test(fx) && !/from\('companies'\)/.test(fx), 'server: no existing login is reused; a failed membership removes the new login; the legacy companies table is not touched');
   assert(/role: 'manager'/.test(fx) && !/console\.log\([^)]*email/.test(fx) && !/SERVICE_ROLE_KEY[^)]*reply/.test(fx), 'server: the new login manages only its workshop; nothing personal is logged');
 }
 if(failed){ console.error(failed+' failed'); process.exit(1); }
