@@ -1716,8 +1716,8 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
     const sbT={console}; vm.createContext(sbT);
     const a3=appSrc3.indexOf("const TEILTOOL_URL"), b3=appSrc3.indexOf('function openTeiltool');
     vm.runInContext('var db={settings:{}}; function workshop(){return {};} var V={v1:{hsn:"0035",tsn:"ASL00123"},v2:{hsn:"",tsn:""},v3:{hsn:"35",tsn:"AS"}}; function vehicleOf(i){return V[i];}\n'+appSrc3.slice(a3,b3)+'\nthis.u=[teiltoolUrl("v1"),teiltoolUrl("v2"),teiltoolUrl("v3"),teiltoolUrl("")];', sbT);
-    assert(sbT.u[0]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?hsn=0035&tsn=ASL', 'with KBA numbers the shop opens directly on the parts for that vehicle (TSN cut to its first three characters)');
-    assert(sbT.u[1]===sbT.u[3] && sbT.u[1]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche' && sbT.u[2]===sbT.u[1], 'without valid KBA numbers the shop opens on its vehicle search, never with a half number');
+    assert(sbT.u[0]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?hsn=0035&tsn=ASL&wp=1', 'with KBA numbers the shop opens directly on the parts for that vehicle (TSN cut to its first three characters)');
+    assert(sbT.u[1]===sbT.u[3] && sbT.u[1]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?wp=1' && sbT.u[2]===sbT.u[1], 'without valid KBA numbers the shop opens on its vehicle search, never with a half number');
     assert(/Rechnung'\} Nr\. \$\{esc\(x\.number/.test(printSrc3) && /Rechnungsnummer/.test(printSrc3), 'the printed invoice carries the title "Rechnung" with its number');
     assert(/<b>\$\{esc\(w\.name\)\}<\/b><br>\$\{esc\(w\.address\)\}/.test(printSrc3) && /rh-sender/.test(printSrc3), 'the full company name and address of the issuer are printed (footer and sender line)');
     assert(!/1 von 1/.test(printSrc3) && !/Kein Ersatz für steuerliche Einzelberatung/.test(printSrc3) && !/AT-MwSt/.test(printSrc3), 'the fixed "page 1 of 1", the tax-advice sentence and the always-zero rows are gone from the print');
@@ -1863,6 +1863,12 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const appS=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), idxS=fs.readFileSync(path.join(root,'index.html'),'utf8'), swS=fs.readFileSync(path.join(root,'sw.js'),'utf8');
   assert(/WP\.TeiltoolImport\.consume\(\)/.test(appS) && idxS.includes('js/teiltool-import.js?v=') && swS.includes('./js/teiltool-import.js?v='), 'the import runs after login and the module is loaded and cached');
   assert(/mark\(p\.id\)/.test(src) && /seen\(p\.id\)/.test(src) && !/nextInvoiceNumber|db\.invoices\.push/.test(src), 'import is a draft only and guarded against double import');
+}
+// ---- Teiltool link marks the visitor as coming from WerkPilot (1.33.0) ----
+{
+  const appS=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), src=fs.readFileSync(path.join(root,'js/teiltool-import.js'),'utf8');
+  assert(/\+tsn\+'&wp=1'/.test(appS) && /fahrzeugsuche\?wp=1'/.test(appS), 'Teiltool links carry wp=1');
+  assert(/if\(ok \|\| label\)/.test(src), 'a vehicle without KBA numbers is still shown by name');
 }
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
