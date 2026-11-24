@@ -45,7 +45,8 @@
       const ok=/^[0-9]{4}$/.test(h) && /^[A-Z0-9]{3}$/.test(t);
       const label=clean(p.veh.n,120);
       // Without KBA numbers the vehicle is still shown by name.
-      if(ok || label) veh={hsn:ok?h:'',tsn:ok?t:'',make:clean(p.veh.mk,40),model:clean(p.veh.md,80),label};
+      const cid=/^[0-9]{1,9}$/.test(String(p.veh.id==null?'':p.veh.id))?String(p.veh.id):'';
+      if(ok || label) veh={hsn:ok?h:'',tsn:ok?t:'',cid,make:clean(p.veh.mk,40),model:clean(p.veh.md,80),label};
     }
     return {id,taxIncluded:p.ti!==0,lines,veh};
   }
@@ -56,7 +57,10 @@
       price:p.taxIncluded ? Math.round(l.cents/(1+rate/100))/100 : l.cents/100}));
   }
   function findVehicle(veh){
-    if(!veh || !veh.hsn) return [];
+    if(!veh) return [];
+    // by catalogue vehicle id (chosen from the lists), else by KBA number
+    if(veh.cid){ const byCat=companyRows('vehicles').filter(v=>String(v.catalogVehicleId||'')===veh.cid); if(byCat.length || !veh.hsn) return byCat; }
+    if(!veh.hsn) return [];
     return companyRows('vehicles').filter(v=>String(v.hsn||'').trim()===veh.hsn && String(v.tsn||'').trim().toUpperCase().slice(0,3)===veh.tsn);
   }
   function open(p,vehicle){

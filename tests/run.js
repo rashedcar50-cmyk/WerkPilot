@@ -2017,6 +2017,18 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/db\.customers\.push\(nc\); audit\('customer\.create',nc\.name\); save\(\);\s*if\(typeof upsertCustomerCloud==='function'\) upsertCustomerCloud\(nc\);/.test(cu) && /kdNr:nextKdNr\(\)/.test(cu.split("value==='__new'")[1].slice(0,500)), 'the inline customer is created with a customer number and synced before the vehicle');
   assert((i18.match(/vfNewCustName:'/g)||[]).length===3, 'labels exist in en/de/ar');
 }
+// ---- Teiltool opens on the catalogue vehicle, cart comes back to it (1.45.0) ----
+{
+  const ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), src=fs.readFileSync(path.join(root,'js/teiltool-import.js'),'utf8');
+  const fn=ap.match(/function teiltoolUrl\(vehicleId\)\{[\s\S]*?\n\}/)[0];
+  const url=(veh)=>new Function('workshop','db','TEILTOOL_URL','vehicleOf','URLSearchParams',fn+'; return teiltoolUrl("v1");')(()=>({}),{settings:{}},'https://shop.example',()=>veh,URLSearchParams);
+  const u=url({make:'VW',model:'GOLF VI Variant (AJ5) 1.4 TSI',catalogVehicleId:'31234',engine_power_kw:'90',engine_displacement_cm3:'1390',fuel_type:'Benzin'});
+  const q=new URL(u).searchParams;
+  assert(q.get('fzv')==='31234' && q.get('mk')==='VW' && q.get('md')==='GOLF VI Variant (AJ5) 1.4 TSI' && q.get('kw')==='90' && q.get('cc')==='1390' && q.get('fu')==='Benzin' && q.get('wp')==='1', 'PROOF OF FIX: a catalogue vehicle without KBA number opens the shop on that vehicle');
+  assert(/hsn=0035&tsn=ASL&wp=1$/.test(url({hsn:'0035',tsn:'asl',catalogVehicleId:'908',make:'OPEL',model:'X'})), 'a KBA number still takes precedence');
+  assert(url({make:'VW',model:'Golf'})==='https://shop.example/pages/fahrzeugsuche?wp=1' && url({make:'VW',model:'Golf',catalogVehicleId:'12;x'})==='https://shop.example/pages/fahrzeugsuche?wp=1', 'no or invalid catalogue id: plain shop link');
+  assert(/String\(v\.catalogVehicleId\|\|''\)===veh\.cid/.test(src) && /const cid=\/\^\[0-9\]\{1,9\}\$\//.test(src), 'a cart from the shop is matched to the vehicle by its catalogue id');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
