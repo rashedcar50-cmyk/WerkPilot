@@ -41,7 +41,7 @@ function login(){
  <div class="brand-mark"><img class="app-logo login-logo" src="logo-app.jpg" alt="TABAH AUTO"></div>
  <div class="field"><label>${t('resetPasswordEmailLabel')}</label><input id="lu" type="email" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
  <div class="field"><label>${t('pass')}</label><input id="lp" type="password" autocomplete="current-password"></div>
- <div class="field"><label>${t('language')}</label><select id="loginLang">${langOptions(db.settings.uiLang||'de')}</select></div>
+ <div class="field"><label>${t('language')}</label><select id="loginLang" class="lang-sel" data-lang="${esc(db.settings.uiLang||'de')}">${langOptions(db.settings.uiLang||'de')}</select></div>
  <button class="btn primary full" id="loginBtn">${t('login')}</button>
  <p style="margin-top:10px"><a href="#" id="forgotPassLink">${t('forgotPassword')}</a></p>
  <div class="login-fail" id="loginErr"></div><p class="muted" style="margin-top:14px;font-size:.8rem"><a href="impressum.html">${t('impressum')}</a> · <a href="privacy.html">${t('privacy')}</a></p>
@@ -323,7 +323,7 @@ function render(force){
    <div class="tools-slot" id="toolsSlot">
     <select id="company">${visibleCompanies().map(c=>`<option value="${c.id}" ${c.id===session.company.id?'selected':''}>${esc(typeof companyLabel==='function'?companyLabel(c):(c.name||'TABAH AUTO'))} · ${c.country}</option>`).join('')}</select>
     <input class="searchbox" id="qsearch" placeholder="${t('search')}">
-    <select id="uiLangTop" title="${t('language')}">${langOptions(db.settings.uiLang||'de')}</select>
+    <select id="uiLangTop" class="lang-sel" data-lang="${esc(db.settings.uiLang||'de')}" title="${t('language')}">${langOptions(db.settings.uiLang||'de')}</select>
     ${isDev()?`<button class="ico-btn" id="addWorkshop" type="button" title="${t('newWorkshop')}">＋</button>`:''}
    </div>
    <button class="ico-btn" id="shopBtnTop" type="button" title="Handwerkzeuge">🛒</button>
@@ -1586,7 +1586,7 @@ function settings(){
  const arch=(db.archive||[]).slice(0,8).map(a=>`${esc(a.number||'')} · ${money(a.total)}`).join('<br>')||'—';
  $('#content').innerHTML=head(t('settings'))+`<div class="grid"><div class="card"><b>${t('archive')}</b><div class="muted">${arch}</div></div><div class="card"><b>${t('conflicts')}</b><div class="muted">${conf}</div></div></div><div class="card"><div class="form-grid">
  <div class="field span2"><div class="alert">${t('activeWs')}: <b>${esc(session.company.name)}</b> · ${esc(session.company.country)}. ${t('wsOnly')}</div></div>
- <div class="field span2"><label>${t('language')}</label><select id="lang">${langOptions(db.settings.uiLang||'de')}</select>
+ <div class="field span2"><label>${t('language')}</label><select id="lang" class="lang-sel" data-lang="${esc(db.settings.uiLang||'de')}">${langOptions(db.settings.uiLang||'de')}</select>
  <div class="hint">${t('langHint')}</div></div>
  <div class="field"><label>${t('font')}</label><input id="font" class="latnum" inputmode="decimal" lang="de" min="13" max="22" value="${db.settings.font}"></div>
  <div class="field"><label>${t('hourly')}</label><input id="hrate" class="latnum" inputmode="decimal" lang="de" step="0.01" value="${w.hourlyRate||85}"></div>

@@ -2043,6 +2043,15 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(!/\.buy\b/.test(pr), 'the purchase price is never printed on the invoice');
   assert(/id="fmk"/.test(ed) && /id="hyProfit"/.test(ed), 'the editor shows the margin field and the profit');
 }
+// ---- Seven languages, picker with a flag (1.48.0) ----
+{
+  const i18=fs.readFileSync(path.join(root,'i18n.js'),'utf8'), css=fs.readFileSync(path.join(root,'css/app.css'),'utf8'), ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  const sb={window:{},document:{documentElement:{},querySelectorAll(){return[];}},localStorage:{getItem(){return null;}},console}; sb.window=sb; vm.createContext(sb); vm.runInContext(i18,sb);
+  const codes=sb.WP_LANGS.map(x=>x[0]);
+  assert(codes.join()==='de,en,ar,tr,pl,ru,es', 'the picker offers seven languages');
+  codes.forEach(c=>{ assert(new RegExp('select\\.lang-sel\\[data-lang="'+c+'"\\]\\{background-image:url\\(').test(css), 'language '+c+' has a flag'); assert(sb.WP_I18N[c] && Object.keys(sb.WP_I18N[c]).length>600, 'language '+c+' has a text pack'); assert(sb.WP_ALLOWED_LANGS.includes(c), 'language '+c+' is selectable'); });
+  assert((ap.match(/class="lang-sel" data-lang=/g)||[]).length===3, 'login, top bar and settings pickers carry the flag');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
