@@ -2037,7 +2037,8 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const pmFn=ed.match(/function partsMarkup\(\)\{[^\n]*\}/)[0];
   const pm=v=>new Function('workshop',pmFn+'; return partsMarkup();')(()=>({partsMarkup:v}));
   assert(pm(30)===30 && pm(undefined)===0 && pm(-5)===0 && pm(9999)===0 && pm('12.5')===12.5, 'the margin is the workshop\'s own setting; nonsense values count as 0');
-  assert(/if\(tr\.dataset\.buy==null \|\| tr\.dataset\.auto!=='1'\) return;/.test(ed) && /if\(e\.isTrusted\) delete tr\.dataset\.auto;/.test(ed), 'a price typed by hand is never recalculated');
+  assert(!/dataset\.auto/.test(ed) && /if\(tr\.dataset\.buy==null \|\| tr\.dataset\.buy===''\) return;/.test(ed), 'nothing is locked: a new margin recalculates every shop part, and any price can be typed by hand afterwards');
+  assert(!/readonly|\.disabled=true;[^\n]*c-price/.test(ed.slice(ed.indexOf('function addInvoiceRow'), ed.indexOf('function addInvoiceRow')+3000)), 'no line field of the draft is read-only');
   assert(/line\.buy=Number\(tr\.dataset\.buy\)/.test(ed) && /buy,autoPrice:true/.test(im) && /buy:a\.price,price:applyMarkup\(a\.price,partsMarkup\(\)\)/.test(ed), 'cart import and part lookup keep the purchase price and apply the margin');
   assert(!/\.buy\b/.test(pr), 'the purchase price is never printed on the invoice');
   assert(/id="fmk"/.test(ed) && /id="hyProfit"/.test(ed), 'the editor shows the margin field and the profit');
