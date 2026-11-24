@@ -2,9 +2,12 @@
 //
 // Only the platform owner may call this: a signed-in user with an ACTIVE
 // membership of company "de" with role "developer". The function then
-//   1. registers the workshop in `companies`,
-//   2. creates a login for the workshop's e-mail (random password that nobody
-//      ever sees) and makes it the "manager" of that one workshop only,
+//   1. creates a login for the workshop's e-mail (random password that nobody
+//      ever sees) and stores the workshop's name with it,
+//   2. makes that login the "manager" of the new workshop only -- a row in
+//      company_memberships, which is what every table's access rule checks
+//      (the workshop id is a text id like the built-in "de"; the legacy
+//      `companies` table with numeric ids is not involved),
 //   3. sends the standard "set your password" e-mail, so the workshop chooses
 //      its own password.
 // If a step fails, the earlier steps are undone. The service-role key never
@@ -63,23 +66,16 @@ Deno.serve(async (req) => {
   if ((list?.users || []).some((u) => (u.email || '').toLowerCase() === email)) return reply(409, { error: 'email_in_use' });
 
   const id = 'ws_' + Array.from(crypto.getRandomValues(new Uint8Array(8))).map((b) => b.toString(16).padStart(2, '0')).join('');
-  const { error: coErr } = await admin.from('companies').insert({ id, name, country, currency });
-  if (coErr) return reply(500, { error: 'company', detail: coErr.message });
-
   const password = Array.from(crypto.getRandomValues(new Uint8Array(24))).map((b) => b.toString(16).padStart(2, '0')).join('') + 'aA1!';
   const { data: made, error: userErr } = await admin.auth.admin.createUser({
     email, password, email_confirm: true,
     user_metadata: { workshops: { [id]: { name, country, currency } } },
   });
-  if (userErr || !made?.user) {
-    await admin.from('companies').delete().eq('id', id);
-    return reply(500, { error: 'user', detail: userErr?.message || '' });
-  }
+  if (userErr || !made?.user) return reply(500, { error: 'user', detail: userErr?.message || '' });
   const { error: memErr } = await admin.from('company_memberships')
     .insert({ company_id: id, user_id: made.user.id, role: 'manager', active: true });
   if (memErr) {
     await admin.auth.admin.deleteUser(made.user.id);
-    await admin.from('companies').delete().eq('id', id);
     return reply(500, { error: 'membership', detail: memErr.message });
   }
 

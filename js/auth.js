@@ -59,15 +59,14 @@
     }catch(e){ return {ok:false, error:e}; }
   }
 
-  // The signed-in user's own workshop memberships (RLS returns only its rows)
-  // plus the names of those workshops where readable.
+  // The signed-in user's own workshop memberships (RLS returns only its rows).
+  // Workshop names come from the login's own metadata (see workshop-admin).
   async function loadMemberships(){
     const sb = client();
     if(!sb) return {rows:[], companies:[]};
     try{
       const m = await sb.from('company_memberships').select('company_id,role,active');
-      const c = await sb.from('companies').select('id,name,country,currency');
-      return {rows:(m && m.data) || [], companies:(c && c.data) || []};
+      return {rows:(m && m.data) || [], companies:[]};
     }catch(e){ return {rows:[], companies:[]}; }
   }
 
