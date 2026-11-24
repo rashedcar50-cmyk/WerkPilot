@@ -1832,6 +1832,12 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(st(1,-1)===1 && st(0.5,-1)===0.5, 'minus never brings a quantity to zero or below');
   assert((ed.match(/class="q-btn"/g)||[]).length===4, 'line rows and quick entry both have − and + buttons');
 }
+// ---- Web search: Teiltool is the only built-in site (1.31.0) ----
+{
+  const ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+  const blk=ed.match(/const WP_SEARCH_SITES=\[[\s\S]*?\];/)[0];
+  assert(/Teiltool/.test(blk) && !/google|ebay|daparto/i.test(blk), 'only Teiltool is offered as built-in search site');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
