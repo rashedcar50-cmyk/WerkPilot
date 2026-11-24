@@ -56,6 +56,46 @@ function openKatySearch(sku){
   const q=encodeURIComponent(sku||'');
   window.open(q? (base + (base.includes('?')?'&':'?') + 'q='+q) : base, '_blank');
 }
+// Web search for a part number: the workshop chooses the site -- built-in
+// general ones plus its own list (db.settings.searchSites, {q} = search term).
+const WP_SEARCH_SITES=[
+  {name:'Google',url:'https://www.google.com/search?q={q}'},
+  {name:'Teiltool',url:'https://kfcjjs-ri.myshopify.com/search?q={q}'},
+  {name:'eBay',url:'https://www.ebay.de/sch/i.html?_nkw={q}'},
+  {name:'Daparto',url:'https://www.daparto.de/Teilenummernsuche/Teile/Alle-Hersteller/{q}'}
+];
+function searchSites(){
+  const own=(db.settings.searchSites||[]).filter(x=>x&&x.name&&/^https:\/\//i.test(x.url||''));
+  return WP_SEARCH_SITES.concat(own.map(x=>({name:x.name,url:x.url,own:true})));
+}
+function searchSiteUrl(site,q){
+  const enc=encodeURIComponent(String(q||'').trim());
+  if(site.url.includes('{q}')) return site.url.replace('{q}',enc);
+  return enc ? site.url+(site.url.includes('?')?'&':'?')+'q='+enc : site.url;
+}
+function addSearchSite(name,url){
+  name=String(name||'').trim(); url=String(url||'').trim();
+  if(url && !/^[a-z]+:\/\//i.test(url)) url='https://'+url;
+  if(!name || !/^https:\/\/[^\s]+\.[^\s]+/i.test(url)) return false;
+  db.settings.searchSites=(db.settings.searchSites||[]).filter(x=>x.name!==name).concat([{name,url}]);
+  save(); return true;
+}
+function removeSearchSite(name){ db.settings.searchSites=(db.settings.searchSites||[]).filter(x=>x.name!==name); save(); }
+function renderWebSearch(q){
+  const box=$('#webSearch'); if(!box) return;
+  if(q!==undefined && $('#wsQ')) $('#wsQ').value=q;
+  const list=$('#wsSites'); if(!list) return;
+  list.innerHTML=searchSites().map((x,i)=>`<span class="ws-site"><button type="button" class="btn small" data-ws="${i}">${esc(x.name)}</button>${x.own?`<button type="button" class="ws-x" data-wsx="${esc(x.name)}" title="${t('del')}">×</button>`:''}</span>`).join('');
+  list.querySelectorAll('[data-ws]').forEach(b=>b.onclick=()=>{
+    const site=searchSites()[Number(b.dataset.ws)]; if(!site) return;
+    window.open(searchSiteUrl(site,$('#wsQ').value),'_blank','noopener');
+  });
+  list.querySelectorAll('[data-wsx]').forEach(b=>b.onclick=()=>{ removeSearchSite(b.dataset.wsx); renderWebSearch(); });
+}
+function openWebSearch(q){
+  const box=$('#webSearch'); if(!box) return openKatySearch(q);
+  box.hidden=false; renderWebSearch(q||''); const i=$('#wsQ'); if(i){ i.focus(); i.select&&i.select(); }
+}
 function parseInvoiceLine(l){
   const parts=l.split('|').map(x=>x.trim());
   if(parts.length>=4) return {sku:parts[0],name:parts[1],qty:Number(parts[2]||1),price:Number(parts[3]||0)};
@@ -238,8 +278,17 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
         <div class="hy-tools">
           <button type="button" class="btn small" id="addRow">+ ${t('kindParts')}</button>
           <button type="button" class="btn small" id="addLabor">+ ${t('kindLabor')}</button>
-          <button type="button" class="btn small" id="katyOpen">${t('catalog')}</button>
+          <button type="button" class="btn small" id="katyOpen">🔎 ${t('webSearch')}</button>
           <button type="button" class="btn small" id="teiltoolOpen">🛒 Teiltool</button>
+        </div>
+        <div id="webSearch" class="hy-web" hidden>
+          <div class="hy-cap">${t('webSearch')}</div>
+          <input id="wsQ" dir="ltr" placeholder="${t('orderNo')}">
+          <div id="wsSites" class="ws-sites"></div>
+          <details><summary>${t('wsAdd')}</summary>
+            <div class="ws-add"><input id="wsName" placeholder="${t('wsName')}"><input id="wsUrl" dir="ltr" placeholder="https://…/suche?q={q}"><button type="button" class="btn small" id="wsSave">${t('save')}</button></div>
+            <div class="hint">${t('wsHint')}</div>
+          </details>
         </div>
         <textarea id="katyPaste" rows="2" placeholder="${t('pasteHint')}"></textarea>
         <button type="button" class="btn small" id="katyPasteBtn">${t('paste')}</button>
@@ -360,7 +409,7 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
     } else {
       addInvoiceRow({sku,name:typed||sku,qty,price:0,tax:+$('#ft').value||19,kind});
       $('#katyHint').textContent=sku?t('notFoundLocal'):'Position übernommen';
-      if(sku) openKatySearch(sku);
+      if(sku) openWebSearch(sku);
     }
     $('#katySku').value=''; if($('#qName')) $('#qName').value=''; $('#katySku').focus();
   };
@@ -369,7 +418,17 @@ function invoiceDesigner(kind='invoice', customerId='', existing=null, vehicleId
   ['katySku','katyQty','qName'].forEach(id=>{
     const el=$('#'+id); if(el) el.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doFetch(); }});
   });
-  if($('#katyOpen')) $('#katyOpen').onclick=()=>openKatySearch($('#katySku').value.trim());
+  if($('#katyOpen')) $('#katyOpen').onclick=()=>{
+    const box=$('#webSearch');
+    if(box && !box.hidden) { box.hidden=true; return; }
+    const cur=document.activeElement&&document.activeElement.classList&&document.activeElement.classList.contains('c-sku')?document.activeElement.value:'';
+    openWebSearch(($('#katySku').value||cur||'').trim());
+  };
+  if($('#wsSave')) $('#wsSave').onclick=()=>{
+    if(!addSearchSite($('#wsName').value,$('#wsUrl').value)) return toast(t('wsBad'));
+    $('#wsName').value=''; $('#wsUrl').value=''; renderWebSearch();
+  };
+  if($('#wsQ')) $('#wsQ').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const b=document.querySelector('#wsSites [data-ws]'); if(b) b.click(); }});
   if($('#teiltoolOpen')) $('#teiltoolOpen').onclick=()=>openTeiltool($('#fv')?$('#fv').value:'');
   if($('#katyPasteBtn')) $('#katyPasteBtn').onclick=()=>{
     const raw=$('#katyPaste').value||'';

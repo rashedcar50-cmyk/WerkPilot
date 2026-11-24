@@ -1814,6 +1814,16 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(/class="c-vat"/.test(ed) && /class="c-tax latnum"[^>]*hidden/.test(ed), 'the VAT column shows the amount; the rate field is opened on demand');
   assert(/function refreshInvoiceVat/.test(ed) && /Math\.round\(sum\*rate\)\/100/.test(ed), 'line VAT amount = line net x rate');
 }
+// ---- Web search instead of the fixed catalog (1.29.0) ----
+{
+  const ed=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8');
+  const fn=ed.match(/function searchSiteUrl\(site,q\)\{[\s\S]*?\n\}/)[0];
+  const url=new Function(fn+'; return searchSiteUrl;')();
+  assert(url({url:'https://x.de/s?q={q}'},' A 1/2 ')==='https://x.de/s?q=A%201%2F2', 'the part number is encoded into the site address');
+  assert(url({url:'https://x.de/s'},'AB')==='https://x.de/s?q=AB' && url({url:'https://x.de/s'},'')==='https://x.de/s', 'sites without a placeholder get ?q=');
+  assert(/id="webSearch"/.test(ed) && /openWebSearch\(sku\)/.test(ed) && !/if\(sku\) openKatySearch\(sku\)/.test(ed), 'an unknown number opens the site chooser, not a fixed catalog');
+  assert(/\^https:/.test(ed), 'own search sites must be https addresses');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
