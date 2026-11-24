@@ -59,7 +59,7 @@ function customerBlock(cust){
   const person=dePrintName(rawPerson);
   const tax=cust.taxId||cust.ustId||'';
   return `<div class="rh-cust">
-    ${(typeof workshopInfo==='function')?(w=>`<div class="rh-sender" style="font-size:10px;color:#555;border-bottom:1px solid #999;display:inline-block;margin-bottom:6px;padding-bottom:1px">${esc(w.name)} · ${esc(w.address)}</div>`)(workshopInfo()):''}
+    ${(typeof workshopInfo==='function')?(w=>`<div class="rh-sender" style="font-size:9.5px;color:#555;text-decoration:none;border-bottom:1px solid #999;display:inline-block;margin-bottom:6px;padding-bottom:1px">${esc(w.name)} · ${esc(w.address)}</div>`)(workshopInfo()):''}
     <div class="muted">Rechnungsempfänger</div>
     ${firma?`<div><b>${esc(firma)}</b></div>`:''}
     ${person?`<div>${esc(person)}</div>`:''}
@@ -222,7 +222,7 @@ function metaTbl(m){
     <tr><td>Auftragsnummer:</td><td>${esc(m.auftrag||'-')}</td></tr>
     <tr><td>Datum:</td><td>${deDate(x.date)}</td></tr>
     <tr><td>Fällig am:</td><td>${esc(m.dueDate)}</td></tr>
-    <tr><td>Leistungsdatum:</td><td>${leistDate} bis ${leistDate}</td></tr>
+    <tr><td>Leistungsdatum:</td><td>${leistDate}</td></tr>
     <tr><td>Kennzeichen:</td><td>${esc(veh.plate||'-')}</td></tr>
     <tr><td>Hersteller:</td><td>${esc(veh.make||'-')}</td></tr>
     <tr><td>Modell:</td><td>${esc(veh.model||'-')}</td></tr>
@@ -241,12 +241,16 @@ function buildWorkshopRechnung(x){
   const head=`<div class="ta-head"><img class="ta-logo" src="${logo}" alt="TABAH AUTO"></div>
       <div class="ta-rule"></div>`;
   const thanks=`<p class="rh-thanks">Vielen Dank für Ihr Vertrauen. Wir sind gerne für Sie da.<br><em>Mit freundlichen Grüßen<br>Ihr Tabah Auto Service Team</em></p>`;
-  return `<div class="rechnung tpl-tabah" dir="ltr" lang="de"><div class="rh-main">
+  // Page frame: the content sits in a table whose footer row reserves the
+  // room for the company footer; in print the footer is fixed to the bottom
+  // of EVERY page, on screen (preview, PDF, saved file) it sits at the
+  // bottom of an A4 sheet. Styles: js/print.js.
+  return `<div class="rechnung tpl-tabah" dir="ltr" lang="de"><table class="pg"><tbody><tr><td><div class="rh-main">
       ${head}
-      ${(!x.stornoOf)?`<div class="rh-title" style="margin:6px 0 10px;font-weight:700;font-size:17px">${x.type==='Barverkauf'?'Barverkauf / Rechnung':'Rechnung'} Nr. ${esc(x.number||'')}</div>`:''}
+      ${(!x.stornoOf)?`<div class="rh-title" style="margin:8px 0 0;font-weight:700;font-size:20px">${x.type==='Barverkauf'?'Barverkauf / Rechnung':'Rechnung'} Nr. ${esc(x.number||'')}</div>`:''}
       ${x.stornoOf?`<div class="rh-storno" style="margin:6px 0 10px;font-weight:700;font-size:15px">Stornorechnung Nr. ${esc(x.number||'')} zur Rechnung Nr. ${esc(x.stornoOfNumber||'')}${x.stornoOfDate?' vom '+deDate(x.stornoOfDate):''}</div>`:''}
       ${x.status==='storno'?`<div class="rh-storno" style="margin:6px 0 10px;font-weight:700;font-size:15px;color:#a40000">STORNIERT${x.stornoBy?' durch Stornorechnung Nr. '+esc(x.stornoBy):''}${x.stornoAt?' am '+deDate(x.stornoAt):''}</div>`:''}
       <div class="rh-grid">${customerBlock(cust)}<div class="rh-meta">${metaTbl(m)}</div></div>
-      ${posTable(m.filled)}${totBlock(m)}${thanks}</div>${footBlock(w)}</div>`;
+      ${posTable(m.filled)}${totBlock(m)}${thanks}</div></td></tr></tbody><tfoot><tr><td><div class="pg-space"></div></td></tr></tfoot></table>${footBlock(w)}</div>`;
 }
 

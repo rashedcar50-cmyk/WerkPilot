@@ -1766,6 +1766,15 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
     assert(/id="fsd" type="date"/.test(edSrc) && /obj\.serviceDate=sd/.test(edSrc), 'the service date is its own field on the invoice and is not copied silently from the issue date');
   }
 
+  // Invoice page frame (2026-11-24): footer at the bottom of the A4 sheet
+  {
+    const pr=fs.readFileSync(path.join(root,'js/print.js'),'utf8'), ip=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
+    assert(/\.rechnung\{width:210mm;max-width:100%;min-height:297mm;[^}]*display:flex;flex-direction:column/.test(pr) && /\.rh-foot\{[^}]*margin-top:auto/.test(pr), 'on screen (preview, PDF, saved file) the invoice is a full A4 sheet with the company footer at its bottom');
+    assert(/@media print\{[\s\S]*?\.pg>tfoot\{display:table-footer-group\}[\s\S]*?\.rh-foot\{position:fixed;left:0;right:0;bottom:0/.test(pr), 'in print the company footer is fixed to the bottom of every page and its room is reserved on each page');
+    assert(/<table class="pg"><tbody><tr><td><div class="rh-main">/.test(ip) && /<tfoot><tr><td><div class="pg-space"><\/div><\/td><\/tr><\/tfoot><\/table>\$\{footBlock\(w\)\}/.test(ip), 'the invoice content sits in the page frame and the footer follows it');
+    assert(/<td>Leistungsdatum:<\/td><td>\$\{leistDate\}<\/td>/.test(ip), 'the service date is printed once, not as "X bis X"');
+  }
+
   if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
