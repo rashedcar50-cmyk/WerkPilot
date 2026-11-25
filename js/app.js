@@ -22,7 +22,7 @@ function nav(){
   ['inventory', t('inventory')],['employees', t('employees')],['expenses', t('expenses')],
   ['journal', t('journal')],['reports', t('reports')],['integrations', t('integrations')],
   ['audit', t('audit')],['help', t('help')||'Hilfe'],['settings', t('settings')],['studio', t('studio')]
- ];
+ ].concat(typeof isDev==='function'&&isDev()?[['supplierOrders', (t('supplierOrders')!=='supplierOrders'&&t('supplierOrders'))||'Lieferantenbestellungen']]:[]);
 }
 
 // Login-unification (2026-11-13): login is now a direct Supabase sign-in
