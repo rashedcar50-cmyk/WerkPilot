@@ -1,9 +1,9 @@
-const CACHE='baymeister-v1.50.1';
+const CACHE='baymeister-v1.50.2';
 const PRECACHE=[
   './','./index.html','./manifest.json','./icon.svg','./icon-192.png','./icon-512.png',
-  './css/app.css?v=1.50.1','./i18n.js?v=1.50.1','./supabase-config.js',
-  './js/config.js?v=1.50.1','./js/engine.js?v=1.50.1','./js/core.js?v=1.50.1','./js/autosiastik.js?v=1.50.1','./js/ocr.js?v=1.50.1','./js/cloud.js?v=1.50.1',
-  './js/lookup.js?v=1.50.1','./js/quality.js?v=1.50.1','./js/schein-engine.js?v=1.50.1','./js/schein-wizard.js?v=1.50.1','./js/logo-invoice-data.js?v=1.50.1','./js/invoice-print.js?v=1.50.1','./js/teiltool-import.js?v=1.50.1','./js/teiltool-bridge.js?v=1.50.1','./js/supplier-orders.js?v=1.50.1','./js/print.js?v=1.50.1','./js/camera.js?v=1.50.1','./js/customers.js?v=1.50.1','./js/repairs.js?v=1.50.1','./js/invoice-edit.js?v=1.50.1','./js/invoice-lifecycle.js?v=1.50.1','./js/auth.js?v=1.50.1','./js/app.js?v=1.50.1','./logo-app.jpg','./logo-invoice.jpg'
+  './css/app.css?v=1.50.2','./i18n.js?v=1.50.2','./supabase-config.js',
+  './js/config.js?v=1.50.2','./js/engine.js?v=1.50.2','./js/core.js?v=1.50.2','./js/autosiastik.js?v=1.50.2','./js/ocr.js?v=1.50.2','./js/cloud.js?v=1.50.2',
+  './js/lookup.js?v=1.50.2','./js/quality.js?v=1.50.2','./js/schein-engine.js?v=1.50.2','./js/schein-wizard.js?v=1.50.2','./js/logo-invoice-data.js?v=1.50.2','./js/invoice-print.js?v=1.50.2','./js/teiltool-import.js?v=1.50.2','./js/teiltool-bridge.js?v=1.50.2','./js/supplier-orders.js?v=1.50.2','./js/print.js?v=1.50.2','./js/camera.js?v=1.50.2','./js/customers.js?v=1.50.2','./js/repairs.js?v=1.50.2','./js/invoice-edit.js?v=1.50.2','./js/invoice-lifecycle.js?v=1.50.2','./js/auth.js?v=1.50.2','./js/app.js?v=1.50.2','./logo-app.jpg','./logo-invoice.jpg'
 ];
 self.addEventListener('install', e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRECACHE).catch(()=>{})));
