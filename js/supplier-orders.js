@@ -6,7 +6,14 @@
   const API='https://teiltool-fahrzeugsuche.onrender.com';
   const KEY='wp-supplier-ordered';
   const state={data:null,loading:false,error:'',showOrdered:false};
-  const L=(k,de)=>{ try{ const v=t(k); return v&&v!==k?v:de; }catch(e){ return de; } };
+  // Page texts: German, with Arabic for the owner's interface language (other languages fall back to German).
+  const AR={soOpen:'مفتوح',soUnpaid:'غير مدفوع',soOrdered:'تم الطلب',soPdfSum:'PDF طلب مجمّع',soPdfDirect:'PDF إرسال للزبون',soMarkAll:'علّم الكل «تم الطلب»',
+    soOrder:'الطلب',soCustomer:'الزبون / عنوان التسليم',soArticle:'رقم القطعة',soTitle:'الوصف',soQty:'الكمية',soAllDone:'تم طلب كل شيء.',
+    soLogin:'سجّل الدخول بحساب السحابة أولاً.',soSetup:'الاتصال بالمتجر غير مُعدّ بعد.',soOffline:'الخادم لا يرد. حاول بعد دقيقة.',
+    soShowOrdered:'أظهر ما تم طلبه',soReload:'تحديث',soLoading:'جارٍ تحميل الطلبات …',soNone:'لا توجد طلبات مفتوحة.',soStand:'آخر تحديث',
+    soHint:'طلبات المتجر المفتوحة والمدفوعة لكل مورد. آخر موعد للطلب الساعة 16:00. بعد أن تطلب من المورد علّم المواضع حتى لا تظهر غداً في الملف من جديد.',
+    soMarkAllAsk:'تعليم كل المواضع المفتوحة لهذا المورد «تم الطلب»؟'};
+  const L=(k,de)=>{ try{ const v=t(k); if(v&&v!==k) return v; if(((db.settings||{}).uiLang)==='ar'&&AR[k]) return AR[k]; }catch(e){} return de; };
 
   function marks(){
     try{ const m=JSON.parse(localStorage.getItem(KEY)||'{}'); return m&&typeof m==='object'?m:{}; }catch(e){ return {}; }
@@ -105,7 +112,7 @@
     host.innerHTML=head(L('supplierOrders','Lieferantenbestellungen'),`<div class="toolbar">
         <label class="so-toggle"><input type="checkbox" id="soShow" ${state.showOrdered?'checked':''}> ${L('soShowOrdered','Bestellte anzeigen')}</label>
         <button class="btn primary" id="soReload" ${state.loading?'disabled':''}>↻ ${L('soReload','Aktualisieren')}</button></div>`)+
-      `<div class="alert">${L('soHint','Offene, bezahlte Shop-Bestellungen je Lieferant. Bestellschluss 16:00 Uhr. Nach dem Bestellen die Positionen abhaken, damit sie morgen nicht erneut in der Datei stehen.')}</div>`+
+      `<div class="card so-hint">${L('soHint','Offene, bezahlte Shop-Bestellungen je Lieferant. Bestellschluss 16:00 Uhr. Nach dem Bestellen die Positionen abhaken, damit sie morgen nicht erneut in der Datei stehen.')}</div>`+
       (state.loading?`<div class="card muted">${L('soLoading','Bestellungen werden geladen …')}</div>`:'')+
       (msg?`<div class="alert bad">${esc(msg)}</div>`:'')+
       (d&&!state.loading?(

@@ -2067,7 +2067,7 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const src=fs.readFileSync(path.join(root,'js/supplier-orders.js'),'utf8');
   const store={}; const pages={};
   const sb={window:{WP:{pages}}, console, localStorage:{getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v;}}, document:{getElementById(){return null;}},
-    session:{page:'supplierOrders'}, t:k=>k, esc:s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])), toast(){}, render(){}, isDev:()=>false, Date, JSON, Object};
+    session:{page:'supplierOrders'}, t:k=>k, esc:s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])), toast(){}, render(){}, isDev:()=>false, db:{settings:{uiLang:'ar'}}, Date, JSON, Object};
   sb.window.localStorage=sb.localStorage; vm.createContext(sb); vm.runInContext('var WP=window.WP;'+src, sb);
   assert(typeof pages.supplierOrders==='function','supplier orders page is registered');
   pages.supplierOrders();
@@ -2080,7 +2080,7 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const look=fs.readFileSync(path.join(root,'js/lookup.js'),'utf8');
   assert(/if\(section==='supplierOrders'\) return false;/.test(look),'only the developer role may open supplier orders');
   const ih=fs.readFileSync(path.join(root,'index.html'),'utf8'), sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-  assert(/CUR='1\.50\.0'/.test(ih) && /supplier-orders\.js\?v=1\.50\.0/.test(ih) && /baymeister-v1\.50\.0/.test(sw) && /supplier-orders\.js\?v=1\.50\.0/.test(sw),'version 1.50.0 in index and service worker');
+  assert(/CUR='1\.50\.1'/.test(ih) && /supplier-orders\.js\?v=1\.50\.1/.test(ih) && /baymeister-v1\.50\.1/.test(sw) && /supplier-orders\.js\?v=1\.50\.1/.test(sw),'version 1.50.1 in index and service worker');
 }
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
