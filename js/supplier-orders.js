@@ -10,7 +10,7 @@
   const AR={soOpen:'مفتوح',soUnpaid:'غير مدفوع',soOrdered:'تم الطلب',soPdfSum:'PDF طلب مجمّع',soPdfDirect:'PDF إرسال للزبون',soMarkAll:'علّم الكل «تم الطلب»',
     soOrder:'الطلب',soCustomer:'الزبون / عنوان التسليم',soArticle:'رقم القطعة',soTitle:'الوصف',soQty:'الكمية',soAllDone:'تم طلب كل شيء.',
     soLogin:'سجّل الدخول بحساب السحابة أولاً.',soSetup:'الاتصال بالمتجر غير مُعدّ بعد.',soOffline:'الخادم لا يرد. حاول بعد دقيقة.',
-    soShowOrdered:'أظهر ما تم طلبه',soPrintAll:'طباعة كل الطلبات',soReload:'تحديث',soLoading:'جارٍ تحميل الطلبات …',soNone:'لا توجد طلبات مفتوحة.',soStand:'آخر تحديث',
+    soShowOrdered:'أظهر ما تم طلبه',soPrintAll:'طباعة كل الطلبات',soOverview:'ورقة مجمّعة لكل الموردين',soReload:'تحديث',soLoading:'جارٍ تحميل الطلبات …',soNone:'لا توجد طلبات مفتوحة.',soStand:'آخر تحديث',
     soHint:'طلبات المتجر المفتوحة والمدفوعة لكل مورد. آخر موعد للطلب الساعة 16:00. بعد أن تطلب من المورد علّم المواضع حتى لا تظهر غداً في الملف من جديد.',
     soMarkAllAsk:'تعليم كل المواضع المفتوحة لهذا المورد «تم الطلب»؟'};
   const L=(k,de)=>{ try{ const v=t(k); if(v&&v!==k) return v; if(((db.settings||{}).uiLang)==='ar'&&AR[k]) return AR[k]; }catch(e){} return de; };
@@ -89,8 +89,28 @@
       '<section><h1>Bestellung – '+esc(s.name)+'</h1><p>'+esc(day)+' · '+sender()+'</p><h2>Sammelbestellung</h2>'+tableHtml(s,false)+
       '<h2>Kunden und Lieferadressen</h2>'+tableHtml(s,true)+'</section>').join('');
   }
+  // One compact sheet for all suppliers: per supplier every article with its total and the customers behind it.
+  function overviewBody(suppliers){
+    const day=new Date().toLocaleDateString('de-DE');
+    const blocks=suppliers.map(s=>{
+      const open=s.positions.filter(p=>p.paid&&!p.ordered); if(!open.length) return '';
+      const rows={}; open.forEach(p=>{ const r=rows[p.article]||(rows[p.article]={article:p.article,brand:p.brand,title:p.title,quantity:0,who:[]});
+        r.quantity+=p.quantity; r.who.push(esc(p.pickup?'ABHOLUNG':((p.customer||{}).name||''))+' ('+esc(p.order)+(p.quantity>1?', '+p.quantity+'×':'')+')'); });
+      const list=Object.keys(rows).map(k=>rows[k]);
+      return '<h2>'+esc(s.name)+' – '+list.reduce((n,r)=>n+r.quantity,0)+' Stück, '+new Set(open.map(p=>p.order)).size+' Bestellung(en)</h2>'+
+        '<table><thead><tr><th>Artikelnummer</th><th>Marke</th><th>Bezeichnung</th><th class="n">Menge</th><th>Kunden</th></tr></thead><tbody>'+
+        list.map(r=>'<tr><td><b>'+esc(r.article)+'</b></td><td>'+esc(r.brand)+'</td><td>'+esc(r.title)+'</td><td class="n">'+r.quantity+'</td><td>'+r.who.join('<br>')+'</td></tr>').join('')+'</tbody></table>';
+    }).join('');
+    return blocks?'<section><h1>Übersicht aller Bestellungen je Lieferant</h1><p>'+esc(day)+' · '+sender()+'</p>'+blocks+'</section>':'';
+  }
+  function printOverview(){
+    const body=overviewBody((state.data&&state.data.suppliers)||[]);
+    if(!body) return toast(L('soNone','Keine offenen Bestellungen.'));
+    printHtml('Übersicht Lieferantenbestellungen '+new Date().toLocaleDateString('de-DE'),body);
+  }
   function printAll(){
-    const body=printAllBody((state.data&&state.data.suppliers)||[]);
+    const list=(state.data&&state.data.suppliers)||[];
+    const body=overviewBody(list)+printAllBody(list);
     if(!body) return toast(L('soNone','Keine offenen Bestellungen.'));
     printHtml('Lieferantenbestellungen '+new Date().toLocaleDateString('de-DE'),body);
   }
@@ -125,6 +145,7 @@
     const msg={login:L('soLogin','Bitte mit dem Cloud-Konto anmelden.'),owner:L('ownerOnly','Nur Inhaber'),setup:L('soSetup','Die Verbindung zum Shop ist noch nicht eingerichtet.'),offline:L('soOffline','Der Server antwortet nicht. Bitte in einer Minute erneut versuchen.')}[state.error]||'';
     host.innerHTML=head(L('supplierOrders','Lieferantenbestellungen'),`<div class="toolbar">
         <label class="so-toggle"><input type="checkbox" id="soShow" ${state.showOrdered?'checked':''}> ${L('soShowOrdered','Bestellte anzeigen')}</label>
+        <button class="btn" id="soOverview" ${d&&d.suppliers.some(x=>x.positions.some(p=>p.paid&&!p.ordered))&&!state.loading?'':'disabled'}>🖨 ${L('soOverview','Übersicht (ein Blatt)')}</button>
         <button class="btn" id="soPrintAll" ${d&&d.suppliers.some(x=>x.positions.some(p=>p.paid&&!p.ordered))&&!state.loading?'':'disabled'}>🖨 ${L('soPrintAll','Alle Bestellungen drucken')}</button>
         <button class="btn primary" id="soReload" ${state.loading?'disabled':''}>↻ ${L('soReload','Aktualisieren')}</button></div>`)+
       `<div class="card so-hint">${L('soHint','Offene, bezahlte Shop-Bestellungen je Lieferant. Bestellschluss 16:00 Uhr. Nach dem Bestellen die Positionen abhaken, damit sie morgen nicht erneut in der Datei stehen.')}</div>`+
@@ -136,6 +157,7 @@
         `<p class="muted">${L('soStand','Stand')}: ${esc(new Date(d.generated).toLocaleString('de-DE'))}</p>`):'');
     const re=document.getElementById('soReload'); if(re) re.onclick=load;
     const pa=document.getElementById('soPrintAll'); if(pa) pa.onclick=printAll;
+    const ov=document.getElementById('soOverview'); if(ov) ov.onclick=printOverview;
     const sh=document.getElementById('soShow'); if(sh) sh.onchange=()=>{ state.showOrdered=sh.checked; draw(); };
     host.querySelectorAll('[data-so]').forEach(b=>b.onclick=()=>{
       const s=d.suppliers[Number(b.dataset.i)]; if(!s) return;
@@ -156,5 +178,5 @@
     if(!state.data&&!state.loading) load();
   }
   window.WP=window.WP||{}; WP.pages=WP.pages||{}; WP.pages.supplierOrders=pageFn;
-  WP.SupplierOrders={marks,address,printAllBody};
+  WP.SupplierOrders={marks,address,printAllBody,overviewBody};
 })();

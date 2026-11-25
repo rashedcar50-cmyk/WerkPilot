@@ -2081,12 +2081,16 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
       {name:'L1',positions:[pos('#1','A1',true,false)],totals:[{article:'A1',quantity:1,orders:['#1']}]},
       {name:'L2',positions:[pos('#2','B1',true,true),pos('#3','B2',false,false)],totals:[]},
       {name:'L3',positions:[pos('#4','C1',true,false)],totals:[{article:'C1',quantity:1,orders:['#4']}]}]);
+    const ov=sb.window.WP.SupplierOrders.overviewBody([
+      {name:'L1',positions:[pos('#1','A1',true,false),Object.assign(pos('#5','A1',true,false),{quantity:2}),pos('#6','A9',true,true)]},
+      {name:'L2',positions:[pos('#3','B2',false,false)]}]);
+    assert((ov.match(/<section>/g)||[]).length===1 && /L1 – 3 Stück, 2 Bestellung/.test(ov) && ov.indexOf('K #5 (#5, 2×)')>0 && ov.indexOf('L2')<0 && ov.indexOf('A9')<0,'overview sums each article per supplier and names the customers');
     assert((body.match(/<section>/g)||[]).length===2 && body.indexOf('L2')<0 && body.indexOf('K #1')>0 && body.indexOf('K #4')>0,'print-all holds every supplier with open paid positions, one section each'); }
   assert(!/Auto Partner|Inter Cars|TOYA|BGS/.test(src),'no supplier names in the public app code');
   const look=fs.readFileSync(path.join(root,'js/lookup.js'),'utf8');
   assert(/if\(section==='supplierOrders'\) return false;/.test(look),'only the developer role may open supplier orders');
   const ih=fs.readFileSync(path.join(root,'index.html'),'utf8'), sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-  assert(/CUR='1\.50\.2'/.test(ih) && /supplier-orders\.js\?v=1\.50\.2/.test(ih) && /baymeister-v1\.50\.2/.test(sw) && /supplier-orders\.js\?v=1\.50\.2/.test(sw),'version 1.50.2 in index and service worker');
+  assert(/CUR='1\.50\.3'/.test(ih) && /supplier-orders\.js\?v=1\.50\.3/.test(ih) && /baymeister-v1\.50\.3/.test(sw) && /supplier-orders\.js\?v=1\.50\.3/.test(sw),'version 1.50.3 in index and service worker');
 }
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
