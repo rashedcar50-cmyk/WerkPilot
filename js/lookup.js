@@ -514,6 +514,7 @@ function canEdit(){return ['manager','developer'].includes(session?.user?.role)}
 function roleCan(section){
  const r=session.user.role;
  if(r==='developer') return true;
+ if(section==='supplierOrders') return false;
  if(r==='manager') return section!=='studio';
  if(r==='accountant') return !['settings','studio'].includes(section);
  if(r==='mechanic') return ['dashboard','customers','vehicles','repairs','estimates','appointments','help'].includes(section);

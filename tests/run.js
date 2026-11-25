@@ -2062,6 +2062,26 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(url(null,'')==='https://shop.example/pages/fahrzeugsuche?wp=1', 'without a vehicle the plain shop link stays');
   assert(/hsn=0035&tsn=ASL&wp=1$/.test(url({hsn:'0035',tsn:'ASL',make:'OPEL',model:'X'})) && new URL(url({make:'VW',model:'Golf',catalogVehicleId:'31234'})).searchParams.get('fzv')==='31234', 'KBA number and catalogue id still take precedence');
 }
+// ---- Supplier orders page: owner only, registered, versioned (1.50.0) ----
+{
+  const src=fs.readFileSync(path.join(root,'js/supplier-orders.js'),'utf8');
+  const store={}; const pages={};
+  const sb={window:{WP:{pages}}, console, localStorage:{getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v;}}, document:{getElementById(){return null;}},
+    session:{page:'supplierOrders'}, t:k=>k, esc:s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])), toast(){}, render(){}, isDev:()=>false, Date, JSON, Object};
+  sb.window.localStorage=sb.localStorage; vm.createContext(sb); vm.runInContext('var WP=window.WP;'+src, sb);
+  assert(typeof pages.supplierOrders==='function','supplier orders page is registered');
+  pages.supplierOrders();
+  assert(sb.session.page==='dashboard','non-owner is sent away from supplier orders');
+  const A=sb.window.WP.SupplierOrders.address;
+  assert(A({pickup:true})==='<b>ABHOLUNG</b>','pickup order shows no address');
+  assert(A({customer:{name:'<b>X',street:'Weg 1',zip:'1',city:'Ort'}}).indexOf('<b>&lt;b&gt;X</b><br>Weg 1<br>1 Ort')===0,'address is escaped and ordered');
+  store['wp-supplier-ordered']='not json'; assert(Object.keys(sb.window.WP.SupplierOrders.marks()).length===0,'broken marks are ignored');
+  assert(!/Auto Partner|Inter Cars|TOYA|BGS/.test(src),'no supplier names in the public app code');
+  const look=fs.readFileSync(path.join(root,'js/lookup.js'),'utf8');
+  assert(/if\(section==='supplierOrders'\) return false;/.test(look),'only the developer role may open supplier orders');
+  const ih=fs.readFileSync(path.join(root,'index.html'),'utf8'), sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
+  assert(/CUR='1\.50\.0'/.test(ih) && /supplier-orders\.js\?v=1\.50\.0/.test(ih) && /baymeister-v1\.50\.0/.test(sw) && /supplier-orders\.js\?v=1\.50\.0/.test(sw),'version 1.50.0 in index and service worker');
+}
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
 })();
