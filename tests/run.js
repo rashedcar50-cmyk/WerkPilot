@@ -1713,11 +1713,11 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
     const appSrc3=fs.readFileSync(path.join(root,'js/app.js'),'utf8'), editSrc3=fs.readFileSync(path.join(root,'js/invoice-edit.js'),'utf8'), custSrc3=fs.readFileSync(path.join(root,'js/customers.js'),'utf8'), printSrc3=fs.readFileSync(path.join(root,'js/invoice-print.js'),'utf8');
     assert(!/henryGo|henryOpen|henry\.matthies\.de|henry-jr/.test(appSrc3+editSrc3), 'the Henry buttons and links are gone');
     assert(/id="teiltoolOpen"/.test(editSrc3) && /id="teiltoolGo"/.test(appSrc3) && /openTeiltool\('\$\{v\.id\}'\)/.test(custSrc3), 'a Teiltool button sits in the invoice editor, on the integrations page and on every vehicle row');
-    const sbT={console}; vm.createContext(sbT);
+    const sbT={console,URLSearchParams}; vm.createContext(sbT);
     const a3=appSrc3.indexOf("const TEILTOOL_URL"), b3=appSrc3.indexOf('function openTeiltool');
     vm.runInContext('var db={settings:{}}; function workshop(){return {};} var V={v1:{hsn:"0035",tsn:"ASL00123"},v2:{hsn:"",tsn:""},v3:{hsn:"35",tsn:"AS"}}; function vehicleOf(i){return V[i];}\n'+appSrc3.slice(a3,b3)+'\nthis.u=[teiltoolUrl("v1"),teiltoolUrl("v2"),teiltoolUrl("v3"),teiltoolUrl("")];', sbT);
     assert(sbT.u[0]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?hsn=0035&tsn=ASL&wp=1', 'with KBA numbers the shop opens directly on the parts for that vehicle (TSN cut to its first three characters)');
-    assert(sbT.u[1]===sbT.u[3] && sbT.u[1]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?wp=1' && sbT.u[2]===sbT.u[1], 'without valid KBA numbers the shop opens on its vehicle search, never with a half number');
+    assert(sbT.u[3]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?wp=1' && sbT.u[1]==='https://kfcjjs-ri.myshopify.com/pages/fahrzeugsuche?fzneu=1&wp=1' && sbT.u[2]===sbT.u[1], 'without valid KBA numbers the shop opens on a cleared vehicle search, never with a half number');
     assert(/Rechnung'\} Nr\. \$\{esc\(x\.number/.test(printSrc3) && /Rechnungsnummer/.test(printSrc3), 'the printed invoice carries the title "Rechnung" with its number');
     assert(/<b>\$\{esc\(w\.name\)\}<\/b><br>\$\{esc\(w\.address\)\}/.test(printSrc3) && /rh-sender/.test(printSrc3), 'the full company name and address of the issuer are printed (footer and sender line)');
     assert(!/1 von 1/.test(printSrc3) && !/Kein Ersatz für steuerliche Einzelberatung/.test(printSrc3) && !/AT-MwSt/.test(printSrc3), 'the fixed "page 1 of 1", the tax-advice sentence and the always-zero rows are gone from the print');
@@ -2026,7 +2026,7 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   const q=new URL(u).searchParams;
   assert(q.get('fzv')==='31234' && q.get('mk')==='VW' && q.get('md')==='GOLF VI Variant (AJ5) 1.4 TSI' && q.get('kw')==='90' && q.get('cc')==='1390' && q.get('fu')==='Benzin' && q.get('wp')==='1', 'PROOF OF FIX: a catalogue vehicle without KBA number opens the shop on that vehicle');
   assert(/hsn=0035&tsn=ASL&wp=1$/.test(url({hsn:'0035',tsn:'asl',catalogVehicleId:'908',make:'OPEL',model:'X'})), 'a KBA number still takes precedence');
-  assert(url({make:'VW',model:'Golf'})==='https://shop.example/pages/fahrzeugsuche?wp=1' && url({make:'VW',model:'Golf',catalogVehicleId:'12;x'})==='https://shop.example/pages/fahrzeugsuche?wp=1', 'no or invalid catalogue id: plain shop link');
+  assert(url({make:'VW',model:'Golf'})==='https://shop.example/pages/fahrzeugsuche?fzneu=1&mk=VW&md=Golf&wp=1' && url({make:'VW',model:'Golf',catalogVehicleId:'12;x'})===url({make:'VW',model:'Golf'}), 'no or invalid catalogue id: the shop vehicle is cleared, never a stale one');
   assert(/String\(v\.catalogVehicleId\|\|''\)===veh\.cid/.test(src) && /const cid=\/\^\[0-9\]\{1,9\}\$\//.test(src), 'a cart from the shop is matched to the vehicle by its catalogue id');
 }
 // ---- The workshop's own margin on Teiltool parts (1.46.0) ----
@@ -2051,6 +2051,16 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(codes.join()==='de,en,ar,tr,pl,ru,es', 'the picker offers seven languages');
   codes.forEach(c=>{ assert(new RegExp('select\\.lang-sel\\[data-lang="'+c+'"\\]\\{background-image:url\\(').test(css), 'language '+c+' has a flag'); assert(sb.WP_I18N[c] && Object.keys(sb.WP_I18N[c]).length>600, 'language '+c+' has a text pack'); assert(sb.WP_ALLOWED_LANGS.includes(c), 'language '+c+' is selectable'); });
   assert((ap.match(/class="lang-sel" data-lang=/g)||[]).length===3, 'login, top bar and settings pickers carry the flag');
+}
+// ---- A vehicle the shop cannot identify never opens the last shop vehicle (1.49.0) ----
+{
+  const ap=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+  const fn=ap.match(/function teiltoolUrl\(vehicleId\)\{[\s\S]*?\n\}/)[0];
+  const url=(veh,id)=>new Function('workshop','db','TEILTOOL_URL','vehicleOf','URLSearchParams',fn+'; return teiltoolUrl('+JSON.stringify(id===undefined?'v1':id)+');')(()=>({}),{settings:{}},'https://shop.example',()=>veh,URLSearchParams);
+  const q=new URL(url({make:'VW',model:'Golf 7',year:'2018',vin:'WVWZZZ1JZYW123456'})).searchParams;
+  assert(q.get('fzneu')==='1' && q.get('mk')==='VW' && q.get('md')==='Golf 7' && q.get('bj')==='2018' && q.get('wp')==='1' && !q.has('vin'), 'PROOF OF FIX: a vehicle without KBA number or catalogue id clears the shop vehicle and passes make, model and year (no VIN)');
+  assert(url(null,'')==='https://shop.example/pages/fahrzeugsuche?wp=1', 'without a vehicle the plain shop link stays');
+  assert(/hsn=0035&tsn=ASL&wp=1$/.test(url({hsn:'0035',tsn:'ASL',make:'OPEL',model:'X'})) && new URL(url({make:'VW',model:'Golf',catalogVehicleId:'31234'})).searchParams.get('fzv')==='31234', 'KBA number and catalogue id still take precedence');
 }
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');

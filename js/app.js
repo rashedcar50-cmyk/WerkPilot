@@ -231,6 +231,17 @@ function teiltoolUrl(vehicleId){
     q.set('wp','1');
     return base+'/pages/fahrzeugsuche?'+q.toString();
   }
+  // A vehicle the shop cannot identify (no KBA number, no catalogue id):
+  // never let the shop show the vehicle it had open last. fzneu=1 clears it,
+  // and make/model/year are shown as a hint so the right type can be chosen.
+  if(v){
+    const q=new URLSearchParams({fzneu:'1'});
+    if(v.make) q.set('mk',String(v.make).slice(0,40));
+    if(v.model) q.set('md',String(v.model).slice(0,80));
+    if(/^(19|20)[0-9]{2}$/.test(String(v.year||'').trim())) q.set('bj',String(v.year).trim());
+    q.set('wp','1');
+    return base+'/pages/fahrzeugsuche?'+q.toString();
+  }
   return base+'/pages/fahrzeugsuche?wp=1';
 }
 function openTeiltool(vehicleId){ window.open(teiltoolUrl(vehicleId),'_blank','noopener'); }
