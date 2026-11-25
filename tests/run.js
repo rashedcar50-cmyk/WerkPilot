@@ -2076,11 +2076,17 @@ assert(/p:\s*null/.test(coreSrc),'core.js seed users now start with no password 
   assert(A({pickup:true})==='<b>ABHOLUNG</b>','pickup order shows no address');
   assert(A({customer:{name:'<b>X',street:'Weg 1',zip:'1',city:'Ort'}}).indexOf('<b>&lt;b&gt;X</b><br>Weg 1<br>1 Ort')===0,'address is escaped and ordered');
   store['wp-supplier-ordered']='not json'; assert(Object.keys(sb.window.WP.SupplierOrders.marks()).length===0,'broken marks are ignored');
+  { const pos=(o,a,paid,ordered)=>({order:o,date:'2026-11-26',article:a,title:'T',quantity:1,paid,ordered,customer:{name:'K '+o}});
+    const body=sb.window.WP.SupplierOrders.printAllBody([
+      {name:'L1',positions:[pos('#1','A1',true,false)],totals:[{article:'A1',quantity:1,orders:['#1']}]},
+      {name:'L2',positions:[pos('#2','B1',true,true),pos('#3','B2',false,false)],totals:[]},
+      {name:'L3',positions:[pos('#4','C1',true,false)],totals:[{article:'C1',quantity:1,orders:['#4']}]}]);
+    assert((body.match(/<section>/g)||[]).length===2 && body.indexOf('L2')<0 && body.indexOf('K #1')>0 && body.indexOf('K #4')>0,'print-all holds every supplier with open paid positions, one section each'); }
   assert(!/Auto Partner|Inter Cars|TOYA|BGS/.test(src),'no supplier names in the public app code');
   const look=fs.readFileSync(path.join(root,'js/lookup.js'),'utf8');
   assert(/if\(section==='supplierOrders'\) return false;/.test(look),'only the developer role may open supplier orders');
   const ih=fs.readFileSync(path.join(root,'index.html'),'utf8'), sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-  assert(/CUR='1\.50\.1'/.test(ih) && /supplier-orders\.js\?v=1\.50\.1/.test(ih) && /baymeister-v1\.50\.1/.test(sw) && /supplier-orders\.js\?v=1\.50\.1/.test(sw),'version 1.50.1 in index and service worker');
+  assert(/CUR='1\.50\.2'/.test(ih) && /supplier-orders\.js\?v=1\.50\.2/.test(ih) && /baymeister-v1\.50\.2/.test(sw) && /supplier-orders\.js\?v=1\.50\.2/.test(sw),'version 1.50.2 in index and service worker');
 }
 if(failed){ console.error(failed+' failed'); process.exit(1); }
   console.log('all tests passed');
